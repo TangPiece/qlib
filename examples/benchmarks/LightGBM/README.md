@@ -65,6 +65,33 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 ---
 
+# 持仓导出与 HTML 日度查看
+
+回测结束后，可用 [`export_positions_view.py`](export_positions_view.py) 从 MLflow 实验读取
+`positions_normal_1day.pkl`，导出：
+
+1. **parquet**（`datetime` 为 `YYYY-MM-DD` 字符串）：长表含 `action ∈ {hold, buy, sell}`
+2. **自包含 HTML**：按日切换查看「今日持仓 / 买入 / 卖出」
+
+```bash
+.venv/bin/python examples/benchmarks/LightGBM/export_positions_view.py \
+  --exp_name=rolling_lgb_7y2y_20261009
+```
+
+可选参数：
+
+- `--recorder_id`：指定 recorder；默认取该实验最新 `FINISHED` recorder
+- `--out_dir`：输出目录（默认 `examples/benchmarks/LightGBM/data/`）
+
+产物示例（目录已被 `.gitignore` 忽略）：
+
+- `data/rolling_lgb_7y2y_20261009_positions_1day.parquet`
+- `data/rolling_lgb_7y2y_20261009_positions_view.html`
+
+用浏览器打开 HTML 即可；左右方向键可切换交易日。买卖标签由相邻交易日持仓集合差集推算。
+
+---
+
 # 每日更新：cn_data 与 rolling 结束日
 
 本地 Qlib 数据目录：`~/.qlib/qlib_data/cn_data`  
