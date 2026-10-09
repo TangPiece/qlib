@@ -31,8 +31,8 @@ DIRNAME = Path(__file__).absolute().resolve().parent
 DEFAULT_CONF = DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml"
 
 # Calendar anchors for ~2-year test windows (trading-day step)
-STEP_START = "2017-01-01"
-STEP_END = "2018-12-31"
+STEP_START = "2016-01-01"
+STEP_END = "2017-12-31"
 
 
 def handler_mod_refit(task: dict, rolling_gen: RollingGen) -> None:

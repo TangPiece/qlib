@@ -15,6 +15,7 @@ from .rule_strategy import (
 )
 
 from .cost_control import SoftTopkStrategy
+from .industry_count_weight import IndustryCountWeightStrategy
 
 __all__ = [
     "TopkDropoutStrategy",
@@ -24,4 +25,5 @@ __all__ = [
     "SBBStrategyBase",
     "SBBStrategyEMA",
     "SoftTopkStrategy",
+    "IndustryCountWeightStrategy",
 ]

@@ -5,8 +5,10 @@
 Daily (manual) refresh of crowd-source cn_data + rolling yaml end dates.
 
 Downloads the latest qlib_bin.tar.gz from chenditc/investment_data, replaces
-~/.qlib/qlib_data/cn_data, then syncs end_time fields in the rolling config
+~/.qlib/qlib_data/cn_data, then syncs **end_time** fields in rolling configs
 to calendars/day.txt last trading day.
+
+Never rewrites start_time, fit_start_time, or train/valid segment endpoints.
 
 Usage:
     python examples/benchmarks/LightGBM/update_cn_data_daily.py
@@ -24,11 +26,14 @@ import tempfile
 import urllib.request
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 DIRNAME = Path(__file__).absolute().resolve().parent
 DEFAULT_QLIB_DIR = Path("~/.qlib/qlib_data/cn_data").expanduser()
-DEFAULT_CONFIG = DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml"
+DEFAULT_CONFIGS = [
+    DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml",
+    DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y2y_ind_weight.yaml",
+]
 DOWNLOAD_URL = (
     "https://github.com/chenditc/investment_data/releases/latest/download/qlib_bin.tar.gz"
 )
@@ -149,6 +154,12 @@ def count_instruments(qlib_dir: Path) -> int:
 
 
 def update_config_end_times(config_path: Path, latest_date: str, dry_run: bool) -> List[str]:
+    """Sync only end dates to ``latest_date``.
+
+    Updates ``data_handler_config.end_time``, ``backtest.end_time``, and the
+    **right** endpoint of ``segments.test``. Does not modify any start_time,
+    fit_* dates, or train/valid segment bounds.
+    """
     text = config_path.read_text()
     changes: List[str] = []
 
@@ -164,7 +175,7 @@ def update_config_end_times(config_path: Path, latest_date: str, dry_run: bool) 
             lambda m: f"{m.group(1)}{latest_date}",
         ),
         (
-            "segments.test",
+            "segments.test right endpoint",
             r"(test:\s*\[[\d-]+,\s*)(\d{4}-\d{2}-\d{2})(\s*\])",
             lambda m: f"{m.group(1)}{latest_date}{m.group(3)}",
         ),
@@ -218,16 +229,13 @@ def resolve_latest_release_tag() -> str:
 
 def run(
     qlib_dir: Path,
-    config: Path,
+    configs: Sequence[Path],
     skip_download: bool,
     dry_run: bool,
     keep_backups: int,
 ) -> None:
     qlib_dir = qlib_dir.expanduser().resolve()
-    config = config.expanduser().resolve()
-
-    if not config.exists() and not dry_run:
-        raise FileNotFoundError(f"Config not found: {config}")
+    config_paths = [c.expanduser().resolve() for c in configs]
 
     release_tag = "local"
     if not skip_download:
@@ -252,17 +260,20 @@ def run(
     log(f"Instruments (all.txt): {n_inst}")
     log(f"Release: {release_tag}")
 
-    if not config.exists():
-        log(f"Config missing, skip yaml update: {config}")
-        return
-
-    update_config_end_times(config, latest, dry_run=dry_run)
+    for config in config_paths:
+        if not config.exists():
+            log(f"Config missing, skip yaml update: {config}")
+            continue
+        update_config_end_times(config, latest, dry_run=dry_run)
     log("Done.")
 
 
 def main(argv: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Download latest crowd-source cn_data and sync rolling yaml end dates."
+        description=(
+            "Download latest crowd-source cn_data and sync rolling yaml end dates only "
+            "(never rewrites start dates)."
+        )
     )
     parser.add_argument(
         "--qlib-dir",
@@ -273,8 +284,12 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=DEFAULT_CONFIG,
-        help=f"rolling yaml to update (default: {DEFAULT_CONFIG.name})",
+        nargs="*",
+        default=None,
+        help=(
+            "rolling yaml(s) to sync end dates; "
+            "default: both workflow_config_lightgbm_Alpha158_rolling_7y2y*.yaml"
+        ),
     )
     parser.add_argument(
         "--skip-download",
@@ -293,9 +308,10 @@ def main(argv: Optional[List[str]] = None) -> None:
         help="Keep N most recent cn_data.bak_* dirs (default: 2)",
     )
     args = parser.parse_args(argv)
+    configs = list(args.config) if args.config else list(DEFAULT_CONFIGS)
     run(
         qlib_dir=args.qlib_dir,
-        config=args.config,
+        configs=configs,
         skip_download=args.skip_download,
         dry_run=args.dry_run,
         keep_backups=args.keep_backups,
