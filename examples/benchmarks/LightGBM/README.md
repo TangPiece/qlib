@@ -68,10 +68,10 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 # 持仓导出与 HTML 日度查看
 
 回测结束后，可用 [`export_positions_view.py`](export_positions_view.py) 从 MLflow 实验读取
-`positions_normal_1day.pkl`，导出：
+持仓与分析产物，导出：
 
-1. **parquet**（`datetime` 为 `YYYY-MM-DD` 字符串）：长表含 `action ∈ {hold, buy, sell}`
-2. **自包含 HTML**：按日切换查看「今日持仓 / 买入 / 卖出」
+1. **parquet**（`datetime` 为 `YYYY-MM-DD`）：含 `name`、`buy_date`、`action ∈ {hold, buy, sell}`
+2. **自包含 HTML**：页顶 IC/IR 与组合指标；按日查看持仓 / 买入 / 卖出（代码、名称、买入日）；**实验 JSON 数据在文件最底部** `#payload`
 
 ```bash
 .venv/bin/python examples/benchmarks/LightGBM/export_positions_view.py \
@@ -82,13 +82,15 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 - `--recorder_id`：指定 recorder；默认取该实验最新 `FINISHED` recorder
 - `--out_dir`：输出目录（默认 `examples/benchmarks/LightGBM/data/`）
+- `--name_map`：股票名称缓存 JSON（默认 `data/stock_name_map.json`；缺失时尝试用 akshare 生成）
 
 产物示例（目录已被 `.gitignore` 忽略）：
 
 - `data/rolling_lgb_7y2y_20261009_positions_1day.parquet`
 - `data/rolling_lgb_7y2y_20261009_positions_view.html`
+- `data/stock_name_map.json`
 
-用浏览器打开 HTML 即可；左右方向键可切换交易日。买卖标签由相邻交易日持仓集合差集推算。
+用浏览器直接打开 HTML 即可（无需本地 HTTP）。默认日期为**当天**（非交易日则落到 ≤ 当天的最近交易日）。左右方向键可切换交易日。买卖标签由相邻交易日持仓集合差集推算；买入日为该票进入持仓的交易日。
 
 ---
 

@@ -5,25 +5,22 @@ market: &market csi300
 benchmark: &benchmark SH000300
 data_handler_config: &data_handler_config
     start_time: 2008-01-01
-    end_time: 2026-10-09
+    end_time: 2026-10-10
     fit_start_time: 2008-01-01
     fit_end_time: 2014-12-31
     instruments: *market
 port_analysis_config: &port_analysis_config
     strategy:
-        class: IndustryCountWeightStrategy
+        class: TopkDropoutStrategy
         module_path: qlib.contrib.strategy
         kwargs:
             signal: <PRED>
-            topk: 10
-            n_drop: 1
-            alpha: 0.5
-            risk_degree: 0.95
-            industry_map_path: examples/benchmarks/LightGBM/data/csi300_sw_l1_industry_intervals.parquet
+            topk: 50
+            n_drop: 5
     backtest:
         start_time: 2016-01-01
-        end_time: 2026-10-09
-        account: 100000
+        end_time: 2026-10-10
+        account: 100000000
         benchmark: *benchmark
         exchange_kwargs:
             limit_threshold: 0.095
@@ -57,7 +54,7 @@ task:
                 # First rolling window template: 7y train + 1y valid; test span is full horizon
                 train: [2008-01-01, 2014-12-31]
                 valid: [2015-01-01, 2015-12-31]
-                test: [2016-01-01, 2026-10-09]
+                test: [2016-01-01, 2026-10-10]
     record:
         - class: SignalRecord
           module_path: qlib.workflow.record_temp

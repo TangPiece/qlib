@@ -54,7 +54,7 @@ task:
                 # First rolling window template: 7y train + 1y valid; test span is full horizon
                 train: [2008-01-01, 2014-12-31]
                 valid: [2015-01-01, 2015-12-31]
-                test: [2016-01-01, 2026-10-09]
+                test: [2016-01-01, 2026-10-10]
     record:
         - class: SignalRecord
           module_path: qlib.workflow.record_temp
