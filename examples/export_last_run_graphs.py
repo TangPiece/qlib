@@ -16,7 +16,7 @@ from qlib.constant import REG_CN
 from qlib.contrib.report import analysis_position
 from qlib.workflow import R
 
-EXPERIMENT_NAME = "rolling_lgb_7y2y_20260930"
+EXPERIMENT_NAME = "rolling_lgb_7y1y_20260930"
 RECORDER_ID = "5c27069aea2449e0ba47f5dda9372fb8"
 OUT_DIR = Path(__file__).resolve().parent / "last_run_plots"
 

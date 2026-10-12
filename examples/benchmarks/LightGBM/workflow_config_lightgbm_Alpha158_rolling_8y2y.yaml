@@ -18,7 +18,7 @@ port_analysis_config: &port_analysis_config
             topk: 10
             n_drop: 1
     backtest:
-        start_time: 2017-01-01
+        start_time: 2018-01-01
         end_time: 2026-10-09
         account: 100000
         benchmark: *benchmark
@@ -51,9 +51,9 @@ task:
                 module_path: qlib.contrib.data.handler
                 kwargs: *data_handler_config
             segments:
-                # First rolling window template: 8y train + 1y valid; test span is full horizon
-                train: [2008-01-01, 2015-12-31]
-                valid: [2016-01-01, 2016-12-31]
+                # First rolling window template: 7y train + 2y valid; test span is full horizon
+                train: [2008-01-01, 2014-12-31]
+                valid: [2015-01-01, 2016-12-31]
                 test: [2017-01-01, 2026-10-10]
     record:
         - class: SignalRecord

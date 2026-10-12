@@ -4,9 +4,14 @@
 """
 Daily (manual) refresh of crowd-source cn_data + rolling yaml end dates.
 
-Downloads the latest qlib_bin.tar.gz from chenditc/investment_data, replaces
-~/.qlib/qlib_data/cn_data, then syncs **end_time** fields in rolling configs
-to calendars/day.txt last trading day.
+Downloads the latest qlib_bin.tar.gz from chenditc/investment_data when local
+data is behind that release, replaces ~/.qlib/qlib_data/cn_data, then syncs
+**end_time** fields in rolling configs to **today's date** (local machine date),
+not the calendar last trading day.
+
+investment_data only ships a full archive (~540MB); there is no incremental
+day pack. This script skips re-download when the local release marker (or
+calendar end) already matches / covers the remote latest tag.
 
 Never rewrites start_time, fit_start_time, or train/valid segment endpoints.
 
@@ -14,6 +19,7 @@ Usage:
     python examples/benchmarks/LightGBM/update_cn_data_daily.py
     python examples/benchmarks/LightGBM/update_cn_data_daily.py --dry-run
     python examples/benchmarks/LightGBM/update_cn_data_daily.py --skip-download
+    python examples/benchmarks/LightGBM/update_cn_data_daily.py --force
 """
 from __future__ import annotations
 
@@ -31,12 +37,16 @@ from typing import Iterable, List, Optional, Sequence, Tuple
 DIRNAME = Path(__file__).absolute().resolve().parent
 DEFAULT_QLIB_DIR = Path("~/.qlib/qlib_data/cn_data").expanduser()
 DEFAULT_CONFIGS = [
-    DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml",
-    DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y2y_ind_weight.yaml",
+    DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml",
+    DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y1y_ind_weight.yaml",
 ]
 DOWNLOAD_URL = (
     "https://github.com/chenditc/investment_data/releases/latest/download/qlib_bin.tar.gz"
 )
+RELEASE_MARKER_NAME = ".investment_data_release"
+_DATE_TAG_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def log(msg: str) -> None:
     print(msg, flush=True)
 
@@ -153,8 +163,64 @@ def count_instruments(qlib_dir: Path) -> int:
     return sum(1 for line in all_txt.read_text().splitlines() if line.strip())
 
 
+def release_marker_path(qlib_dir: Path) -> Path:
+    return qlib_dir / RELEASE_MARKER_NAME
+
+
+def read_release_marker(qlib_dir: Path) -> Optional[str]:
+    path = release_marker_path(qlib_dir)
+    if not path.exists():
+        return None
+    tag = path.read_text().strip()
+    return tag or None
+
+
+def write_release_marker(qlib_dir: Path, release_tag: str) -> None:
+    qlib_dir.mkdir(parents=True, exist_ok=True)
+    release_marker_path(qlib_dir).write_text(f"{release_tag}\n")
+
+
+def is_local_up_to_date(qlib_dir: Path, remote_tag: str) -> Tuple[bool, str]:
+    """Return (up_to_date, reason) against remote release tag."""
+    if remote_tag in ("", "latest"):
+        return False, f"remote tag unresolved ({remote_tag!r}); need full download"
+
+    marker = read_release_marker(qlib_dir)
+    if marker == remote_tag:
+        return True, f"release marker matches remote tag {remote_tag}"
+
+    if not qlib_dir.exists():
+        return False, f"no local data at {qlib_dir}"
+
+    cal_path = qlib_dir / "calendars" / "day.txt"
+    if not cal_path.exists():
+        return False, f"missing calendar {cal_path}"
+
+    if not _DATE_TAG_RE.match(remote_tag):
+        reason = f"marker {marker!r} != remote {remote_tag!r} and tag is not YYYY-MM-DD"
+        return False, reason
+
+    try:
+        _, local_end = read_calendar_bounds(qlib_dir)
+    except (FileNotFoundError, RuntimeError) as exc:
+        return False, f"cannot read calendar ({exc})"
+
+    if local_end >= remote_tag:
+        return (
+            True,
+            f"calendar end {local_end} >= remote tag {remote_tag}"
+            + (f" (marker was {marker!r})" if marker else " (no marker)"),
+        )
+
+    return (
+        False,
+        f"calendar end {local_end} < remote tag {remote_tag}"
+        + (f"; marker {marker!r}" if marker else "; no marker"),
+    )
+
+
 def update_config_end_times(config_path: Path, latest_date: str, dry_run: bool) -> List[str]:
-    """Sync only end dates to ``latest_date``.
+    """Sync only end dates to ``latest_date`` (typically today's date).
 
     Updates ``data_handler_config.end_time``, ``backtest.end_time``, and the
     **right** endpoint of ``segments.test``. Does not modify any start_time,
@@ -233,46 +299,80 @@ def run(
     skip_download: bool,
     dry_run: bool,
     keep_backups: int,
+    force: bool = False,
 ) -> None:
     qlib_dir = qlib_dir.expanduser().resolve()
     config_paths = [c.expanduser().resolve() for c in configs]
 
     release_tag = "local"
-    if not skip_download:
+    did_download = False
+
+    if skip_download:
+        log("Skipping download (--skip-download); using existing local data")
+        marker = read_release_marker(qlib_dir)
+        if marker:
+            release_tag = marker
+    else:
         release_tag = resolve_latest_release_tag()
         log(f"Latest release tag: {release_tag}")
-        if dry_run:
-            log(f"[dry-run] would download {DOWNLOAD_URL}")
-            log(f"[dry-run] would backup/replace {qlib_dir}")
-        else:
-            with tempfile.TemporaryDirectory(prefix="qlib_bin_") as tmp:
-                archive = Path(tmp) / "qlib_bin.tar.gz"
-                download_archive(DOWNLOAD_URL, archive)
-                backup_qlib_dir(qlib_dir)
-                extract_qlib_bin(archive, qlib_dir)
-                prune_backups(qlib_dir, keep_backups)
-    else:
-        log("Skipping download; using existing local data")
 
-    first, latest = read_calendar_bounds(qlib_dir)
+        up_to_date, reason = is_local_up_to_date(qlib_dir, release_tag)
+        if force:
+            log(f"Force download requested (--force); ignoring freshness: {reason}")
+            need_download = True
+        elif up_to_date:
+            log(f"Local data is up to date; skip download ({reason})")
+            need_download = False
+            # Backfill marker when calendar-end path skipped without one
+            if not dry_run and read_release_marker(qlib_dir) != release_tag:
+                write_release_marker(qlib_dir, release_tag)
+                log(f"Wrote release marker: {release_marker_path(qlib_dir)} -> {release_tag}")
+        else:
+            log(f"Local data behind remote; will download ({reason})")
+            need_download = True
+
+        if need_download:
+            if dry_run:
+                log(f"[dry-run] would download {DOWNLOAD_URL}")
+                log(f"[dry-run] would backup/replace {qlib_dir}")
+                log(f"[dry-run] would write marker {RELEASE_MARKER_NAME}={release_tag}")
+            else:
+                with tempfile.TemporaryDirectory(prefix="qlib_bin_") as tmp:
+                    archive = Path(tmp) / "qlib_bin.tar.gz"
+                    download_archive(DOWNLOAD_URL, archive)
+                    backup_qlib_dir(qlib_dir)
+                    extract_qlib_bin(archive, qlib_dir)
+                    prune_backups(qlib_dir, keep_backups)
+                    write_release_marker(qlib_dir, release_tag)
+                    log(f"Wrote release marker: {release_marker_path(qlib_dir)} -> {release_tag}")
+                did_download = True
+
+    first, cal_latest = read_calendar_bounds(qlib_dir)
     n_inst = count_instruments(qlib_dir)
-    log(f"Calendar: {first} .. {latest}")
+    yaml_end = datetime.now().date().isoformat()
+    log(f"Calendar: {first} .. {cal_latest}")
     log(f"Instruments (all.txt): {n_inst}")
-    log(f"Release: {release_tag}")
+    log(f"Release: {release_tag}" + (" (downloaded)" if did_download else ""))
+    log(f"YAML end date target (today): {yaml_end}")
+    if yaml_end > cal_latest:
+        log(
+            f"Warning: today ({yaml_end}) is after local calendar end ({cal_latest}); "
+            "features/backtest may lack the most recent days"
+        )
 
     for config in config_paths:
         if not config.exists():
             log(f"Config missing, skip yaml update: {config}")
             continue
-        update_config_end_times(config, latest, dry_run=dry_run)
+        update_config_end_times(config, yaml_end, dry_run=dry_run)
     log("Done.")
 
 
 def main(argv: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Download latest crowd-source cn_data and sync rolling yaml end dates only "
-            "(never rewrites start dates)."
+            "Download latest crowd-source cn_data when behind, then sync rolling yaml "
+            "end dates to today's date (never rewrites start dates)."
         )
     )
     parser.add_argument(
@@ -288,13 +388,18 @@ def main(argv: Optional[List[str]] = None) -> None:
         default=None,
         help=(
             "rolling yaml(s) to sync end dates; "
-            "default: both workflow_config_lightgbm_Alpha158_rolling_7y2y*.yaml"
+            "default: both workflow_config_lightgbm_Alpha158_rolling_7y1y*.yaml"
         ),
     )
     parser.add_argument(
         "--skip-download",
         action="store_true",
-        help="Only refresh yaml from existing local calendar",
+        help="Skip data download; still sync yaml end dates to today",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force full download even if local data matches latest release",
     )
     parser.add_argument(
         "--dry-run",
@@ -315,6 +420,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         skip_download=args.skip_download,
         dry_run=args.dry_run,
         keep_backups=args.keep_backups,
+        force=args.force,
     )
 
 

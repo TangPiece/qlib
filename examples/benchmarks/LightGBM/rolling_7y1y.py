@@ -3,12 +3,14 @@
 """
 Sliding rolling retraining: 7y train + 1y valid -> predict next ~2y.
 
+Naming: NyMy = N years train + M years valid (rolling step stays ~2y trading days).
+
 Uses RollingGen(ROLL_SD) with per-window processor refit (no handler cache).
 
 Example:
-    python examples/benchmarks/LightGBM/rolling_7y2y.py \\
-      --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml \\
-      --exp_name=rolling_lgb_7y2y_20260930 \\
+    python examples/benchmarks/LightGBM/rolling_7y1y.py \\
+      --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml \\
+      --exp_name=rolling_lgb_7y1y_20260930 \\
       --horizon=20 \\
       run
 
@@ -28,7 +30,7 @@ from qlib.workflow.task.gen import RollingGen, handler_mod, task_generator
 from qlib.workflow.task.utils import TimeAdjuster
 
 DIRNAME = Path(__file__).absolute().resolve().parent
-DEFAULT_CONF = DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml"
+DEFAULT_CONF = DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml"
 
 # Calendar anchors for ~2-year test windows (trading-day step)
 STEP_START = "2016-01-01"
@@ -58,8 +60,8 @@ def compute_step_2y(step_start: str = STEP_START, step_end: str = STEP_END) -> i
     return step
 
 
-class Rolling7y2y(Rolling):
-    """Sliding 7y/1y/2y rolling with per-window Alpha158 processor refit."""
+class Rolling7y1y(Rolling):
+    """Sliding 7y train / 1y valid rolling (~2y step) with per-window Alpha158 processor refit."""
 
     def __init__(
         self,
@@ -111,4 +113,4 @@ class Rolling7y2y(Rolling):
 
 if __name__ == "__main__":
     auto_init()
-    fire.Fire(Rolling7y2y)
+    fire.Fire(Rolling7y1y)

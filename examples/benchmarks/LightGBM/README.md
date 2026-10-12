@@ -8,22 +8,37 @@
 `workflow_config_lightgbm_multi_freq.yaml`
 - 使用多频率数据源做日频预测。
 
-`workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml`
+`workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml`
+- 命名约定：`NyMy` = N 年训练 + M 年验证（滚动滑动步长仍约 2 年交易日，不写入文件名）。
 - 滚动重训：7 年训练 + 1 年验证，再预测约 2 年窗口；首窗自 **2008-01-01** 起。
-- 通过 [`rolling_7y2y.py`](rolling_7y2y.py) 运行；`end_time` 需与本地 `cn_data` 对齐（见下文「每日更新」）。
+- 通过 [`rolling_7y1y.py`](rolling_7y1y.py) 运行；`end_time` 由每日更新脚本写成**当天日期**（见下文「每日更新」）；本地 `cn_data` 可能略滞后。
 
 ---
 
-# 滚动训练（rolling_7y2y）
+# 本地控制台（页面操作）
 
-脚本：[`rolling_7y2y.py`](rolling_7y2y.py)  
-默认配置：[`workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml`](workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml)
+静态 HTML + 极简本地 HTTP 服务，用于在浏览器里改结束日、更新数据、跑滚动训练、导出持仓 HTML，并浏览历史结果。
+
+```bash
+# 在 qlib 仓库根目录，建议用 .venv
+.venv/bin/python examples/benchmarks/LightGBM/console/server.py
+# 浏览器打开 http://127.0.0.1:8765
+```
+
+页面会调用本目录现有脚本（`update_cn_data_daily.py` / `rolling_7y1y.py` / `export_positions_view.py`）；历史列表来自 `data/*_positions_view.html`，点击「查看详情」打开对应持仓页。同时只跑一个后台任务，日志在页面底部轮询显示。
+
+---
+
+# 滚动训练（rolling_7y1y）
+
+脚本：[`rolling_7y1y.py`](rolling_7y1y.py)  
+默认配置：[`workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml`](workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml)
 
 ## 前置条件
 
 1. 已安装本仓库 qlib，且能正常 `import qlib`
-2. 本地数据 `~/.qlib/qlib_data/cn_data` 覆盖到 yaml 中的 `end_time`
-3. 建议先跑一遍数据更新脚本，保证日历与配置一致：
+2. 本地数据 `~/.qlib/qlib_data/cn_data` 尽量新；yaml `end_time` 可能晚于日历末日
+3. 建议先跑一遍数据更新脚本（同步结束日为当天，并按需刷新数据）：
 
 ```bash
 python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
@@ -35,9 +50,9 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 ```bash
 # 推荐：使用虚拟环境中的 python
-.venv/bin/python examples/benchmarks/LightGBM/rolling_7y2y.py \
-  --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y2y.yaml \
-  --exp_name=rolling_lgb_7y2y_20261009 \
+.venv/bin/python examples/benchmarks/LightGBM/rolling_7y1y.py \
+  --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml \
+  --exp_name=rolling_lgb_7y1y_20261009 \
   --horizon=1 \
   run
 ```
@@ -57,8 +72,8 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 # 2) 滚动训练
-.venv/bin/python examples/benchmarks/LightGBM/rolling_7y2y.py \
-  --exp_name=rolling_lgb_7y2y_$(date +%Y%m%d) \
+.venv/bin/python examples/benchmarks/LightGBM/rolling_7y1y.py \
+  --exp_name=rolling_lgb_7y1y_$(date +%Y%m%d) \
   --horizon=1 \
   run
 ```
@@ -75,7 +90,7 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 ```bash
 .venv/bin/python examples/benchmarks/LightGBM/export_positions_view.py \
-  --exp_name=rolling_lgb_7y2y_20261009
+  --exp_name=rolling_lgb_7y1y_20261009
 ```
 
 可选参数：
@@ -86,8 +101,8 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 产物示例（目录已被 `.gitignore` 忽略）：
 
-- `data/rolling_lgb_7y2y_20261009_positions_1day.parquet`
-- `data/rolling_lgb_7y2y_20261009_positions_view.html`
+- `data/rolling_lgb_7y1y_20261009_positions_1day.parquet`
+- `data/rolling_lgb_7y1y_20261009_positions_view.html`
 - `data/stock_name_map.json`
 
 用浏览器直接打开 HTML 即可（无需本地 HTTP）。默认日期为**当天**（非交易日则落到 ≤ 当天的最近交易日）。左右方向键可切换交易日。买卖标签由相邻交易日持仓集合差集推算；买入日为该票进入持仓的交易日。
@@ -100,17 +115,20 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 数据来源为社区打包 bin：[chenditc/investment_data](https://github.com/chenditc/investment_data/releases/latest)
 
 使用 [`update_cn_data_daily.py`](update_cn_data_daily.py) 刷新数据，并把两份 rolling yaml
-（`..._rolling_7y2y.yaml` 与 `..._ind_weight.yaml`）中的**结束日**同步为
-`calendars/day.txt` 的最新交易日。
+（`..._rolling_7y1y.yaml` 与 `..._ind_weight.yaml`）中的**结束日**同步为
+**运行当天的日期**（本机 `YYYY-MM-DD`），不是 `calendars/day.txt` 末日。本地日历仍用于判断数据是否落后于 GitHub release；若今天晚于日历末日会打印 Warning。
 
 **只改结束日**：不改写任何 `start_time`、`fit_start_time`，也不改 train/valid 区间或 `segments.test` 左端。
 
+investment_data **只提供全量** `qlib_bin.tar.gz`（约 540MB），无按日增量包。脚本会先比对远程 latest release tag 与本地
+`cn_data/.investment_data_release`（或日历末日）；已最新则**跳过下载**，只同步 yaml；落后再整包替换。
+
 ## 脚本做什么
 
-1. 从 investment_data 最新 GitHub Release 下载 `qlib_bin.tar.gz`
-2. 将现有 `cn_data` 备份为 `cn_data.bak_YYYYMMDD_HHMMSS`（默认保留 2 份）
-3. 解压覆盖到 `~/.qlib/qlib_data/cn_data`
-4. 默认同步两份 rolling yaml 中三处结束日：
+1. 解析 investment_data 最新 GitHub Release tag；若本地 marker / 日历已覆盖则跳过下载
+2. 需要更新时：下载 `qlib_bin.tar.gz`，将现有 `cn_data` 备份为 `cn_data.bak_YYYYMMDD_HHMMSS`（默认保留 2 份）
+3. 解压覆盖到 `~/.qlib/qlib_data/cn_data`，写入 `.investment_data_release`
+4. 默认同步两份 rolling yaml 中三处结束日为**今天**：
    - `data_handler_config.end_time`
    - `backtest.end_time`
    - `segments.test` 右端点
@@ -120,14 +138,17 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 在 qlib 仓库根目录执行：
 
 ```bash
-# 完整每日更新（推荐；默认同步两份 rolling yaml）
+# 完整每日更新（推荐；已最新则跳过下载，仍同步 yaml）
 python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 # 仅预览，不下载、不写盘
 python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --dry-run
 
-# 不下载，仅按本地日历改写 yaml
+# 不下载，仍把 yaml 结束日改成今天
 python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --skip-download
+
+# 强制全量重新下载（忽略已最新判定）
+python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --force
 ```
 
 ### 参数
@@ -135,14 +156,15 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --skip-download
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `--qlib-dir` | `~/.qlib/qlib_data/cn_data` | 数据目录 |
-| `--config` | 两份 `rolling_7y2y*.yaml` | 要同步结束日的 YAML（可传多个路径） |
+| `--config` | 两份 `rolling_7y1y*.yaml` | 要同步结束日的 YAML（可传多个路径） |
 | `--keep-backups N` | `2` | 保留最近 N 个 `cn_data.bak_*` |
 | `--skip-download` | 关闭 | 跳过下载，只同步 yaml |
+| `--force` | 关闭 | 强制全量下载，即使本地已是 latest |
 | `--dry-run` | 关闭 | 只打印将要执行的操作 |
 
 ## 注意
 
-- 压缩包约 500MB+；网络不稳定可能中途失败，重新跑一遍即可。
+- 压缩包约 500MB+；已最新时默认不再重复下载。网络不稳定导致失败时，可重新跑或加 `--force`。
 - 官方 Yahoo 离线包与本社区 bin 不能增量混用；请始终用本脚本（或重新解压 release 包）整包替换。
 - 其它非 rolling yaml（momentum / chatgpt / zhipu 等）默认不改；如需更新，请传 `--config <路径>`。
 
@@ -199,7 +221,7 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --skip-download
 # 行业入选数量加权策略
 
 策略类：`IndustryCountWeightStrategy`（继承 `TopkDropoutStrategy`）  
-配置：[`workflow_config_lightgbm_Alpha158_rolling_7y2y_ind_weight.yaml`](workflow_config_lightgbm_Alpha158_rolling_7y2y_ind_weight.yaml)
+配置：[`workflow_config_lightgbm_Alpha158_rolling_7y1y_ind_weight.yaml`](workflow_config_lightgbm_Alpha158_rolling_7y1y_ind_weight.yaml)
 
 **调仓**：与 `TopkDropoutStrategy` 相同（`topk` / `n_drop`）；行业**不**改变买卖名单。  
 **权重**：仅对新买入股票分配卖出后现金时，按行业入选数量加权：
@@ -224,9 +246,9 @@ v_i = C\cdot R\cdot\frac{n_i^{\alpha}}{\sum_{j\in\mathrm{buy}} n_j^{\alpha}}
 ## 用法
 
 ```bash
-.venv/bin/python examples/benchmarks/LightGBM/rolling_7y2y.py \
-  --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y2y_ind_weight.yaml \
-  --exp_name=rolling_lgb_7y2y_ind_weight_$(date +%Y%m%d) \
+.venv/bin/python examples/benchmarks/LightGBM/rolling_7y1y.py \
+  --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y1y_ind_weight.yaml \
+  --exp_name=rolling_lgb_7y1y_ind_weight_$(date +%Y%m%d) \
   --horizon=1 \
   run
 ```

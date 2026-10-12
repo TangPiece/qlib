@@ -1,0 +1,148 @@
+$ /Users/900game/Desktop/ai/qlib/.venv/bin/python /Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/rolling_7y1y.py --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml --exp_name=rolling_lgb_7y1y_20261012_1748 --horizon=1 run
+
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+[57967:MainThread](2026-10-12 17:48:46,067) INFO - qlib.Initialization - [config.py:473] - default_conf: client.
+[57967:MainThread](2026-10-12 17:48:46,072) INFO - qlib.Initialization - [__init__.py:82] - qlib successfully initialized based on client settings.
+[57967:MainThread](2026-10-12 17:48:46,073) INFO - qlib.Initialization - [__init__.py:84] - data_path={'__DEFAULT_FREQ': PosixPath('/Users/900game/.qlib/qlib_data/cn_data')}
+[57967:MainThread](2026-10-12 17:48:46,105) INFO - qlib.Rolling - [rolling_7y1y.py:91] - Using auto step=488 trading days (~2y from 2016-01-01 to 2017-12-31)
+[57967:MainThread](2026-10-12 17:48:46,137) INFO - qlib.Rolling - [base.py:166] - The prediction horizon is overrided
+[57967:MainThread](2026-10-12 17:48:46,138) INFO - qlib.Rolling - [base.py:181] - {'model': {'class': 'LGBModel', 'module_path': 'qlib.contrib.model.gbdt', 'kwargs': {'loss': 'mse', 'colsample_bytree': 0.8879, 'learning_rate': 0.2, 'subsample': 0.8789, 'lambda_l1': 20.57, 'lambda_l2': 58.0977, 'max_depth': 8, 'num_leaves': 210, 'num_threads': 20}}, 'dataset': {'class': 'DatasetH', 'module_path': 'qlib.data.dataset', 'kwargs': {'handler': {'class': 'Alpha158', 'module_path': 'qlib.contrib.data.handler', 'kwargs': {'start_time': datetime.date(2008, 1, 1), 'end_time': datetime.date(2026, 10, 12), 'fit_start_time': datetime.date(2008, 1, 1), 'fit_end_time': datetime.date(2014, 12, 31), 'instruments': 'csi300', 'label': ['Ref($close, -2) / Ref($close, -1) - 1']}}, 'segments': {'train': [datetime.date(2008, 1, 1), datetime.date(2014, 12, 31)], 'valid': [datetime.date(2015, 1, 1), datetime.date(2015, 12, 31)], 'test': [datetime.date(2016, 1, 1), datetime.date(2026, 10, 12)]}}}, 'record': [{'class': 'SignalRecord', 'module_path': 'qlib.workflow.record_temp', 'kwargs': {'model': '<MODEL>', 'dataset': '<DATASET>'}}, {'class': 'SigAnaRecord', 'module_path': 'qlib.workflow.record_temp', 'kwargs': {'ana_long_short': False, 'ann_scaler': 252}}, {'class': 'PortAnaRecord', 'module_path': 'qlib.workflow.record_temp', 'kwargs': {'config': {'strategy': {'class': 'TopkDropoutStrategy', 'module_path': 'qlib.contrib.strategy', 'kwargs': {'signal': '<PRED>', 'topk': 10, 'n_drop': 1}}, 'backtest': {'start_time': datetime.date(2016, 1, 1), 'end_time': datetime.date(2026, 10, 12), 'account': 100000, 'benchmark': 'SH000300', 'exchange_kwargs': {'limit_threshold': 0.095, 'deal_price': 'close', 'open_cost': 0.0005, 'close_cost': 0.0015, 'min_cost': 5}}}}}]}
+[57967:MainThread](2026-10-12 17:48:46,151) WARNING - qlib.utils - [__init__.py:485] - 
+Info: the end_date in the configuration file is 2026-10-12 00:00:00, so the default last date 2026-10-09 00:00:00 is used.
+[57967:MainThread](2026-10-12 17:48:46,152) INFO - qlib.Rolling - [rolling_7y1y.py:105] - Generated 6 sliding rolling tasks
+[57967:MainThread](2026-10-12 17:48:46,153) INFO - qlib.Rolling - [rolling_7y1y.py:108] -   window1: train=(Timestamp('2008-01-02 00:00:00'), Timestamp('2014-12-31 00:00:00')), valid=(Timestamp('2015-01-05 00:00:00'), Timestamp('2015-12-30 00:00:00')), test=(Timestamp('2016-01-04 00:00:00'), Timestamp('2017-12-29 00:00:00'))
+[57967:MainThread](2026-10-12 17:48:46,153) INFO - qlib.Rolling - [rolling_7y1y.py:108] -   window2: train=(Timestamp('2009-12-30 00:00:00'), Timestamp('2016-12-30 00:00:00')), valid=(Timestamp('2017-01-03 00:00:00'), Timestamp('2017-12-28 00:00:00')), test=(Timestamp('2018-01-02 00:00:00'), Timestamp('2020-01-02 00:00:00'))
+[57967:MainThread](2026-10-12 17:48:46,154) INFO - qlib.Rolling - [rolling_7y1y.py:108] -   window3: train=(Timestamp('2012-01-04 00:00:00'), Timestamp('2019-01-02 00:00:00')), valid=(Timestamp('2019-01-03 00:00:00'), Timestamp('2019-12-31 00:00:00')), test=(Timestamp('2020-01-03 00:00:00'), Timestamp('2022-01-06 00:00:00'))
+[57967:MainThread](2026-10-12 17:48:46,154) INFO - qlib.Rolling - [rolling_7y1y.py:108] -   window4: train=(Timestamp('2014-01-13 00:00:00'), Timestamp('2021-01-05 00:00:00')), valid=(Timestamp('2021-01-06 00:00:00'), Timestamp('2022-01-05 00:00:00')), test=(Timestamp('2022-01-07 00:00:00'), Timestamp('2024-01-10 00:00:00'))
+[57967:MainThread](2026-10-12 17:48:46,154) INFO - qlib.Rolling - [rolling_7y1y.py:108] -   window5: train=(Timestamp('2016-01-12 00:00:00'), Timestamp('2023-01-09 00:00:00')), valid=(Timestamp('2023-01-10 00:00:00'), Timestamp('2024-01-09 00:00:00')), test=(Timestamp('2024-01-11 00:00:00'), Timestamp('2026-01-16 00:00:00'))
+[57967:MainThread](2026-10-12 17:48:46,154) INFO - qlib.Rolling - [rolling_7y1y.py:108] -   window6: train=(Timestamp('2018-01-10 00:00:00'), Timestamp('2025-01-14 00:00:00')), valid=(Timestamp('2025-01-15 00:00:00'), Timestamp('2026-01-15 00:00:00')), test=(Timestamp('2026-01-19 00:00:00'), None)
+[57967:MainThread](2026-10-12 17:48:46,154) INFO - qlib.Rolling - [base.py:208] - Deleting previous Rolling results
+/Users/900game/Desktop/ai/qlib/.venv/lib/python3.12/site-packages/mlflow/tracking/_tracking_service/utils.py:184: FutureWarning: The filesystem tracking backend (e.g., './mlruns') is deprecated as of February 2026. Consider transitioning to a database backend (e.g., 'sqlite:///mlflow.db') to take advantage of the latest MLflow features. See https://mlflow.org/docs/latest/self-hosting/migrate-from-file-store for migration guidance.
+  return FileStore(store_uri, store_uri)
+[57967:MainThread](2026-10-12 17:48:46,223) INFO - qlib.Rolling - [base.py:214] - No previous rolling results
+train tasks:   0%|          | 0/6 [00:00<?, ?it/s][57967:MainThread](2026-10-12 17:48:46,269) WARNING - qlib.workflow - [expm.py:230] - No valid experiment found. Create a new experiment with name rolling_models_20261012174846.
+[57967:MainThread](2026-10-12 17:48:46,313) INFO - qlib.workflow - [exp.py:258] - Experiment 412625657630895289 starts running ...
+[57967:MainThread](2026-10-12 17:48:46,915) INFO - qlib.workflow - [recorder.py:345] - Recorder 32bf48af77ab4ce5b3321abc074bc28e starts running under Experiment 412625657630895289 ...
+ModuleNotFoundError. CatBoostModel are skipped. (optional: maybe installing CatBoostModel can fix it.)
+ModuleNotFoundError. XGBModel is skipped(optional: maybe installing xgboost can fix it).
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+[57967:MainThread](2026-10-12 17:50:16,668) INFO - qlib.timer - [log.py:127] - Time cost: 81.991s | Loading data Done
+[57967:MainThread](2026-10-12 17:50:20,402) INFO - qlib.timer - [log.py:127] - Time cost: 1.781s | DropnaLabel Done
+[57967:MainThread](2026-10-12 17:50:25,436) INFO - qlib.timer - [log.py:127] - Time cost: 5.033s | CSZScoreNorm Done
+[57967:MainThread](2026-10-12 17:50:25,437) INFO - qlib.timer - [log.py:127] - Time cost: 8.768s | fit & process data Done
+[57967:MainThread](2026-10-12 17:50:25,437) INFO - qlib.timer - [log.py:127] - Time cost: 90.763s | Init data Done
+[57967:MainThread](2026-10-12 17:50:48,106) INFO - qlib.workflow - [record_temp.py:197] - Signal record 'pred.pkl' has been saved as the artifact of the Experiment 412625657630895289
+[57967:MainThread](2026-10-12 17:50:48,167) INFO - qlib.timer - [log.py:127] - Time cost: 0.002s | waiting `async_log` Done
+train tasks:  17%|█▋        | 1/6 [02:01<10:09, 121.95s/it][57967:MainThread](2026-10-12 17:50:48,387) INFO - qlib.workflow - [exp.py:258] - Experiment 412625657630895289 starts running ...
+[57967:MainThread](2026-10-12 17:50:48,451) INFO - qlib.workflow - [recorder.py:345] - Recorder 0ead227f3c75479f88bdf8dbbcc52c3b starts running under Experiment 412625657630895289 ...
+Training until validation scores don't improve for 50 rounds
+[20]	train's l2: 0.960622	valid's l2: 0.99567
+[40]	train's l2: 0.939163	valid's l2: 1.00065
+Early stopping, best iteration is:
+[5]	train's l2: 0.982155	valid's l2: 0.992016
+'The following are prediction results of the LGBModel model.'
+                          score
+datetime   instrument          
+2016-01-04 SH600000   -0.005567
+           SH600005   -0.134127
+           SH600008   -0.083086
+           SH600009    0.014526
+           SH600010   -0.102135
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.

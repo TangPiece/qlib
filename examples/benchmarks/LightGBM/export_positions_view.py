@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Export backtest positions to parquet + a self-contained HTML day browser.
+"""Export backtest positions to a self-contained HTML day browser.
 
 Reads positions and analysis artifacts from an MLflow experiment recorder,
-labels hold/buy/sell, attaches stock names and buy dates, and writes:
-
-- long-form parquet (datetime as YYYY-MM-DD)
-- single-file HTML with metrics cards; experiment JSON payload at file bottom
+labels hold/buy/sell, attaches stock names and buy dates, and writes a
+single-file HTML with metrics cards, yearly excess table, and day browser;
+experiment JSON payload sits at the file bottom.
 
 Example (from qlib repo root)::
 
     .venv/bin/python examples/benchmarks/LightGBM/export_positions_view.py \\
-      --exp_name=rolling_lgb_7y2y_20261009
+      --exp_name=rolling_lgb_7y1y_20261009
 """
 from __future__ import annotations
 
@@ -25,14 +24,16 @@ import pandas as pd
 import qlib
 from qlib.config import C
 from qlib.constant import REG_CN
+from qlib.contrib.evaluate import risk_analysis
 from qlib.data import D
 from qlib.workflow import R
 
 DIRNAME = Path(__file__).absolute().resolve().parent
 DEFAULT_OUT_DIR = DIRNAME / "data"
-DEFAULT_EXP_NAME = "rolling_lgb_7y2y_20261009"
+DEFAULT_EXP_NAME = "rolling_lgb_7y1y_20261009"
 NAME_MAP_PATH = DEFAULT_OUT_DIR / "stock_name_map.json"
 POSITIONS_ARTIFACT = "portfolio_analysis/positions_normal_1day.pkl"
+REPORT_ARTIFACT = "portfolio_analysis/report_normal_1day.pkl"
 
 
 def _latest_recorder(exp_name: str, recorder_id: Optional[str] = None):
@@ -380,6 +381,67 @@ def collect_metrics(recorder) -> Dict[str, Any]:
     return metrics
 
 
+def annualize(r: pd.Series) -> float:
+    """Annualized return using qlib day-freq risk_analysis (mean * 238)."""
+    r = r.dropna()
+    if r.empty:
+        return float("nan")
+    return float(risk_analysis(r, freq="day").loc["annualized_return", "risk"])
+
+
+def collect_yearly_excess(recorder) -> Dict[str, Any]:
+    """Yearly excess table + concentration warning from report_normal."""
+    out: Dict[str, Any] = {"rows": [], "concentration_warning": None}
+    try:
+        report = recorder.load_object(REPORT_ARTIFACT)
+    except Exception as exc:  # noqa: BLE001
+        warnings.warn(f"report_normal unavailable for yearly excess: {exc}")
+        return out
+
+    excess = report["return"] - report["bench"]
+    excess_cost = report["return"] - report["bench"] - report["cost"]
+    # Ensure DatetimeIndex for .year grouping
+    if not isinstance(excess.index, pd.DatetimeIndex):
+        excess.index = pd.to_datetime(excess.index)
+        excess_cost.index = pd.to_datetime(excess_cost.index)
+
+    by_year = excess.groupby(excess.index.year).apply(annualize)
+    by_year_cost = excess_cost.groupby(excess_cost.index.year).apply(annualize)
+    days_by_year = excess.groupby(excess.index.year).size()
+    cum_cost_by_year = excess_cost.groupby(excess_cost.index.year).sum()
+
+    years = sorted(set(by_year.index) | set(by_year_cost.index))
+    rows: List[Dict[str, Any]] = []
+    for y in years:
+        ann = float(by_year.get(y, float("nan")))
+        ann_cost = float(by_year_cost.get(y, float("nan")))
+        cum_cost = float(cum_cost_by_year.get(y, float("nan")))
+        n_days = int(days_by_year.get(y, 0))
+        rows.append(
+            {
+                "year": int(y),
+                "annualized_without_cost": None if np.isnan(ann) else ann,
+                "annualized_with_cost": None if np.isnan(ann_cost) else ann_cost,
+                "cum_excess_with_cost": None if np.isnan(cum_cost) else cum_cost,
+                "n_days": n_days,
+            }
+        )
+    out["rows"] = rows
+
+    # Concentration: one year ≥ 50% of sum of positive with-cost annualized excess
+    pos = [(r["year"], r["annualized_with_cost"]) for r in rows if r["annualized_with_cost"] and r["annualized_with_cost"] > 0]
+    pos_sum = sum(v for _, v in pos)
+    if pos and pos_sum > 0:
+        top_year, top_val = max(pos, key=lambda t: t[1])
+        share = top_val / pos_sum
+        if share >= 0.5:
+            out["concentration_warning"] = (
+                f"{top_year} 年含成本年化超额占各年正贡献之和的 {share:.0%}；"
+                "若大部分改善集中在一两年，警惕是特定行情（如风格切换）喂出来的。"
+            )
+    return out
+
+
 def render_html(payload: Dict[str, Any]) -> str:
     """Build HTML shell; experiment JSON is appended at the very bottom."""
     exp_name = payload.get("exp_name", "")
@@ -541,6 +603,34 @@ def render_html(payload: Dict[str, Any]) -> str:
   .pill-hold {{ background: rgba(89,194,255,0.12); color: var(--hold); }}
   .ret-pos {{ color: var(--sell); }}
   .ret-neg {{ color: var(--buy); }}
+  .yearly-wrap {{
+    margin: 0 1.5rem 0.85rem;
+  }}
+  .yearly-wrap h2 {{
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+  }}
+  .warn {{
+    background: rgba(230, 180, 80, 0.12);
+    border: 1px solid rgba(230, 180, 80, 0.45);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 0.55rem 0.85rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.88rem;
+  }}
+  .yearly-table-wrap {{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: auto;
+  }}
+  .yearly-table-wrap table {{ font-size: 0.88rem; }}
+  .yearly-table-wrap th {{ white-space: nowrap; }}
+  .num-pos {{ color: var(--sell); }}
+  .num-neg {{ color: var(--buy); }}
 </style>
 </head>
 <body>
@@ -558,6 +648,24 @@ def render_html(payload: Dict[str, Any]) -> str:
   <summary>更多组合 / 成交指标</summary>
   <pre id="moreMetrics"></pre>
 </details>
+<section class="yearly-wrap" id="yearlySection" hidden>
+  <h2>分年度超额</h2>
+  <div class="warn" id="yearlyWarn" hidden></div>
+  <div class="yearly-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>年份</th>
+          <th>年化超额(无成本)</th>
+          <th>年化超额(含成本)</th>
+          <th>累计超额(含成本)</th>
+          <th>交易日数</th>
+        </tr>
+      </thead>
+      <tbody id="yearlyBody"></tbody>
+    </table>
+  </div>
+</section>
 <div class="controls">
   <button id="prevBtn" type="button">← 前一日</button>
   <input id="dateInput" type="date"/>
@@ -696,6 +804,11 @@ def render_html(payload: Dict[str, Any]) -> str:
       return best;
     }}
 
+    function pctClass(x) {{
+      if (x === null || x === undefined || Number.isNaN(x)) return "";
+      return x >= 0 ? "num-pos" : "num-neg";
+    }}
+
     function renderMetrics() {{
       const m = data.metrics || {{}};
       const ewc = (m.port && m.port.excess_with_cost) || {{}};
@@ -713,8 +826,40 @@ def render_html(payload: Dict[str, Any]) -> str:
       ).join("");
       document.getElementById("moreMetrics").textContent = JSON.stringify({{
         port: m.port || {{}},
-        indicators: m.indicators || {{}}
+        indicators: m.indicators || {{}},
+        yearly_excess: data.yearly_excess || {{}}
       }}, null, 2);
+    }}
+
+    function renderYearly() {{
+      const ye = data.yearly_excess || {{}};
+      const rows = ye.rows || [];
+      const section = document.getElementById("yearlySection");
+      if (!rows.length) {{
+        section.hidden = true;
+        return;
+      }}
+      section.hidden = false;
+      const warnEl = document.getElementById("yearlyWarn");
+      if (ye.concentration_warning) {{
+        warnEl.hidden = false;
+        warnEl.textContent = ye.concentration_warning;
+      }} else {{
+        warnEl.hidden = true;
+        warnEl.textContent = "";
+      }}
+      document.getElementById("yearlyBody").innerHTML = rows.map(r => {{
+        const a0 = r.annualized_without_cost;
+        const a1 = r.annualized_with_cost;
+        const c = r.cum_excess_with_cost;
+        return "<tr>" +
+          "<td>" + r.year + "</td>" +
+          '<td class="' + pctClass(a0) + '">' + fmtPct(a0) + "</td>" +
+          '<td class="' + pctClass(a1) + '">' + fmtPct(a1) + "</td>" +
+          '<td class="' + pctClass(c) + '">' + fmtPct(c) + "</td>" +
+          "<td>" + (r.n_days == null ? "—" : r.n_days) + "</td>" +
+          "</tr>";
+      }}).join("");
     }}
 
     document.getElementById("expName").textContent = data.exp_name;
@@ -740,6 +885,7 @@ def render_html(payload: Dict[str, Any]) -> str:
     }});
 
     renderMetrics();
+    renderYearly();
     idx = defaultIndex();
     render();
   }}
@@ -766,7 +912,7 @@ def export(
     out_dir: Path = DEFAULT_OUT_DIR,
     provider_uri: str = "~/.qlib/qlib_data/cn_data",
     name_map_path: Path = NAME_MAP_PATH,
-) -> Tuple[Path, Path]:
+) -> Path:
     qlib.init(provider_uri=provider_uri, region=REG_CN)
     recorder = _latest_recorder(exp_name, recorder_id)
     rid = recorder.info.get("id") if hasattr(recorder, "info") else getattr(recorder, "id", None)
@@ -776,8 +922,9 @@ def export(
 
     name_map = load_or_build_name_map(Path(name_map_path))
     positions = recorder.load_object(POSITIONS_ARTIFACT)
-    df, days = build_day_frames(positions, name_map=name_map)
+    _, days = build_day_frames(positions, name_map=name_map)
     metrics = collect_metrics(recorder)
+    yearly_excess = collect_yearly_excess(recorder)
 
     dates = [d["date"] for d in days]
     payload = {
@@ -788,25 +935,25 @@ def export(
         "first_account_value": days[0]["account_value"] if days else None,
         "last_account_value": days[-1]["account_value"] if days else None,
         "metrics": metrics,
+        "yearly_excess": yearly_excess,
         "days": days,
     }
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     safe_name = exp_name.replace("/", "_")
-    parquet_path = out_dir / f"{safe_name}_positions_1day.parquet"
     html_path = out_dir / f"{safe_name}_positions_view.html"
 
-    df.to_parquet(parquet_path, index=False)
     html_path.write_text(render_html(payload), encoding="utf-8")
 
-    print(f"wrote {parquet_path} ({len(df)} rows, {df['datetime'].nunique()} days)")
-    print(f"wrote {html_path}")
-    return parquet_path, html_path
+    print(f"wrote {html_path} ({len(days)} days)")
+    if yearly_excess.get("concentration_warning"):
+        print(f"WARNING: {yearly_excess['concentration_warning']}")
+    return html_path
 
 
 def main(argv: Optional[List[str]] = None) -> None:
-    parser = argparse.ArgumentParser(description="Export positions parquet + HTML day browser")
+    parser = argparse.ArgumentParser(description="Export positions HTML day browser")
     parser.add_argument("--exp_name", default=DEFAULT_EXP_NAME, help="MLflow experiment name")
     parser.add_argument("--recorder_id", default=None, help="Optional recorder id; default=latest FINISHED")
     parser.add_argument(
