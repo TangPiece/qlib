@@ -56,3 +56,4 @@ node_modules/
 
 .venv/
 .jobs/
+/.venv.py39.bak
