@@ -31,6 +31,7 @@ DEFAULT_INDUSTRY_MAP = (
     / "benchmarks"
     / "LightGBM"
     / "data"
+    / "ref"
     / "csi300_sw_l1_industry_intervals.parquet"
 )
 

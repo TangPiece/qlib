@@ -26,7 +26,7 @@ from urllib.parse import unquote, urlparse
 CONSOLE_DIR = Path(__file__).absolute().resolve().parent
 LGBM_DIR = CONSOLE_DIR.parent
 REPO_ROOT = LGBM_DIR.parents[2]  # LightGBM -> benchmarks -> examples -> qlib
-DATA_DIR = LGBM_DIR / "data"
+DATA_DIR = LGBM_DIR / "data" / "runs"
 JOBS_DIR = CONSOLE_DIR / ".jobs"
 DEFAULT_QLIB_DIR = Path("~/.qlib/qlib_data/cn_data").expanduser()
 HOST = "127.0.0.1"

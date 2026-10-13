@@ -5,7 +5,7 @@ Uses OnlineToolR (not full OnlineManager): tag the latest trainable window as
 online, optionally extend ``pred.pkl`` to the local calendar end, then apply the
 same TopkDropout rule as the rolling yaml (topk=10, n_drop=1).
 
-Output: ``data/{exp_name}_live_signal.json``
+Output: ``data/runs/{exp_name}_live_signal.json``
 
 Example (repo root)::
 
@@ -40,7 +40,7 @@ from export_positions_view import (  # noqa: E402
     load_or_build_name_map,
 )
 
-DEFAULT_OUT_DIR = DIRNAME / "data"
+DEFAULT_OUT_DIR = DIRNAME / "data" / "runs"
 DEFAULT_TOPK = 10
 DEFAULT_N_DROP = 1
 DEFAULT_HOLD_THRESH = 1

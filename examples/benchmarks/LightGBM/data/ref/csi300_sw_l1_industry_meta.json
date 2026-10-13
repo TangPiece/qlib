@@ -1,0 +1,29 @@
+{
+  "asof": "2026-10-09T23:14:03",
+  "qlib_dir": "/Users/900game/.qlib/qlib_data/cn_data",
+  "calendar_start": "2000-01-04",
+  "calendar_end": "2026-10-09",
+  "calendar_days": 6484,
+  "csi300_symbols": 949,
+  "interval_rows": 1396,
+  "covered_symbols": 948,
+  "coverage_ratio": 0.998946,
+  "missing_symbols_count": 1,
+  "missing_symbols_sample": [
+    "SHT00018"
+  ],
+  "standard": "SW",
+  "standard_version": "2021",
+  "source": "akshare",
+  "akshare_apis": [
+    "stock_industry_clf_hist_sw"
+  ],
+  "fetch_method": "direct:https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls",
+  "sw_hist_url": "https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls",
+  "open_end_sentinel": "9999-12-31",
+  "end_date_convention": "9999-12-31 for still-active before clip; after CSI300 intersect clipped to membership/calendar",
+  "pit_inference_rule": "Source Excel gives industry entry dates (计入日期) per stock without explicit exit dates. For each stock, rows are sorted by entry date; start_date = entry; end_date = day before the next entry; the last segment uses open end 9999-12-31 before intersecting with CSI300 membership and the local calendar. 6-digit SW industry codes are mapped to L1 index codes via code prefix.",
+  "limitations": "Official SW workbook is a point-in-time classification history, but exit dates are inferred. Some SW2014 prefixes are mapped to the closest L1 index code (e.g. 采掘 801020; 信息设备-era 32xx -> 计算机 801750). Coverage depends on workbook completeness for delisted names.",
+  "validation_warnings": [],
+  "output_parquet": "/Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/data/csi300_sw_l1_industry_intervals.parquet"
+}
