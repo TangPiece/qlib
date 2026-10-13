@@ -1,0 +1,18 @@
+$ /Users/900game/Desktop/ai/qlib/.venv/bin/python /Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/update_cn_data_daily.py --force
+
+Latest release tag: 2026-10-11
+Force download requested (--force); ignoring freshness: release marker matches remote tag 2026-10-11
+Downloading: https://github.com/chenditc/investment_data/releases/latest/download/qlib_bin.tar.gz
+        to: /var/folders/2n/mmpdg1gx1z536fvmc9p__crh0000gn/T/qlib_bin_vg8ks9b2/qlib_bin.tar.gz
+    0%  (0.0/541.1 MB)    1%  (5.4/541.1 MB)    2%  (10.8/541.1 MB)    3%  (16.2/541.1 MB)    4%  (21.6/541.1 MB)    5%  (27.1/541.1 MB)    6%  (32.5/541.1 MB)    7%  (37.9/541.1 MB)    8%  (43.3/541.1 MB)    9%  (48.7/541.1 MB)   10%  (54.1/541.1 MB)   11%  (59.5/541.1 MB)   12%  (64.9/541.1 MB)Traceback (most recent call last):
+  File "/Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/update_cn_data_daily.py", line 428, in <module>
+    main()
+  File "/Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/update_cn_data_daily.py", line 417, in main
+    run(
+  File "/Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/update_cn_data_daily.py", line 342, in run
+    download_archive(DOWNLOAD_URL, archive)
+  File "/Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/update_cn_data_daily.py", line 75, in download_archive
+    urllib.request.urlretrieve(url, dest, reporthook=_reporthook)
+  File "/Users/900game/.local/share/uv/python/cpython-3.12.14-macos-aarch64-none/lib/python3.12/urllib/request.py", line 276, in urlretrieve
+    raise ContentTooShortError(
+urllib.error.ContentTooShortError: <urlopen error retrieval incomplete: got only 69613895 out of 567432997 bytes>

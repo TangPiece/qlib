@@ -4,9 +4,11 @@ qlib_init:
 market: &market csi300
 benchmark: &benchmark SH000300
 data_handler_config: &data_handler_config
-    start_time: 2008-01-01
+    # Must not use calendars/day.txt first day (2000-01-04, idx=0):
+    # RollingGen trunc_segments asserts align_idx(train_start) > 0.
+    start_time: 2000-01-05
     end_time: 2026-10-12
-    fit_start_time: 2008-01-01
+    fit_start_time: 2000-01-05
     fit_end_time: 2014-12-31
     instruments: *market
 port_analysis_config: &port_analysis_config
@@ -51,8 +53,8 @@ task:
                 module_path: qlib.contrib.data.handler
                 kwargs: *data_handler_config
             segments:
-                # First rolling window template: 7y train + 1y valid; test span is full horizon
-                train: [2008-01-01, 2014-12-31]
+                # First rolling window template: long train + 1y valid; test span is full horizon
+                train: [2000-01-05, 2014-12-31]
                 valid: [2015-01-01, 2015-12-31]
                 test: [2016-01-01, 2026-10-12]
     record:

@@ -116,18 +116,20 @@
     const body = $("resultsBody");
     const rows = data.results || [];
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="4">暂无 *_positions_view.html</td></tr>';
+      body.innerHTML = '<tr><td colspan="5">暂无 *_positions.json / 旧 HTML</td></tr>';
       return;
     }
     body.innerHTML = rows
-      .map(
-        (r) => `<tr>
+      .map((r) => {
+        const kind = r.kind === "json" ? "JSON" : "旧HTML";
+        return `<tr>
         <td>${escapeHtml(r.exp_name)}</td>
+        <td>${kind}</td>
         <td>${escapeHtml(r.mtime)}</td>
         <td>${r.size_mb} MB</td>
         <td><a class="detail" href="${escapeAttr(r.url)}" target="_blank" rel="noopener">查看详情</a></td>
-      </tr>`
-      )
+      </tr>`;
+      })
       .join("");
   }
 

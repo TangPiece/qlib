@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>持仓日度查看</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a222c;
+    --text: #e7ecf1;
+    --muted: #8b98a5;
+    --border: #2c3640;
+    --buy: #3dd68c;
+    --sell: #f07178;
+    --hold: #59c2ff;
+    --accent: #e6b450;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+  }
+  header {
+    padding: 1.25rem 1.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #18202a 0%, var(--bg) 100%);
+  }
+  h1 {
+    margin: 0 0 0.35rem;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .meta { color: var(--muted); font-size: 0.9rem; }
+  .meta strong { color: var(--accent); font-weight: 560; }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 0.6rem;
+    padding: 0.85rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.7rem;
+  }
+  .metric .label { color: var(--muted); font-size: 0.75rem; }
+  .metric .value { font-size: 1.05rem; font-weight: 600; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
+  details.more-metrics {
+    margin: 0 1.5rem 0.75rem;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+  details.more-metrics summary { cursor: pointer; color: var(--accent); }
+  details.more-metrics pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    overflow: auto;
+    color: var(--text);
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(15, 20, 25, 0.94);
+    backdrop-filter: blur(6px);
+    z-index: 2;
+  }
+  button, select, input[type="date"] {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+    font: inherit;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .stats {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-left: auto;
+  }
+  .stats span b { color: var(--text); font-weight: 560; }
+  main {
+    padding: 1rem 1.5rem 2rem;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  section h2 {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  section h2 .tag { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+  .buy h2 { color: var(--buy); }
+  .sell h2 { color: var(--sell); }
+  .hold h2 { color: var(--hold); }
+  #holdBody, #buyBody, #sellBody {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+  }
+  #holdBody table, #buyBody table, #sellBody table {
+    width: max-content;
+    min-width: 100%;
+  }
+  th, td {
+    padding: 0.4rem 0.65rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th { color: var(--muted); font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+  .empty {
+    padding: 1rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .pill {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 0.35rem;
+  }
+  .pill-buy { background: rgba(61,214,140,0.15); color: var(--buy); }
+  .pill-hold { background: rgba(89,194,255,0.12); color: var(--hold); }
+  .ret-pos { color: var(--sell); }
+  .ret-neg { color: var(--buy); }
+  .yearly-wrap {
+    margin: 0 1.5rem 0.85rem;
+  }
+  .yearly-wrap h2 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .warn {
+    background: rgba(230, 180, 80, 0.12);
+    border: 1px solid rgba(230, 180, 80, 0.45);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 0.55rem 0.85rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.88rem;
+  }
+  .yearly-table-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: auto;
+  }
+  .yearly-table-wrap table { font-size: 0.88rem; }
+  .yearly-table-wrap th { white-space: nowrap; }
+  .num-pos { color: var(--sell); }
+  .num-neg { color: var(--buy); }
+  .industry-wrap {
+    margin: 0 1.5rem 0.85rem;
+  }
+  .industry-wrap h2 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .industry-table-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: auto;
+  }
+  .industry-bar {
+    display: inline-block;
+    height: 0.45rem;
+    border-radius: 2px;
+    background: var(--accent);
+    vertical-align: middle;
+    margin-left: 0.5rem;
+    min-width: 0;
+  }
+  .timing-note {
+    margin: 0 1.5rem 0.85rem;
+    padding: 0.65rem 0.9rem;
+    background: rgba(89, 194, 255, 0.08);
+    border: 1px solid rgba(89, 194, 255, 0.35);
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 0.86rem;
+    line-height: 1.5;
+  }
+  .timing-note strong { color: var(--hold); font-weight: 560; }
+  .timing-note code { color: var(--accent); font-size: 0.84rem; }
+  #predictBtn {
+    background: rgba(61, 214, 140, 0.12);
+    border-color: rgba(61, 214, 140, 0.45);
+    color: var(--buy);
+  }
+  #predictBtn:hover { border-color: var(--buy); }
+  #predictBtn:disabled { opacity: 0.45; }
+  .live-signal {
+    margin: 0 1.5rem 0.85rem;
+    background: var(--panel);
+    border: 1px solid rgba(61, 214, 140, 0.35);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .live-signal > h2 {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    color: var(--buy);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .live-signal .meta-row {
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-weight: 500;
+  }
+  .live-signal .meta-row b { color: var(--text); font-weight: 560; }
+  .live-signal .note {
+    padding: 0.55rem 1rem;
+    color: var(--muted);
+    font-size: 0.84rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .live-signal .grids {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0;
+  }
+  .live-signal .grids > div { border-right: 1px solid var(--border); }
+  .live-signal .grids > div:last-child { border-right: none; }
+  .live-signal .grids h3 {
+    margin: 0;
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .live-signal .grids .buy-col h3 { color: var(--buy); }
+  .live-signal .grids .sell-col h3 { color: var(--sell); }
+  .live-signal .status {
+    padding: 0.55rem 1rem;
+    font-size: 0.84rem;
+    color: var(--accent);
+    border-top: 1px solid var(--border);
+    white-space: pre-wrap;
+    max-height: 8rem;
+    overflow: auto;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>持仓日度查看</h1>
+  <p id="loadStatus" class="meta" style="color:var(--accent)">准备加载…</p>
+<div class="meta">
+    实验 <strong id="expName"></strong>
+    · recorder <code id="recId" style="color:var(--muted)"></code>
+    · <span id="range"></span>
+    · 账户 <span id="avSummary"></span>
+  </div>
+</header>
+<div class="metrics" id="metricsRow"></div>
+<details class="more-metrics">
+  <summary>更多组合 / 成交指标</summary>
+  <pre id="moreMetrics"></pre>
+</details>
+<section class="yearly-wrap" id="yearlySection" hidden>
+  <h2>分年度超额</h2>
+  <div class="warn" id="yearlyWarn" hidden></div>
+  <div class="yearly-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>年份</th>
+          <th>年化超额(无成本)</th>
+          <th>年化超额(含成本)</th>
+          <th>累计超额(含成本)</th>
+          <th>交易日数</th>
+        </tr>
+      </thead>
+      <tbody id="yearlyBody"></tbody>
+    </table>
+  </div>
+</section>
+<div class="controls">
+  <button id="prevBtn" type="button">← 前一日</button>
+  <input id="dateInput" type="date"/>
+  <select id="dateSelect"></select>
+  <button id="nextBtn" type="button">后一日 →</button>
+  <button id="predictBtn" type="button" title="基于 OnlineToolR 更新预测并生成下一交易日 TopkDropout 名单">预测</button>
+  <div class="stats">
+    <span>现金 <b id="cash"></b></span>
+    <span>总资产 <b id="account"></b></span>
+    <span>持仓 <b id="nHold"></b></span>
+    <span>买入 <b id="nBuy"></b></span>
+    <span>卖出 <b id="nSell"></b></span>
+  </div>
+</div>
+<p class="timing-note" id="timingNote">
+  当前选择日为<strong>回测成交日</strong>（按当日 close 撮合）；策略信号来自<strong>上一交易日</strong>
+  （<code id="signalDateLabel">—</code>）。日频包通常要等成交日收盘后才有，缺当日行情时本页可能显示 0 买卖（仓位结转），那是复盘缺数，不是「当日无信号」。
+  实盘应在信号日收盘后定名单、在下一交易日执行；不要等本页复盘出来再去补做已过去的成交日。
+  点「预测」生成<strong>实盘信号</strong>（信号日 → 建议执行日），与下方回测复盘表分开看。
+</p>
+<section class="live-signal" id="liveSignalSection" hidden>
+  <h2>
+    <span>实盘预测信号</span>
+    <span class="meta-row">
+      信号日 <b id="liveSignalDate">—</b>
+      · 建议执行日 <b id="liveExecuteDate">—</b>
+      · 买入 <b id="liveNBuy">0</b>
+      · 卖出 <b id="liveNSell">0</b>
+    </span>
+  </h2>
+  <div class="note" id="liveSignalNote"></div>
+  <div class="grids">
+    <div class="buy-col">
+      <h3>建议买入 <span id="liveBuyTag"></span></h3>
+      <div id="liveBuyBody"></div>
+    </div>
+    <div class="sell-col">
+      <h3>建议卖出 <span id="liveSellTag"></span></h3>
+      <div id="liveSellBody"></div>
+    </div>
+  </div>
+  <div class="status" id="livePredictStatus" hidden></div>
+</section>
+<section class="industry-wrap" id="industrySection" hidden>
+  <h2>行业占比（申万一级 · 持仓权重）</h2>
+  <div class="industry-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>行业</th>
+          <th>权重占比</th>
+          <th>只数</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="industryBody"></tbody>
+    </table>
+  </div>
+</section>
+<main>
+  <section class="hold">
+    <h2>成交日持仓 <span class="tag" id="holdTag"></span></h2>
+    <div id="holdBody"></div>
+  </section>
+  <section class="buy">
+    <h2>成交日买入 <span class="tag" id="buyTag"></span></h2>
+    <div id="buyBody"></div>
+  </section>
+  <section class="sell">
+    <h2>成交日卖出 <span class="tag" id="sellTag"></span></h2>
+    <div id="sellBody"></div>
+  </section>
+</main>
+<script>
+(function () {
+  async function boot() {
+    const status = document.getElementById("loadStatus");
+    const params = new URLSearchParams(location.search);
+    let dataUrl = params.get("data");
+    if (!dataUrl) {
+      if (status) status.textContent = "缺少 ?data= 参数（例如 /positions_view.html?data=/data/exp_positions.json）";
+      return;
+    }
+    if (!dataUrl.startsWith("/") && !/^https?:/i.test(dataUrl)) {
+      dataUrl = "/data/" + dataUrl.replace(/^\.\//, "");
+    }
+    let data;
+    try {
+      if (status) status.textContent = "加载数据中… " + dataUrl;
+      const res = await fetch(dataUrl);
+      if (!res.ok) throw new Error("HTTP " + res.status + " " + dataUrl);
+      data = await res.json();
+      if (status) status.remove();
+    } catch (err) {
+      if (status) status.textContent = "加载失败: " + (err && err.message ? err.message : err);
+      return;
+    }
+    document.title = "Positions · " + (data.exp_name || "");
+    const dates = data.days.map(d => d.date);
+    let idx = 0;
+
+    const fmt = (x, digits=4) => {
+      if (x === null || x === undefined || Number.isNaN(x)) return "—";
+      if (typeof x === "number") return x.toLocaleString(undefined, { maximumFractionDigits: digits });
+      return String(x);
+    };
+    const fmtPct = (x) => {
+      if (x === null || x === undefined || Number.isNaN(x)) return "—";
+      return (x * 100).toFixed(2) + "%";
+    };
+    const fmtNum = (x, digits=4) => {
+      if (x === null || x === undefined || Number.isNaN(x)) return "—";
+      return Number(x).toFixed(digits);
+    };
+
+    function table(items, {showAction=false, showBuyDate=true, showReturn=false, showIndustry=false} = {}) {
+      if (!items || !items.length) return '<div class="empty">无</div>';
+      const head = '<tr><th>代码</th><th>名称</th>' +
+        (showIndustry ? '<th>行业</th>' : '') +
+        (showBuyDate ? '<th>买入日</th>' : '') +
+        '<th>权重</th><th>数量</th><th>复权价</th><th>现价</th>' +
+        (showReturn ? '<th>收益率</th>' : '') +
+        (showAction ? '<th>标记</th>' : '') + '</tr>';
+      const body = items.map(it => {
+        const pill = showAction
+          ? (it.action === "buy"
+              ? '<span class="pill pill-buy">buy</span>'
+              : '<span class="pill pill-hold">hold</span>')
+          : "";
+        let retCell = "";
+        if (showReturn) {
+          const r = it.return_rate;
+          if (r === null || r === undefined || Number.isNaN(r)) {
+            retCell = '<td>—</td>';
+          } else {
+            const cls = r >= 0 ? "ret-pos" : "ret-neg";
+            retCell = '<td class="' + cls + '">' + fmtPct(r) + '</td>';
+          }
+        }
+        const adjPx = showReturn && it.sell_price != null ? it.sell_price : it.price;
+        const rawPx = showReturn && it.sell_raw_price != null ? it.sell_raw_price : it.raw_price;
+        return '<tr>' +
+          '<td>' + it.instrument + (showAction ? pill : '') + '</td>' +
+          '<td>' + (it.name || "—") + '</td>' +
+          (showIndustry ? '<td>' + (it.industry_name || "—") + '</td>' : '') +
+          (showBuyDate ? '<td>' + (it.buy_date || "—") + '</td>' : '') +
+          '<td>' + fmtPct(it.weight) + '</td>' +
+          '<td>' + fmt(it.amount, 2) + '</td>' +
+          '<td>' + fmt(adjPx, 4) + '</td>' +
+          '<td>' + fmt(rawPx, 4) + '</td>' +
+          retCell +
+          (showAction ? '<td>' + (it.action || '') + '</td>' : '') +
+          '</tr>';
+      }).join("");
+      return '<table><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+    }
+
+    function renderIndustries(day) {
+      const section = document.getElementById("industrySection");
+      const body = document.getElementById("industryBody");
+      const rows = day.industries || [];
+      if (!rows.length) {
+        section.hidden = true;
+        body.innerHTML = "";
+        return;
+      }
+      section.hidden = false;
+      const maxW = Math.max(...rows.map(r => Number(r.weight) || 0), 1e-12);
+      body.innerHTML = rows.map(r => {
+        const w = Number(r.weight) || 0;
+        const barPct = Math.max(0, Math.min(100, (w / maxW) * 100));
+        return "<tr>" +
+          "<td>" + (r.industry_name || "未知") + "</td>" +
+          "<td>" + fmtPct(w) + "</td>" +
+          "<td>" + (r.n == null ? "—" : r.n) + "</td>" +
+          '<td><span class="industry-bar" style="width:' + barPct.toFixed(1) + '%"></span></td>' +
+          "</tr>";
+      }).join("");
+    }
+
+    function render() {
+      const day = data.days[idx];
+      const signalDate = idx > 0 ? dates[idx - 1] : "（首日无上一交易日）";
+      const signalEl = document.getElementById("signalDateLabel");
+      if (signalEl) signalEl.textContent = signalDate;
+      document.getElementById("dateInput").value = day.date;
+      document.getElementById("dateSelect").value = day.date;
+      document.getElementById("cash").textContent = fmt(day.cash, 2);
+      document.getElementById("account").textContent = fmt(day.account_value, 2);
+      document.getElementById("nHold").textContent = day.n_hold;
+      document.getElementById("nBuy").textContent = day.n_buy;
+      document.getElementById("nSell").textContent = day.n_sell;
+      document.getElementById("holdTag").textContent = day.n_hold + " 只";
+      document.getElementById("buyTag").textContent = day.n_buy + " 只";
+      document.getElementById("sellTag").textContent = day.n_sell + " 只";
+      document.getElementById("holdBody").innerHTML = table(day.hold, {showAction: true, showIndustry: true});
+      document.getElementById("buyBody").innerHTML = table(day.buy, {showBuyDate: false});
+      document.getElementById("sellBody").innerHTML = table(day.sell, {showReturn: true});
+      renderIndustries(day);
+      document.getElementById("prevBtn").disabled = idx <= 0;
+      document.getElementById("nextBtn").disabled = idx >= dates.length - 1;
+    }
+
+    function gotoDate(dateStr) {
+      const i = dates.indexOf(dateStr);
+      if (i >= 0) { idx = i; render(); return; }
+      let best = 0;
+      for (let j = 0; j < dates.length; j++) {
+        if (dates[j] <= dateStr) best = j;
+        else break;
+      }
+      idx = best;
+      render();
+    }
+
+    function defaultIndex() {
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth() + 1).padStart(2, "0");
+      const d = String(today.getDate()).padStart(2, "0");
+      const todayStr = y + "-" + m + "-" + d;
+      if (!dates.length) return 0;
+      if (todayStr < dates[0]) return 0;
+      if (todayStr > dates[dates.length - 1]) return dates.length - 1;
+      let best = 0;
+      for (let j = 0; j < dates.length; j++) {
+        if (dates[j] <= todayStr) best = j;
+        else break;
+      }
+      return best;
+    }
+
+    function pctClass(x) {
+      if (x === null || x === undefined || Number.isNaN(x)) return "";
+      return x >= 0 ? "num-pos" : "num-neg";
+    }
+
+    function renderMetrics() {
+      const m = data.metrics || {};
+      const ewc = (m.port && m.port.excess_with_cost) || {};
+      const cards = [
+        ["IC", fmtNum(m.IC, 4)],
+        ["ICIR", fmtNum(m.ICIR, 4)],
+        ["Rank IC", fmtNum(m["Rank IC"], 4)],
+        ["Rank ICIR", fmtNum(m["Rank ICIR"], 4)],
+        ["超额年化(含成本)", fmtPct(ewc.annualized_return)],
+        ["IR(含成本)", fmtNum(ewc.information_ratio, 4)],
+        ["最大回撤(含成本)", fmtPct(ewc.max_drawdown)],
+      ];
+      document.getElementById("metricsRow").innerHTML = cards.map(([label, value]) =>
+        '<div class="metric"><div class="label">' + label + '</div><div class="value">' + value + '</div></div>'
+      ).join("");
+      document.getElementById("moreMetrics").textContent = JSON.stringify({
+        port: m.port || {},
+        indicators: m.indicators || {},
+        yearly_excess: data.yearly_excess || {}
+      }, null, 2);
+    }
+
+    function renderYearly() {
+      const ye = data.yearly_excess || {};
+      const rows = ye.rows || [];
+      const section = document.getElementById("yearlySection");
+      if (!rows.length) {
+        section.hidden = true;
+        return;
+      }
+      section.hidden = false;
+      const warnEl = document.getElementById("yearlyWarn");
+      if (ye.concentration_warning) {
+        warnEl.hidden = false;
+        warnEl.textContent = ye.concentration_warning;
+      } else {
+        warnEl.hidden = true;
+        warnEl.textContent = "";
+      }
+      document.getElementById("yearlyBody").innerHTML = rows.map(r => {
+        const a0 = r.annualized_without_cost;
+        const a1 = r.annualized_with_cost;
+        const c = r.cum_excess_with_cost;
+        return "<tr>" +
+          "<td>" + r.year + "</td>" +
+          '<td class="' + pctClass(a0) + '">' + fmtPct(a0) + "</td>" +
+          '<td class="' + pctClass(a1) + '">' + fmtPct(a1) + "</td>" +
+          '<td class="' + pctClass(c) + '">' + fmtPct(c) + "</td>" +
+          "<td>" + (r.n_days == null ? "—" : r.n_days) + "</td>" +
+          "</tr>";
+      }).join("");
+    }
+
+    document.getElementById("expName").textContent = data.exp_name;
+    document.getElementById("recId").textContent = data.recorder_id;
+    document.getElementById("range").textContent = data.start + " → " + data.end;
+    document.getElementById("avSummary").textContent =
+      fmt(data.first_account_value, 2) + " → " + fmt(data.last_account_value, 2);
+
+    const sel = document.getElementById("dateSelect");
+    dates.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d; opt.textContent = d;
+      sel.appendChild(opt);
+    });
+
+    document.getElementById("prevBtn").onclick = () => { if (idx > 0) { idx--; render(); } };
+    document.getElementById("nextBtn").onclick = () => { if (idx < dates.length - 1) { idx++; render(); } };
+    document.getElementById("dateSelect").onchange = (e) => gotoDate(e.target.value);
+    document.getElementById("dateInput").onchange = (e) => gotoDate(e.target.value);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") document.getElementById("prevBtn").click();
+      if (e.key === "ArrowRight") document.getElementById("nextBtn").click();
+    });
+
+    function liveSignalUrl() {
+      const exp = data.exp_name || "";
+      if (!exp) return null;
+      return "/data/" + String(exp).replace(/\//g, "_") + "_live_signal.json";
+    }
+
+    function renderLiveItems(items) {
+      if (!items || !items.length) return '<div class="empty">无</div>';
+      const rows = items.map((it) => {
+        const score = (it.score === null || it.score === undefined || Number.isNaN(it.score))
+          ? "—"
+          : Number(it.score).toFixed(6);
+        return "<tr><td>" + (it.instrument || "") +
+          (it.name ? " <span style=\"color:var(--muted)\">" + it.name + "</span>" : "") +
+          "</td><td>" + score + "</td></tr>";
+      }).join("");
+      return "<table><thead><tr><th>代码</th><th>分数</th></tr></thead><tbody>" + rows + "</tbody></table>";
+    }
+
+    function showLiveSignal(sig) {
+      const section = document.getElementById("liveSignalSection");
+      section.hidden = false;
+      document.getElementById("liveSignalDate").textContent = sig.signal_date || "—";
+      document.getElementById("liveExecuteDate").textContent = sig.execute_date || "（无下一交易日）";
+      document.getElementById("liveNBuy").textContent = sig.n_buy != null ? sig.n_buy : (sig.buys || []).length;
+      document.getElementById("liveNSell").textContent = sig.n_sell != null ? sig.n_sell : (sig.sells || []).length;
+      document.getElementById("liveBuyTag").textContent = "(" + (sig.buys || []).length + ")";
+      document.getElementById("liveSellTag").textContent = "(" + (sig.sells || []).length + ")";
+      document.getElementById("liveSignalNote").textContent = sig.note || "";
+      document.getElementById("liveBuyBody").innerHTML = renderLiveItems(sig.buys);
+      document.getElementById("liveSellBody").innerHTML = renderLiveItems(sig.sells);
+    }
+
+    async function loadExistingLiveSignal() {
+      const url = liveSignalUrl();
+      if (!url) return;
+      try {
+        const res = await fetch(url + "?t=" + Date.now());
+        if (!res.ok) return;
+        showLiveSignal(await res.json());
+      } catch (_) { /* no cached signal yet */ }
+    }
+
+    let predictPoll = null;
+    function setPredictBusy(busy, msg) {
+      const btn = document.getElementById("predictBtn");
+      btn.disabled = !!busy;
+      const st = document.getElementById("livePredictStatus");
+      if (msg) {
+        st.hidden = false;
+        st.textContent = msg;
+      } else if (!busy) {
+        st.hidden = true;
+        st.textContent = "";
+      }
+    }
+
+    async function pollPredictJob(jobId, signalUrl) {
+      if (predictPoll) clearInterval(predictPoll);
+      predictPoll = setInterval(async () => {
+        try {
+          const res = await fetch("/api/jobs/" + encodeURIComponent(jobId));
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const job = await res.json();
+          const tail = (job.log || "").split("\n").slice(-8).join("\n");
+          setPredictBusy(true, (job.kind || "predict") + " · " + job.status + "\n" + tail);
+          if (job.status === "finished" || job.status === "failed") {
+            clearInterval(predictPoll);
+            predictPoll = null;
+            if (job.status === "failed") {
+              setPredictBusy(false, "预测失败: " + (job.error || "unknown"));
+              return;
+            }
+            const sigRes = await fetch((signalUrl || liveSignalUrl()) + "?t=" + Date.now());
+            if (!sigRes.ok) throw new Error("信号文件未生成 HTTP " + sigRes.status);
+            showLiveSignal(await sigRes.json());
+            setPredictBusy(false, "预测完成");
+          }
+        } catch (err) {
+          clearInterval(predictPoll);
+          predictPoll = null;
+          setPredictBusy(false, "预测出错: " + (err && err.message ? err.message : err));
+        }
+      }, 2000);
+    }
+
+    document.getElementById("predictBtn").onclick = async () => {
+      const exp = data.exp_name;
+      if (!exp) {
+        setPredictBusy(false, "当前 JSON 缺少 exp_name，无法预测");
+        document.getElementById("liveSignalSection").hidden = false;
+        return;
+      }
+      document.getElementById("liveSignalSection").hidden = false;
+      setPredictBusy(true, "正在启动预测…");
+      try {
+        const res = await fetch("/api/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            exp_name: exp,
+            recorder_id: data.recorder_id || undefined,
+          }),
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || ("HTTP " + res.status));
+        await pollPredictJob(body.job.id, body.signal_url);
+      } catch (err) {
+        setPredictBusy(false, "启动失败: " + (err && err.message ? err.message : err));
+      }
+    };
+
+    renderMetrics();
+    renderYearly();
+    idx = defaultIndex();
+    render();
+    loadExistingLiveSignal();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+
+</body>
+</html>

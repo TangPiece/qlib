@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Export backtest positions to a self-contained HTML day browser.
+"""Export backtest positions to JSON for the shared day-browser HTML.
 
 Reads positions and analysis artifacts from an MLflow experiment recorder,
-labels hold/buy/sell, attaches stock names and buy dates, and writes a
-single-file HTML with metrics cards, yearly excess table, and day browser;
-experiment JSON payload sits at the file bottom.
+labels hold/buy/sell, attaches stock names and buy dates, and writes
+``data/{exp_name}_positions.json``. View via the console shared page::
+
+    /positions_view.html?data=/data/{exp_name}_positions.json
 
 Example (from qlib repo root)::
 
@@ -17,6 +18,7 @@ import argparse
 import json
 import warnings
 from pathlib import Path
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -32,8 +34,12 @@ DIRNAME = Path(__file__).absolute().resolve().parent
 DEFAULT_OUT_DIR = DIRNAME / "data"
 DEFAULT_EXP_NAME = "rolling_lgb_7y1y_20261009"
 NAME_MAP_PATH = DEFAULT_OUT_DIR / "stock_name_map.json"
+DEFAULT_INDUSTRY_MAP = DEFAULT_OUT_DIR / "csi300_sw_l1_industry_intervals.parquet"
 POSITIONS_ARTIFACT = "portfolio_analysis/positions_normal_1day.pkl"
 REPORT_ARTIFACT = "portfolio_analysis/report_normal_1day.pkl"
+
+# instrument -> [(start, end, industry_code, industry_name), ...]
+IndustryIntervals = Dict[str, List[Tuple[pd.Timestamp, pd.Timestamp, str, str]]]
 
 
 def _latest_recorder(exp_name: str, recorder_id: Optional[str] = None):
@@ -105,43 +111,145 @@ def _stock_info(pos) -> Dict[str, Dict[str, Any]]:
     return out
 
 
-def _fetch_sell_closes(sell_keys: List[Tuple[str, str]]) -> Dict[Tuple[str, str], Optional[float]]:
-    """Map (instrument, YYYY-MM-DD) -> $close on that day.
+def load_industry_intervals(path: Path) -> Optional[IndustryIntervals]:
+    """Load PIT SW L1 intervals; return None if missing/unreadable."""
+    path = Path(path).expanduser()
+    if not path.exists():
+        warnings.warn(
+            f"industry map not found: {path}; day.industries will be empty. "
+            "Run build_csi300_industry_map.py first."
+        )
+        return None
+    try:
+        df = pd.read_parquet(path)
+    except Exception as exc:  # noqa: BLE001
+        warnings.warn(f"failed to read industry map {path}: {exc}")
+        return None
+    required = {"instrument", "industry_code", "industry_name", "start_date", "end_date"}
+    missing = required - set(df.columns)
+    if missing:
+        warnings.warn(f"industry map missing columns {sorted(missing)}; skipping")
+        return None
+    out: IndustryIntervals = defaultdict(list)
+    for row in df.itertuples(index=False):
+        inst = str(getattr(row, "instrument")).strip().upper()
+        code = str(getattr(row, "industry_code")).strip()
+        name = str(getattr(row, "industry_name")).strip() or code
+        start = pd.Timestamp(getattr(row, "start_date")).normalize()
+        end = pd.Timestamp(getattr(row, "end_date")).normalize()
+        out[inst].append((start, end, code, name))
+    for inst in out:
+        out[inst].sort(key=lambda x: (x[1], x[0]))
+    return dict(out)
+
+
+def lookup_industry(
+    intervals: Optional[IndustryIntervals],
+    instrument: str,
+    trade_date: pd.Timestamp,
+) -> Tuple[str, str]:
+    """Return (industry_code, industry_name); unknown -> ('', '未知')."""
+    if not intervals:
+        return "", "未知"
+    trade_date = pd.Timestamp(trade_date).normalize()
+    key = str(instrument).strip().upper()
+    ivs = intervals.get(key)
+    if not ivs:
+        return "", "未知"
+
+    covering = [iv for iv in ivs if iv[0] <= trade_date <= iv[1]]
+    if covering:
+        covering.sort(key=lambda x: x[0])
+        _, _, code, name = covering[-1]
+        return code, name
+
+    earlier = [iv for iv in ivs if iv[1] < trade_date]
+    if earlier:
+        earlier.sort(key=lambda x: x[1])
+        _, _, code, name = earlier[-1]
+        return code, name
+
+    return "", "未知"
+
+
+def aggregate_industries(hold_items: List[dict], date_str: str, intervals: Optional[IndustryIntervals]) -> List[dict]:
+    """Sum hold weights by SW L1 industry (desc by weight)."""
+    buckets: Dict[str, Dict[str, Any]] = {}
+    trade_date = pd.Timestamp(date_str)
+    for item in hold_items:
+        code = item.get("instrument") or ""
+        ind_code, ind_name = lookup_industry(intervals, code, trade_date)
+        item["industry_code"] = ind_code
+        item["industry_name"] = ind_name
+        w = item.get("weight")
+        w = float(w) if w is not None and not (isinstance(w, float) and np.isnan(w)) else 0.0
+        key = ind_code or "__UNKNOWN__"
+        if key not in buckets:
+            buckets[key] = {
+                "industry_code": ind_code,
+                "industry_name": ind_name,
+                "weight": 0.0,
+                "n": 0,
+            }
+        buckets[key]["weight"] += w
+        buckets[key]["n"] += 1
+    rows = list(buckets.values())
+    rows.sort(key=lambda r: (-float(r["weight"]), str(r["industry_name"])))
+    return rows
+
+
+def _fetch_adj_raw_prices(
+    keys: List[Tuple[str, str]],
+) -> Dict[Tuple[str, str], Tuple[Optional[float], Optional[float]]]:
+    """Map (instrument, YYYY-MM-DD) -> (adj_close, raw_price).
+
+    ``adj_close`` is qlib ``$close`` (factor-adjusted). ``raw_price`` is
+    ``$close / $factor`` (approx. exchange nominal close).
 
     Uses a single kernel: macOS spawn + python -c/<stdin> breaks qlib's multiprocessing.
     """
-    out: Dict[Tuple[str, str], Optional[float]] = {k: None for k in sell_keys}
-    if not sell_keys:
+    out: Dict[Tuple[str, str], Tuple[Optional[float], Optional[float]]] = {
+        k: (None, None) for k in keys
+    }
+    if not keys:
         return out
-    instruments = sorted({code for code, _ in sell_keys})
-    start = min(d for _, d in sell_keys)
-    end = max(d for _, d in sell_keys)
+    instruments = sorted({code for code, _ in keys})
+    start = min(d for _, d in keys)
+    end = max(d for _, d in keys)
     prev_kernels = C.kernels
     try:
         C.kernels = 1
-        close_df = D.features(instruments, ["$close"], start_time=start, end_time=end, freq="day")
+        price_df = D.features(
+            instruments, ["$close", "$factor"], start_time=start, end_time=end, freq="day"
+        )
     except Exception as exc:  # noqa: BLE001
-        warnings.warn(f"failed to load sell-day closes: {exc}")
+        warnings.warn(f"failed to load adj/raw prices: {exc}")
         return out
     finally:
         C.kernels = prev_kernels
-    if close_df is None or close_df.empty:
+    if price_df is None or price_df.empty:
         return out
-    # index: (instrument, datetime)
-    for (code, date_str) in sell_keys:
+    for (code, date_str) in keys:
         try:
-            val = close_df.loc[(code, pd.Timestamp(date_str)), "$close"]
-            if isinstance(val, pd.Series):
-                val = val.iloc[0]
-            out[(code, date_str)] = float(val) if pd.notna(val) else None
-        except (KeyError, TypeError, ValueError, IndexError):
-            out[(code, date_str)] = None
+            row = price_df.loc[(code, pd.Timestamp(date_str))]
+            if isinstance(row, pd.DataFrame):
+                row = row.iloc[0]
+            adj = row["$close"]
+            fac = row["$factor"]
+            adj_f = float(adj) if pd.notna(adj) else None
+            raw_f = None
+            if adj_f is not None and pd.notna(fac) and float(fac) != 0.0:
+                raw_f = adj_f / float(fac)
+            out[(code, date_str)] = (adj_f, raw_f)
+        except (KeyError, TypeError, ValueError, IndexError, ZeroDivisionError):
+            out[(code, date_str)] = (None, None)
     return out
 
 
 def build_day_frames(
     positions: Dict,
     name_map: Optional[Dict[str, str]] = None,
+    industry_intervals: Optional[IndustryIntervals] = None,
 ) -> Tuple[pd.DataFrame, List[dict]]:
     """Return long parquet rows + per-day HTML payload (with name / buy_date / sell return)."""
     name_map = name_map or {}
@@ -191,12 +299,14 @@ def build_day_frames(
                 "name": name_map.get(code) or "",
                 "buy_date": buy_date,
                 "amount": info.get("amount"),
-                "price": info.get("price"),
+                "price": info.get("price"),  # qlib adj close ($close)
+                "raw_price": None,  # filled later: $close / $factor
                 "weight": info.get("weight"),
                 "count_day": info.get("count_day"),
                 "action": action,
                 "buy_price": buy_price,
                 "sell_price": sell_price,
+                "sell_raw_price": None,
                 "return_rate": return_rate,
             }
 
@@ -259,6 +369,8 @@ def build_day_frames(
                 }
             )
 
+        industries = aggregate_industries(day_hold, date_str, industry_intervals)
+
         days_payload.append(
             {
                 "date": date_str,
@@ -270,37 +382,71 @@ def build_day_frames(
                 "hold": day_hold,
                 "buy": day_buy,
                 "sell": day_sell,
+                "industries": industries,
             }
         )
         prev_codes = cur_codes
         prev_info = cur_info
 
-    close_map = _fetch_sell_closes(sell_keys)
+    price_keys: List[Tuple[str, str]] = []
     for day in days_payload:
+        d = day["date"]
+        for bucket in ("hold", "buy", "sell"):
+            for item in day[bucket]:
+                code = item.get("instrument")
+                if code:
+                    price_keys.append((code, d))
+    # unique while preserving order
+    seen = set()
+    uniq_keys: List[Tuple[str, str]] = []
+    for k in price_keys:
+        if k not in seen:
+            seen.add(k)
+            uniq_keys.append(k)
+
+    price_map = _fetch_adj_raw_prices(uniq_keys)
+    for day in days_payload:
+        d = day["date"]
+        for bucket in ("hold", "buy"):
+            for item in day[bucket]:
+                code = item.get("instrument")
+                if not code:
+                    continue
+                adj, raw = price_map.get((code, d), (None, None))
+                if item.get("price") is None and adj is not None:
+                    item["price"] = adj
+                item["raw_price"] = raw
         for item in day["sell"]:
-            code = item["instrument"]
-            sell_price = close_map.get((code, day["date"]))
+            code = item.get("instrument")
+            if not code:
+                continue
+            adj, raw = price_map.get((code, d), (None, None))
             buy_price = item.get("buy_price")
-            item["sell_price"] = sell_price
-            if buy_price and sell_price and buy_price != 0:
-                item["return_rate"] = float(sell_price) / float(buy_price) - 1.0
+            item["sell_price"] = adj
+            item["sell_raw_price"] = raw
+            item["raw_price"] = raw
+            if buy_price and adj and buy_price != 0:
+                item["return_rate"] = float(adj) / float(buy_price) - 1.0
             else:
                 item["return_rate"] = None
 
     for row in rows:
-        if row.get("action") != "sell":
-            continue
         code = row.get("instrument")
         date_str = row.get("datetime")
         if not code or not date_str:
             continue
-        sell_price = close_map.get((code, date_str))
-        buy_price = row.get("buy_price")
-        row["sell_price"] = sell_price
-        if buy_price and sell_price and buy_price != 0:
-            row["return_rate"] = float(sell_price) / float(buy_price) - 1.0
-        else:
-            row["return_rate"] = None
+        adj, raw = price_map.get((code, date_str), (None, None))
+        if row.get("price") is None and adj is not None:
+            row["price"] = adj
+        row["raw_price"] = raw
+        if row.get("action") == "sell":
+            buy_price = row.get("buy_price")
+            row["sell_price"] = adj
+            row["sell_raw_price"] = raw
+            if buy_price and adj and buy_price != 0:
+                row["return_rate"] = float(adj) / float(buy_price) - 1.0
+            else:
+                row["return_rate"] = None
 
     df = pd.DataFrame(rows)
     if not df.empty:
@@ -442,469 +588,6 @@ def collect_yearly_excess(recorder) -> Dict[str, Any]:
     return out
 
 
-def render_html(payload: Dict[str, Any]) -> str:
-    """Build HTML shell; experiment JSON is appended at the very bottom."""
-    exp_name = payload.get("exp_name", "")
-    # Pretty-print for readability at file bottom; still valid JSON.
-    data_json = json.dumps(payload, ensure_ascii=False, indent=2)
-
-    return f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Positions · {exp_name}</title>
-<style>
-  :root {{
-    --bg: #0f1419;
-    --panel: #1a222c;
-    --text: #e7ecf1;
-    --muted: #8b98a5;
-    --border: #2c3640;
-    --buy: #3dd68c;
-    --sell: #f07178;
-    --hold: #59c2ff;
-    --accent: #e6b450;
-  }}
-  * {{ box-sizing: border-box; }}
-  body {{
-    margin: 0;
-    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.45;
-  }}
-  header {{
-    padding: 1.25rem 1.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, #18202a 0%, var(--bg) 100%);
-  }}
-  h1 {{
-    margin: 0 0 0.35rem;
-    font-size: 1.35rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }}
-  .meta {{ color: var(--muted); font-size: 0.9rem; }}
-  .meta strong {{ color: var(--accent); font-weight: 560; }}
-  .metrics {{
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 0.6rem;
-    padding: 0.85rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-  }}
-  .metric {{
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.55rem 0.7rem;
-  }}
-  .metric .label {{ color: var(--muted); font-size: 0.75rem; }}
-  .metric .value {{ font-size: 1.05rem; font-weight: 600; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }}
-  details.more-metrics {{
-    margin: 0 1.5rem 0.75rem;
-    color: var(--muted);
-    font-size: 0.88rem;
-  }}
-  details.more-metrics summary {{ cursor: pointer; color: var(--accent); }}
-  details.more-metrics pre {{
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    overflow: auto;
-    color: var(--text);
-  }}
-  .controls {{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    align-items: center;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
-    background: rgba(15, 20, 25, 0.94);
-    backdrop-filter: blur(6px);
-    z-index: 2;
-  }}
-  button, select, input[type="date"] {{
-    background: var(--panel);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.45rem 0.75rem;
-    font: inherit;
-  }}
-  button {{ cursor: pointer; }}
-  button:hover {{ border-color: var(--accent); }}
-  button:disabled {{ opacity: 0.4; cursor: not-allowed; }}
-  .stats {{
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    color: var(--muted);
-    font-size: 0.9rem;
-    margin-left: auto;
-  }}
-  .stats span b {{ color: var(--text); font-weight: 560; }}
-  main {{
-    padding: 1rem 1.5rem 2rem;
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  }}
-  section {{
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-  }}
-  section h2 {{
-    margin: 0;
-    padding: 0.75rem 1rem;
-    font-size: 0.95rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-  }}
-  section h2 .tag {{ font-size: 0.8rem; color: var(--muted); font-weight: 500; }}
-  .buy h2 {{ color: var(--buy); }}
-  .sell h2 {{ color: var(--sell); }}
-  .hold h2 {{ color: var(--hold); }}
-  table {{
-    width: 100%;
-    border-collapse: collapse;
-    font-variant-numeric: tabular-nums;
-    font-size: 0.85rem;
-  }}
-  th, td {{
-    padding: 0.4rem 0.65rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-  }}
-  th {{ color: var(--muted); font-weight: 500; }}
-  tr:last-child td {{ border-bottom: none; }}
-  .empty {{
-    padding: 1rem;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }}
-  .pill {{
-    display: inline-block;
-    padding: 0.1rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    margin-left: 0.35rem;
-  }}
-  .pill-buy {{ background: rgba(61,214,140,0.15); color: var(--buy); }}
-  .pill-hold {{ background: rgba(89,194,255,0.12); color: var(--hold); }}
-  .ret-pos {{ color: var(--sell); }}
-  .ret-neg {{ color: var(--buy); }}
-  .yearly-wrap {{
-    margin: 0 1.5rem 0.85rem;
-  }}
-  .yearly-wrap h2 {{
-    margin: 0 0 0.5rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text);
-  }}
-  .warn {{
-    background: rgba(230, 180, 80, 0.12);
-    border: 1px solid rgba(230, 180, 80, 0.45);
-    color: var(--accent);
-    border-radius: 8px;
-    padding: 0.55rem 0.85rem;
-    margin-bottom: 0.6rem;
-    font-size: 0.88rem;
-  }}
-  .yearly-table-wrap {{
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: auto;
-  }}
-  .yearly-table-wrap table {{ font-size: 0.88rem; }}
-  .yearly-table-wrap th {{ white-space: nowrap; }}
-  .num-pos {{ color: var(--sell); }}
-  .num-neg {{ color: var(--buy); }}
-</style>
-</head>
-<body>
-<header>
-  <h1>持仓日度查看</h1>
-  <div class="meta">
-    实验 <strong id="expName"></strong>
-    · recorder <code id="recId" style="color:var(--muted)"></code>
-    · <span id="range"></span>
-    · 账户 <span id="avSummary"></span>
-  </div>
-</header>
-<div class="metrics" id="metricsRow"></div>
-<details class="more-metrics">
-  <summary>更多组合 / 成交指标</summary>
-  <pre id="moreMetrics"></pre>
-</details>
-<section class="yearly-wrap" id="yearlySection" hidden>
-  <h2>分年度超额</h2>
-  <div class="warn" id="yearlyWarn" hidden></div>
-  <div class="yearly-table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>年份</th>
-          <th>年化超额(无成本)</th>
-          <th>年化超额(含成本)</th>
-          <th>累计超额(含成本)</th>
-          <th>交易日数</th>
-        </tr>
-      </thead>
-      <tbody id="yearlyBody"></tbody>
-    </table>
-  </div>
-</section>
-<div class="controls">
-  <button id="prevBtn" type="button">← 前一日</button>
-  <input id="dateInput" type="date"/>
-  <select id="dateSelect"></select>
-  <button id="nextBtn" type="button">后一日 →</button>
-  <div class="stats">
-    <span>现金 <b id="cash"></b></span>
-    <span>总资产 <b id="account"></b></span>
-    <span>持仓 <b id="nHold"></b></span>
-    <span>买入 <b id="nBuy"></b></span>
-    <span>卖出 <b id="nSell"></b></span>
-  </div>
-</div>
-<main>
-  <section class="hold">
-    <h2>今日持仓 <span class="tag" id="holdTag"></span></h2>
-    <div id="holdBody"></div>
-  </section>
-  <section class="buy">
-    <h2>今日买入 <span class="tag" id="buyTag"></span></h2>
-    <div id="buyBody"></div>
-  </section>
-  <section class="sell">
-    <h2>今日卖出 <span class="tag" id="sellTag"></span></h2>
-    <div id="sellBody"></div>
-  </section>
-</main>
-<script>
-(function () {{
-  function boot() {{
-    const el = document.getElementById("payload");
-    if (!el) {{
-      document.body.insertAdjacentHTML("afterbegin", "<p style='padding:1rem;color:#f07178'>缺少 #payload 数据</p>");
-      return;
-    }}
-    const data = JSON.parse(el.textContent);
-    const dates = data.days.map(d => d.date);
-    let idx = 0;
-
-    const fmt = (x, digits=4) => {{
-      if (x === null || x === undefined || Number.isNaN(x)) return "—";
-      if (typeof x === "number") return x.toLocaleString(undefined, {{ maximumFractionDigits: digits }});
-      return String(x);
-    }};
-    const fmtPct = (x) => {{
-      if (x === null || x === undefined || Number.isNaN(x)) return "—";
-      return (x * 100).toFixed(2) + "%";
-    }};
-    const fmtNum = (x, digits=4) => {{
-      if (x === null || x === undefined || Number.isNaN(x)) return "—";
-      return Number(x).toFixed(digits);
-    }};
-
-    function table(items, {{showAction=false, showBuyDate=true, showReturn=false}} = {{}}) {{
-      if (!items || !items.length) return '<div class="empty">无</div>';
-      const head = '<tr><th>代码</th><th>名称</th>' +
-        (showBuyDate ? '<th>买入日</th>' : '') +
-        '<th>权重</th><th>数量</th><th>价格</th>' +
-        (showReturn ? '<th>收益率</th>' : '') +
-        (showAction ? '<th>标记</th>' : '') + '</tr>';
-      const body = items.map(it => {{
-        const pill = showAction
-          ? (it.action === "buy"
-              ? '<span class="pill pill-buy">buy</span>'
-              : '<span class="pill pill-hold">hold</span>')
-          : "";
-        let retCell = "";
-        if (showReturn) {{
-          const r = it.return_rate;
-          if (r === null || r === undefined || Number.isNaN(r)) {{
-            retCell = '<td>—</td>';
-          }} else {{
-            const cls = r >= 0 ? "ret-pos" : "ret-neg";
-            retCell = '<td class="' + cls + '">' + fmtPct(r) + '</td>';
-          }}
-        }}
-        return '<tr>' +
-          '<td>' + it.instrument + (showAction ? pill : '') + '</td>' +
-          '<td>' + (it.name || "—") + '</td>' +
-          (showBuyDate ? '<td>' + (it.buy_date || "—") + '</td>' : '') +
-          '<td>' + fmtPct(it.weight) + '</td>' +
-          '<td>' + fmt(it.amount, 2) + '</td>' +
-          '<td>' + fmt(showReturn && it.sell_price != null ? it.sell_price : it.price, 4) + '</td>' +
-          retCell +
-          (showAction ? '<td>' + (it.action || '') + '</td>' : '') +
-          '</tr>';
-      }}).join("");
-      return '<table><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
-    }}
-
-    function render() {{
-      const day = data.days[idx];
-      document.getElementById("dateInput").value = day.date;
-      document.getElementById("dateSelect").value = day.date;
-      document.getElementById("cash").textContent = fmt(day.cash, 2);
-      document.getElementById("account").textContent = fmt(day.account_value, 2);
-      document.getElementById("nHold").textContent = day.n_hold;
-      document.getElementById("nBuy").textContent = day.n_buy;
-      document.getElementById("nSell").textContent = day.n_sell;
-      document.getElementById("holdTag").textContent = day.n_hold + " 只";
-      document.getElementById("buyTag").textContent = day.n_buy + " 只";
-      document.getElementById("sellTag").textContent = day.n_sell + " 只";
-      document.getElementById("holdBody").innerHTML = table(day.hold, {{showAction: true}});
-      document.getElementById("buyBody").innerHTML = table(day.buy, {{showBuyDate: false}});
-      document.getElementById("sellBody").innerHTML = table(day.sell, {{showReturn: true}});
-      document.getElementById("prevBtn").disabled = idx <= 0;
-      document.getElementById("nextBtn").disabled = idx >= dates.length - 1;
-    }}
-
-    function gotoDate(dateStr) {{
-      const i = dates.indexOf(dateStr);
-      if (i >= 0) {{ idx = i; render(); return; }}
-      let best = 0;
-      for (let j = 0; j < dates.length; j++) {{
-        if (dates[j] <= dateStr) best = j;
-        else break;
-      }}
-      idx = best;
-      render();
-    }}
-
-    function defaultIndex() {{
-      const today = new Date();
-      const y = today.getFullYear();
-      const m = String(today.getMonth() + 1).padStart(2, "0");
-      const d = String(today.getDate()).padStart(2, "0");
-      const todayStr = y + "-" + m + "-" + d;
-      if (!dates.length) return 0;
-      if (todayStr < dates[0]) return 0;
-      if (todayStr > dates[dates.length - 1]) return dates.length - 1;
-      let best = 0;
-      for (let j = 0; j < dates.length; j++) {{
-        if (dates[j] <= todayStr) best = j;
-        else break;
-      }}
-      return best;
-    }}
-
-    function pctClass(x) {{
-      if (x === null || x === undefined || Number.isNaN(x)) return "";
-      return x >= 0 ? "num-pos" : "num-neg";
-    }}
-
-    function renderMetrics() {{
-      const m = data.metrics || {{}};
-      const ewc = (m.port && m.port.excess_with_cost) || {{}};
-      const cards = [
-        ["IC", fmtNum(m.IC, 4)],
-        ["ICIR", fmtNum(m.ICIR, 4)],
-        ["Rank IC", fmtNum(m["Rank IC"], 4)],
-        ["Rank ICIR", fmtNum(m["Rank ICIR"], 4)],
-        ["超额年化(含成本)", fmtPct(ewc.annualized_return)],
-        ["IR(含成本)", fmtNum(ewc.information_ratio, 4)],
-        ["最大回撤(含成本)", fmtPct(ewc.max_drawdown)],
-      ];
-      document.getElementById("metricsRow").innerHTML = cards.map(([label, value]) =>
-        '<div class="metric"><div class="label">' + label + '</div><div class="value">' + value + '</div></div>'
-      ).join("");
-      document.getElementById("moreMetrics").textContent = JSON.stringify({{
-        port: m.port || {{}},
-        indicators: m.indicators || {{}},
-        yearly_excess: data.yearly_excess || {{}}
-      }}, null, 2);
-    }}
-
-    function renderYearly() {{
-      const ye = data.yearly_excess || {{}};
-      const rows = ye.rows || [];
-      const section = document.getElementById("yearlySection");
-      if (!rows.length) {{
-        section.hidden = true;
-        return;
-      }}
-      section.hidden = false;
-      const warnEl = document.getElementById("yearlyWarn");
-      if (ye.concentration_warning) {{
-        warnEl.hidden = false;
-        warnEl.textContent = ye.concentration_warning;
-      }} else {{
-        warnEl.hidden = true;
-        warnEl.textContent = "";
-      }}
-      document.getElementById("yearlyBody").innerHTML = rows.map(r => {{
-        const a0 = r.annualized_without_cost;
-        const a1 = r.annualized_with_cost;
-        const c = r.cum_excess_with_cost;
-        return "<tr>" +
-          "<td>" + r.year + "</td>" +
-          '<td class="' + pctClass(a0) + '">' + fmtPct(a0) + "</td>" +
-          '<td class="' + pctClass(a1) + '">' + fmtPct(a1) + "</td>" +
-          '<td class="' + pctClass(c) + '">' + fmtPct(c) + "</td>" +
-          "<td>" + (r.n_days == null ? "—" : r.n_days) + "</td>" +
-          "</tr>";
-      }}).join("");
-    }}
-
-    document.getElementById("expName").textContent = data.exp_name;
-    document.getElementById("recId").textContent = data.recorder_id;
-    document.getElementById("range").textContent = data.start + " → " + data.end;
-    document.getElementById("avSummary").textContent =
-      fmt(data.first_account_value, 2) + " → " + fmt(data.last_account_value, 2);
-
-    const sel = document.getElementById("dateSelect");
-    dates.forEach(d => {{
-      const opt = document.createElement("option");
-      opt.value = d; opt.textContent = d;
-      sel.appendChild(opt);
-    }});
-
-    document.getElementById("prevBtn").onclick = () => {{ if (idx > 0) {{ idx--; render(); }} }};
-    document.getElementById("nextBtn").onclick = () => {{ if (idx < dates.length - 1) {{ idx++; render(); }} }};
-    document.getElementById("dateSelect").onchange = (e) => gotoDate(e.target.value);
-    document.getElementById("dateInput").onchange = (e) => gotoDate(e.target.value);
-    document.addEventListener("keydown", (e) => {{
-      if (e.key === "ArrowLeft") document.getElementById("prevBtn").click();
-      if (e.key === "ArrowRight") document.getElementById("nextBtn").click();
-    }});
-
-    renderMetrics();
-    renderYearly();
-    idx = defaultIndex();
-    render();
-  }}
-
-  if (document.readyState === "loading") {{
-    document.addEventListener("DOMContentLoaded", boot);
-  }} else {{
-    boot();
-  }}
-}})();
-</script>
-<!-- payload: experiment data at file bottom -->
-<script id="payload" type="application/json">
-{data_json}
-</script>
-</body>
-</html>
-"""
-
 
 def export(
     exp_name: str,
@@ -912,6 +595,7 @@ def export(
     out_dir: Path = DEFAULT_OUT_DIR,
     provider_uri: str = "~/.qlib/qlib_data/cn_data",
     name_map_path: Path = NAME_MAP_PATH,
+    industry_map_path: Path = DEFAULT_INDUSTRY_MAP,
 ) -> Path:
     qlib.init(provider_uri=provider_uri, region=REG_CN)
     recorder = _latest_recorder(exp_name, recorder_id)
@@ -921,8 +605,13 @@ def export(
     print(f"using experiment={exp_name!r} recorder={rid}")
 
     name_map = load_or_build_name_map(Path(name_map_path))
+    industry_intervals = load_industry_intervals(Path(industry_map_path))
+    if industry_intervals:
+        print(f"loaded industry map ({len(industry_intervals)} instruments)")
     positions = recorder.load_object(POSITIONS_ARTIFACT)
-    _, days = build_day_frames(positions, name_map=name_map)
+    _, days = build_day_frames(
+        positions, name_map=name_map, industry_intervals=industry_intervals
+    )
     metrics = collect_metrics(recorder)
     yearly_excess = collect_yearly_excess(recorder)
 
@@ -942,18 +631,23 @@ def export(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     safe_name = exp_name.replace("/", "_")
-    html_path = out_dir / f"{safe_name}_positions_view.html"
+    json_path = out_dir / f"{safe_name}_positions.json"
 
-    html_path.write_text(render_html(payload), encoding="utf-8")
+    with json_path.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
 
-    print(f"wrote {html_path} ({len(days)} days)")
+    print(f"wrote {json_path} ({len(days)} days)")
+    print(
+        "view: start console server, then open "
+        f"/positions_view.html?data=/data/{json_path.name}"
+    )
     if yearly_excess.get("concentration_warning"):
         print(f"WARNING: {yearly_excess['concentration_warning']}")
-    return html_path
+    return json_path
 
 
 def main(argv: Optional[List[str]] = None) -> None:
-    parser = argparse.ArgumentParser(description="Export positions HTML day browser")
+    parser = argparse.ArgumentParser(description="Export positions JSON for shared day browser")
     parser.add_argument("--exp_name", default=DEFAULT_EXP_NAME, help="MLflow experiment name")
     parser.add_argument("--recorder_id", default=None, help="Optional recorder id; default=latest FINISHED")
     parser.add_argument(
@@ -973,6 +667,12 @@ def main(argv: Optional[List[str]] = None) -> None:
         default="~/.qlib/qlib_data/cn_data",
         help="qlib data provider uri",
     )
+    parser.add_argument(
+        "--industry_map",
+        type=Path,
+        default=DEFAULT_INDUSTRY_MAP,
+        help=f"SW L1 industry intervals parquet (default: {DEFAULT_INDUSTRY_MAP})",
+    )
     args = parser.parse_args(argv)
     export(
         exp_name=args.exp_name,
@@ -980,6 +680,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         out_dir=args.out_dir,
         provider_uri=args.provider_uri,
         name_map_path=args.name_map,
+        industry_map_path=args.industry_map,
     )
 
 

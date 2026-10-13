@@ -25,7 +25,7 @@
 # 浏览器打开 http://127.0.0.1:8765
 ```
 
-页面会调用本目录现有脚本（`update_cn_data_daily.py` / `rolling_7y1y.py` / `export_positions_view.py`）；历史列表来自 `data/*_positions_view.html`，点击「查看详情」打开对应持仓页。同时只跑一个后台任务，日志在页面底部轮询显示。
+页面会调用本目录现有脚本（`update_cn_data_daily.py` / `rolling_7y1y.py` / `export_positions_view.py`）；历史列表优先 `data/*_positions.json`，经共用页 [`console/positions_view.html`](console/positions_view.html) 加载；旧的 `*_positions_view.html` 仍可直开。同时只跑一个后台任务，日志在页面底部轮询显示。
 
 ---
 
@@ -80,17 +80,21 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 ---
 
-# 持仓导出与 HTML 日度查看
+# 持仓导出与日度查看
 
 回测结束后，可用 [`export_positions_view.py`](export_positions_view.py) 从 MLflow 实验读取
-持仓与分析产物，导出：
+持仓与分析产物，导出 **`data/{exp_name}_positions.json`**（指标 + 分日持仓/买卖 + **申万一级行业权重占比**）。  
+UI 为共用页 [`console/positions_view.html`](console/positions_view.html)，**不再**为每个实验生成巨型自包含 HTML。
 
-1. **parquet**（`datetime` 为 `YYYY-MM-DD`）：含 `name`、`buy_date`、`action ∈ {hold, buy, sell}`
-2. **自包含 HTML**：页顶 IC/IR 与组合指标；按日查看持仓 / 买入 / 卖出（代码、名称、买入日）；**实验 JSON 数据在文件最底部** `#payload`
+行业占比依赖 [`build_csi300_industry_map.py`](build_csi300_industry_map.py) 生成的
+`data/csi300_sw_l1_industry_intervals.parquet`；缺失时导出仍成功，但无行业分布。
 
 ```bash
 .venv/bin/python examples/benchmarks/LightGBM/export_positions_view.py \
   --exp_name=rolling_lgb_7y1y_20261009
+
+# 需先启动控制台服务，再打开（file:// 下 fetch 无法加载本地 JSON）：
+# http://127.0.0.1:8765/positions_view.html?data=/data/rolling_lgb_7y1y_20261009_positions.json
 ```
 
 可选参数：
@@ -98,14 +102,61 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 - `--recorder_id`：指定 recorder；默认取该实验最新 `FINISHED` recorder
 - `--out_dir`：输出目录（默认 `examples/benchmarks/LightGBM/data/`）
 - `--name_map`：股票名称缓存 JSON（默认 `data/stock_name_map.json`；缺失时尝试用 akshare 生成）
+- `--industry_map`：申万一级 PIT 区间 parquet（默认 `data/csi300_sw_l1_industry_intervals.parquet`）
 
 产物示例（目录已被 `.gitignore` 忽略）：
 
-- `data/rolling_lgb_7y1y_20261009_positions_1day.parquet`
-- `data/rolling_lgb_7y1y_20261009_positions_view.html`
+- `data/rolling_lgb_7y1y_20261009_positions.json`
 - `data/stock_name_map.json`
 
-用浏览器直接打开 HTML 即可（无需本地 HTTP）。默认日期为**当天**（非交易日则落到 ≤ 当天的最近交易日）。左右方向键可切换交易日。买卖标签由相邻交易日持仓集合差集推算；买入日为该票进入持仓的交易日。
+默认日期为**当天**（非交易日则落到 ≤ 当天的最近交易日）。左右方向键可切换交易日。买卖标签由相邻交易日持仓集合差集推算；买入日为该票进入持仓的**回测成交日**（见下节）。查看器按日展示申万一级行业权重占比（需重新导出 JSON 后才有 `industries` 字段）。  
+「复权价」为回测用的 qlib `$close`；「现价」为 `$close/$factor`（近似交易所名义收盘价）。重新导出后才有 `raw_price`。
+
+---
+
+# 信号日 / 成交日 / 实盘节奏
+
+滚动配置（如 `workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml`）使用 `TopkDropoutStrategy` + `deal_price: close`。qlib 在成交日 **T** 读取 **T-1** 的预测分数（`get_step_time(..., shift=1)`），再按 **T 日收盘价**撮合。持仓页上的「今日买入/卖出」是对相邻两日仓位做差，标签是 **回测成交日 T**，不是数据包到达日，也不是「刚看到这天数据才该下单」的日子。
+
+日频 `cn_data` 的正常节奏：**要等 T 日收盘后，才有含 T 日的数据包。** 这不改变策略时点。
+
+| 概念 | 时刻 | 需要的数据 | 做什么 |
+|------|------|------------|--------|
+| 信号就绪 | **T-1 收盘之后**（包已含 T-1） | T-1 及更早行情 | 算出分数 → 得到 **将在 T 日执行** 的买卖名单 |
+| 实盘执行 | **T 日盘中 / 近收盘** | **不需要** T 日数据包 | 按名单下单（对齐 `deal_price: close`） |
+| 回测复盘 | **T 收盘之后**（包已含 T） | T 日 `$close` 等 | 才能在 positions 页把「T 日买卖」撮合出来 |
+
+**实盘 SOP（以执行日 = 10-12 为例）**
+
+1. **10-11 收盘后**：更新数据，确认包已含 **10-11**；跑滚动/推理，得到基于 10-11 信号的调仓名单。
+2. **10-12 盘中（近收盘更贴回测）**：按该名单买卖。**不要等 10-12 包。**
+3. **10-12 收盘后**：更新含 10-12 的包；重跑用于 **核对回测** 与生成 **10-13 名单**。
+4. **10-13**：执行的是「10-12 信号 → 10-13 成交」的单；**不要**把页面上「日期=10-12」的买卖当成 10-13 才下的补单。
+
+**为何缺 T 包时页面上 T 日买卖为 0**
+
+yaml `end_time` 常被写成「今天」，日历上可能已有 T，但本地尚无 T 的 `$close` 时，回测无法按 close 撮合，仓位结转 → 持仓页显示买入/卖出 = 0、全是 hold。这 **不等于**「策略认为当日无调仓」，只是复盘缺数。等 T 包到位后重跑，同一成交日 T 才会出现真实买卖。实盘信号在 **T-1 包就绪后**就已可定，不必等这份复盘页。
+
+若数据源经常 **T+1 早上才发 T 日包**（比「T 收盘后当晚」更晚）：仍用 **最新已完整的信号日** 指导 **下一交易日** 执行；相对 `deal_price: close` 回测会有额外滑点，属数据源滞后，不是策略再晚一天。
+
+## 持仓页「预测」按钮（实盘信号）
+
+[`console/positions_view.html`](console/positions_view.html) 上的 **预测** 会调用 [`predict_live_signal.py`](predict_live_signal.py)：
+
+1. 用 **`OnlineToolR`** 把当前实验中带 `params.pkl`+`pred.pkl` 的最新窗标记为 online，并尽量 `update_online_pred()` 续写到本地日历末日；
+2. 取最新 **信号日** 分数，相对末日持仓套用与 yaml 一致的 TopkDropout（`topk=10`, `n_drop=1`）；
+3. 写出 `data/{exp_name}_live_signal.json`，页面展示 **信号日 / 建议执行日** 与买卖名单。
+
+这与下方「成交日持仓/买入/卖出」回测复盘表分开：预测结果是给 **下一交易日执行** 用的，不是等包到齐后再补做已过去的成交日。
+
+命令行等价：
+
+```bash
+.venv/bin/python examples/benchmarks/LightGBM/predict_live_signal.py \
+  --exp_name=rolling_lgb_7y1y_20261013_1013
+```
+
+说明：完整 **OnlineManager**（`first_train` / `routine` / `RollingStrategy`）与现有 `rolling_7y1y` 并行且更重，**未**接入本控制台；日常实盘信号走 OnlineToolR 增量预测即可。
 
 ---
 

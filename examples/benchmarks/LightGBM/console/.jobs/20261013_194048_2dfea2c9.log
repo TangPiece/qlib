@@ -1,0 +1,15 @@
+$ /Users/900game/Desktop/ai/qlib/.venv/bin/python /Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/update_cn_data_daily.py
+
+Latest release tag: 2026-10-12
+Local data is up to date; skip download (release marker matches remote tag 2026-10-12)
+Calendar: 2000-01-04 .. 2026-10-12
+Instruments (all.txt): 6165
+Release: 2026-10-12
+YAML end date target (today): 2026-10-13
+Warning: today (2026-10-13) is after local calendar end (2026-10-12); features/backtest may lack the most recent days
+Updated config: /Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml
+  data_handler_config.end_time: already 2026-10-13
+  backtest.end_time: already 2026-10-13
+  segments.test right endpoint: already 2026-10-13
+Config missing, skip yaml update: /Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y1y_ind_weight.yaml
+Done.

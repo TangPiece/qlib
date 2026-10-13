@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Minimal local console for LightGBM rolling workflows (stdlib only).
 
-Serves static UI + triggers existing scripts (update data / train / export).
+Serves static UI + triggers existing scripts (update data / train / export / predict).
 
 Usage (from qlib repo root)::
 
@@ -227,20 +227,47 @@ def _start_job(kind: str, command: List[str]) -> Dict[str, Any]:
 def _list_results() -> List[Dict[str, Any]]:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     rows: List[Dict[str, Any]] = []
-    for path in sorted(DATA_DIR.glob("*_positions_view.html"), key=lambda p: p.stat().st_mtime, reverse=True):
+
+    for path in DATA_DIR.glob("*_positions.json"):
         st = path.stat()
         name = path.name
-        exp_name = name[: -len("_positions_view.html")] if name.endswith("_positions_view.html") else name
+        exp_name = name[: -len("_positions.json")] if name.endswith("_positions.json") else name
         rows.append(
             {
                 "filename": name,
                 "exp_name": exp_name,
-                "url": f"/data/{name}",
+                "kind": "json",
+                "url": f"/positions_view.html?data=/data/{name}",
                 "mtime": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
+                "mtime_ts": st.st_mtime,
                 "size_bytes": st.st_size,
                 "size_mb": round(st.st_size / (1024 * 1024), 2),
             }
         )
+
+    # Legacy self-contained HTML (read-only history; new exports write JSON only)
+    for path in DATA_DIR.glob("*_positions_view.html"):
+        st = path.stat()
+        name = path.name
+        exp_name = (
+            name[: -len("_positions_view.html")] if name.endswith("_positions_view.html") else name
+        )
+        rows.append(
+            {
+                "filename": name,
+                "exp_name": exp_name,
+                "kind": "html_legacy",
+                "url": f"/data/{name}",
+                "mtime": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
+                "mtime_ts": st.st_mtime,
+                "size_bytes": st.st_size,
+                "size_mb": round(st.st_size / (1024 * 1024), 2),
+            }
+        )
+
+    rows.sort(key=lambda r: r.get("mtime_ts") or 0, reverse=True)
+    for r in rows:
+        r.pop("mtime_ts", None)
     return rows
 
 
@@ -297,6 +324,9 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
 
         if path == "/" or path == "/index.html":
             return self._serve_file(CONSOLE_DIR / "index.html", "text/html; charset=utf-8")
+
+        if path == "/positions_view.html":
+            return self._serve_file(CONSOLE_DIR / "positions_view.html", "text/html; charset=utf-8")
 
         if path.startswith("/static/"):
             rel = path[len("/static/") :]
@@ -393,6 +423,34 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
                 ]
                 job = _start_job("export", cmd)
                 _json_response(self, 200, {"ok": True, "job": job, "exp_name": exp_name})
+                return
+
+            if path == "/api/predict":
+                exp_name = str(body.get("exp_name") or "").strip()
+                if not exp_name:
+                    raise ValueError("exp_name is required")
+                cmd = [
+                    sys.executable,
+                    str(LGBM_DIR / "predict_live_signal.py"),
+                    f"--exp_name={exp_name}",
+                ]
+                recorder_id = str(body.get("recorder_id") or "").strip()
+                if recorder_id:
+                    cmd.append(f"--recorder_id={recorder_id}")
+                if body.get("skip_update"):
+                    cmd.append("--skip_update")
+                job = _start_job("predict", cmd)
+                safe = exp_name.replace("/", "_")
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "ok": True,
+                        "job": job,
+                        "exp_name": exp_name,
+                        "signal_url": f"/data/{safe}_live_signal.json",
+                    },
+                )
                 return
 
             _json_response(self, 404, {"error": f"unknown endpoint {path}"})
