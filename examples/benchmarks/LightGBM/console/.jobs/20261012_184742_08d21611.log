@@ -1,21 +1,0 @@
-$ /Users/900game/Desktop/ai/qlib/.venv/bin/python /Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/export_positions_view.py --exp_name=rolling_lgb_7y1y_20261012_1838_test
-
-Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
-Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
-Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
-See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
-[31234:MainThread](2026-10-12 18:47:43,593) INFO - qlib.Initialization - [config.py:473] - default_conf: client.
-[31234:MainThread](2026-10-12 18:47:43,594) INFO - qlib.Initialization - [__init__.py:82] - qlib successfully initialized based on client settings.
-[31234:MainThread](2026-10-12 18:47:43,594) INFO - qlib.Initialization - [__init__.py:84] - data_path={'__DEFAULT_FREQ': PosixPath('/Users/900game/.qlib/qlib_data/cn_data')}
-/Users/900game/Desktop/ai/qlib/.venv/lib/python3.12/site-packages/mlflow/tracking/_tracking_service/utils.py:184: FutureWarning: The filesystem tracking backend (e.g., './mlruns') is deprecated as of February 2026. Consider transitioning to a database backend (e.g., 'sqlite:///mlflow.db') to take advantage of the latest MLflow features. See https://mlflow.org/docs/latest/self-hosting/migrate-from-file-store for migration guidance.
-  return FileStore(store_uri, store_uri)
-using experiment='rolling_lgb_7y1y_20261012_1838_test' recorder=2f237f1850d54855aea67afb6ffbab39
-loaded industry map (948 instruments)
-Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 725.66it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 689.74it/s]
-Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1872.46it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1697.41it/s]
-Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 2050.00it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1912.59it/s]
-Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 4112.06it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 3533.53it/s]
-Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 5343.06it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 4519.72it/s]
-Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 4505.16it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 3679.21it/s]
-wrote /Users/900game/Desktop/ai/qlib/examples/benchmarks/LightGBM/data/rolling_lgb_7y1y_20261012_1838_test_positions.json (2614 days)
-view: start console server, then open /positions_view.html?data=/data/rolling_lgb_7y1y_20261012_1838_test_positions.json
