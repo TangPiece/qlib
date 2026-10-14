@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Produce next-session TopkDropout live signals from an online-tagged recorder.
 
-Uses OnlineToolR (not full OnlineManager): tag the latest trainable window as
-online, optionally extend ``pred.pkl`` to the local calendar end, then apply the
-same TopkDropout rule as the rolling yaml (topk=10, n_drop=1).
+Rolling ensemble experiments (``rolling_lgb_*``) only store concatenated pred;
+trainable windows live in the companion ``rolling_models_*`` experiment (logged
+as param ``exp_name`` on the ensemble recorder). This script resolves that
+window, uses OnlineToolR to extend ``pred.pkl`` to the local calendar end, then
+applies the same TopkDropout rule as the rolling yaml (topk=10, n_drop=1).
 
 Output: ``data/runs/{exp_name}_live_signal.json``
 
 Example (repo root)::
 
     .venv/bin/python examples/benchmarks/LightGBM/predict_live_signal.py \\
-      --exp_name=rolling_lgb_7y1y_20261013_1013
+      --exp_name=rolling_lgb_7y1y_20261013
 """
 from __future__ import annotations
 
@@ -58,11 +60,85 @@ def _recorder_has(rec, name: str) -> bool:
         return False
 
 
-def _find_model_recorder(exp_name: str, recorder_id: Optional[str] = None):
-    """Prefer a FINISHED recorder that has params + pred (trainable window)."""
+def _recorder_id(rec) -> str:
+    if hasattr(rec, "info") and isinstance(rec.info, dict):
+        return str(rec.info.get("id") or "")
+    return str(getattr(rec, "id", "") or "")
+
+
+def _get_ensemble_recorder(exp_name: str, recorder_id: Optional[str] = None):
     if recorder_id:
         return R.get_recorder(recorder_id=recorder_id, experiment_name=exp_name)
+    return _latest_recorder(exp_name)
 
+
+def _rolling_models_exp_name(ensemble_rec) -> Optional[str]:
+    """Companion rolling_models_* experiment name logged by Rolling._ens_rolling."""
+    try:
+        params = ensemble_rec.list_params() or {}
+    except Exception:  # noqa: BLE001
+        return None
+    name = params.get("exp_name")
+    if not name:
+        return None
+    name = str(name).strip()
+    if name.startswith("rolling_models_"):
+        return name
+    return None
+
+
+def _test_segment_end(rec) -> Any:
+    """Return test-segment end (None = open-ended); 'missing' if task absent."""
+    try:
+        task = rec.load_object("task")
+        test = task["dataset"]["kwargs"]["segments"]["test"]
+        if isinstance(test, (list, tuple)) and len(test) >= 2:
+            return test[1]
+        return "missing"
+    except Exception:  # noqa: BLE001
+        return "missing"
+
+
+def _find_trainable_window(models_exp: str):
+    """Pick latest window with params + dataset + pred; prefer open-ended test."""
+    exp = R.get_exp(experiment_name=models_exp, create=False)
+    recorders = exp.list_recorders(rtype="list")
+    if not recorders:
+        raise RuntimeError(f"No recorders found for model experiment {models_exp!r}")
+
+    finished = [r for r in recorders if getattr(r, "status", None) == "FINISHED"]
+    pool = finished or list(recorders)
+    trainable: List[Tuple[Any, Any]] = []
+    for rec in pool:
+        if not (
+            _recorder_has(rec, "params.pkl")
+            and _recorder_has(rec, "dataset")
+            and _recorder_has(rec, "pred.pkl")
+        ):
+            continue
+        trainable.append((rec, _test_segment_end(rec)))
+
+    if not trainable:
+        raise RuntimeError(
+            f"No trainable window (params.pkl + dataset + pred.pkl) in {models_exp!r}"
+        )
+
+    open_ended = [r for r, end in trainable if end is None]
+    if open_ended:
+        open_ended.sort(key=lambda r: str(getattr(r, "start_time", None) or ""), reverse=True)
+        return open_ended[0]
+
+    dated = [(r, end) for r, end in trainable if end not in (None, "missing")]
+    if dated:
+        dated.sort(key=lambda x: pd.Timestamp(x[1]), reverse=True)
+        return dated[0][0]
+
+    trainable.sort(key=lambda x: str(getattr(x[0], "start_time", None) or ""), reverse=True)
+    return trainable[0][0]
+
+
+def _find_model_recorder_in_exp(exp_name: str):
+    """Fallback when ensemble itself stores a trainable recorder (non-rolling)."""
     exp = R.get_exp(experiment_name=exp_name, create=False)
     recorders = exp.list_recorders(rtype="list")
     if not recorders:
@@ -72,11 +148,34 @@ def _find_model_recorder(exp_name: str, recorder_id: Optional[str] = None):
     candidates = finished or list(recorders)
     with_model: List[Any] = []
     for rec in candidates:
-        if _recorder_has(rec, "params.pkl") and _recorder_has(rec, "pred.pkl"):
+        if (
+            _recorder_has(rec, "params.pkl")
+            and _recorder_has(rec, "dataset")
+            and _recorder_has(rec, "pred.pkl")
+        ):
             with_model.append(rec)
-    pool = with_model or candidates
-    pool.sort(key=lambda r: getattr(r, "start_time", None) or "", reverse=True)
-    return pool[0]
+    if not with_model:
+        raise RuntimeError(
+            f"Experiment {exp_name!r} has no trainable recorder and no rolling_models_* link"
+        )
+    with_model.sort(key=lambda r: getattr(r, "start_time", None) or "", reverse=True)
+    return with_model[0]
+
+
+def _resolve_model_source(
+    exp_name: str, recorder_id: Optional[str] = None
+) -> Tuple[str, Any, Any]:
+    """Return (models_exp_name, model_recorder, ensemble_recorder)."""
+    ensemble_rec = _get_ensemble_recorder(exp_name, recorder_id)
+    models_exp = _rolling_models_exp_name(ensemble_rec)
+    if models_exp:
+        model_rec = _find_trainable_window(models_exp)
+        return models_exp, model_rec, ensemble_rec
+    # Same-exp trainable model (non-rolling / already has params)
+    if _recorder_has(ensemble_rec, "params.pkl") and _recorder_has(ensemble_rec, "dataset"):
+        return exp_name, ensemble_rec, ensemble_rec
+    model_rec = _find_model_recorder_in_exp(exp_name)
+    return exp_name, model_rec, ensemble_rec
 
 
 def _pred_to_series(pred: pd.DataFrame | pd.Series) -> pd.Series:
@@ -250,20 +349,59 @@ def run(
     out_dir.mkdir(parents=True, exist_ok=True)
     safe = _safe_name(exp_name)
 
-    model_rec = _find_model_recorder(exp_name, recorder_id)
-    rid = model_rec.info.get("id") if hasattr(model_rec, "info") else getattr(model_rec, "id", None)
-    print(f"using experiment={exp_name!r} recorder={rid}")
+    models_exp, model_rec, ensemble_rec = _resolve_model_source(exp_name, recorder_id)
+    model_rid = _recorder_id(model_rec)
+    ens_rid = _recorder_id(ensemble_rec)
+    print(
+        f"ensemble={exp_name!r} recorder={ens_rid}; "
+        f"model_exp={models_exp!r} model_recorder={model_rid}"
+    )
 
-    tool = OnlineToolR(exp_name)
-    tool.reset_online_tag(model_rec, exp_name=exp_name)
+    tool = OnlineToolR(models_exp)
+    tool.reset_online_tag(model_rec, exp_name=models_exp)
     updated = False
+    update_error: Optional[str] = None
     if not skip_update:
         try:
-            tool.update_online_pred(exp_name=exp_name)
+            tool.update_online_pred(exp_name=models_exp)
             updated = True
             print("update_online_pred finished")
         except Exception as exc:  # noqa: BLE001
-            warnings.warn(f"update_online_pred failed ({exc}); using existing pred.pkl")
+            update_error = str(exc)
+            print(f"update_online_pred failed: {update_error}", file=sys.stderr)
+
+    out_path = out_dir / f"{safe}_live_signal.json"
+
+    if update_error:
+        note = (
+            "预测更新失败：未能把分数续算到本地日历末日。"
+            "请检查 rolling_models 窗口是否含 params.pkl/dataset，以及本地行情是否完整。"
+        )
+        payload = {
+            "exp_name": exp_name,
+            "recorder_id": ens_rid,
+            "model_exp_name": models_exp,
+            "model_recorder_id": model_rid,
+            "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+            "signal_date": None,
+            "execute_date": None,
+            "holdings_asof": None,
+            "pred_updated": False,
+            "error": update_error,
+            "topk": topk,
+            "n_drop": n_drop,
+            "hold_thresh": hold_thresh,
+            "n_buy": 0,
+            "n_sell": 0,
+            "n_hold": 0,
+            "buys": [],
+            "sells": [],
+            "holds": [],
+            "note": note,
+        }
+        out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"wrote {out_path} (error)")
+        raise RuntimeError(f"update_online_pred failed: {update_error}")
 
     pred = model_rec.load_object("pred.pkl")
     signal_ts = _latest_signal_date(pred)
@@ -293,18 +431,24 @@ def run(
     note = (
         "信号日分数用于下一交易日执行（对齐 TopkDropout shift=1）。"
         "本结果不是回测成交复盘；勿把 positions 页上的成交日买卖当成刚生成的实盘单。"
+        f" 分数来自模型实验 {models_exp}。"
     )
     if execute_date is None:
         note += " 日历上暂无信号日之后的交易日，execute_date 为空。"
+    if skip_update:
+        note += " （跳过了 update_online_pred，使用已有 pred.pkl。）"
 
     payload = {
         "exp_name": exp_name,
-        "recorder_id": str(rid),
+        "recorder_id": ens_rid,
+        "model_exp_name": models_exp,
+        "model_recorder_id": model_rid,
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         "signal_date": signal_date,
         "execute_date": execute_date,
         "holdings_asof": hold_date,
         "pred_updated": updated,
+        "error": None,
         "topk": topk,
         "n_drop": n_drop,
         "hold_thresh": hold_thresh,
@@ -317,12 +461,11 @@ def run(
         "note": note,
     }
 
-    out_path = out_dir / f"{safe}_live_signal.json"
     out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"wrote {out_path}")
     print(
         f"signal_date={signal_date} execute_date={execute_date} "
-        f"buy={len(buys)} sell={len(sells)} hold={len(holds)}"
+        f"buy={len(buys)} sell={len(sells)} hold={len(holds)} pred_updated={updated}"
     )
     return out_path
 

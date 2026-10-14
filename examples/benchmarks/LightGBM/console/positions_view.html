@@ -658,15 +658,31 @@
     function showLiveSignal(sig) {
       const section = document.getElementById("liveSignalSection");
       section.hidden = false;
-      document.getElementById("liveSignalDate").textContent = sig.signal_date || "—";
-      document.getElementById("liveExecuteDate").textContent = sig.execute_date || "（无下一交易日）";
-      document.getElementById("liveNBuy").textContent = sig.n_buy != null ? sig.n_buy : (sig.buys || []).length;
-      document.getElementById("liveNSell").textContent = sig.n_sell != null ? sig.n_sell : (sig.sells || []).length;
-      document.getElementById("liveBuyTag").textContent = "(" + (sig.buys || []).length + ")";
-      document.getElementById("liveSellTag").textContent = "(" + (sig.sells || []).length + ")";
-      document.getElementById("liveSignalNote").textContent = sig.note || "";
-      document.getElementById("liveBuyBody").innerHTML = renderLiveItems(sig.buys);
-      document.getElementById("liveSellBody").innerHTML = renderLiveItems(sig.sells);
+      const hasError = !!(sig && sig.error);
+      document.getElementById("liveSignalDate").textContent = hasError ? "—" : (sig.signal_date || "—");
+      document.getElementById("liveExecuteDate").textContent = hasError
+        ? "—"
+        : (sig.execute_date || "（无下一交易日）");
+      document.getElementById("liveNBuy").textContent = hasError
+        ? "0"
+        : (sig.n_buy != null ? sig.n_buy : (sig.buys || []).length);
+      document.getElementById("liveNSell").textContent = hasError
+        ? "0"
+        : (sig.n_sell != null ? sig.n_sell : (sig.sells || []).length);
+      document.getElementById("liveBuyTag").textContent = "(" + (hasError ? 0 : (sig.buys || []).length) + ")";
+      document.getElementById("liveSellTag").textContent = "(" + (hasError ? 0 : (sig.sells || []).length) + ")";
+      const noteParts = [];
+      if (hasError) {
+        noteParts.push("预测失败（未续算到最新交易日，请勿按旧名单下单）: " + sig.error);
+      }
+      if (sig.note) noteParts.push(sig.note);
+      if (sig.model_exp_name) noteParts.push("模型实验: " + sig.model_exp_name);
+      document.getElementById("liveSignalNote").textContent = noteParts.join(" ");
+      document.getElementById("liveBuyBody").innerHTML = renderLiveItems(hasError ? [] : sig.buys);
+      document.getElementById("liveSellBody").innerHTML = renderLiveItems(hasError ? [] : sig.sells);
+      if (hasError) {
+        setPredictBusy(false, "预测失败: " + sig.error);
+      }
     }
 
     async function loadExistingLiveSignal() {
@@ -705,14 +721,26 @@
           if (job.status === "finished" || job.status === "failed") {
             clearInterval(predictPoll);
             predictPoll = null;
+            const url = (signalUrl || liveSignalUrl()) + "?t=" + Date.now();
             if (job.status === "failed") {
+              try {
+                const sigRes = await fetch(url);
+                if (sigRes.ok) {
+                  const sig = await sigRes.json();
+                  showLiveSignal(sig);
+                  if (sig.error) return;
+                }
+              } catch (_) { /* fall through to job.error */ }
               setPredictBusy(false, "预测失败: " + (job.error || "unknown"));
               return;
             }
-            const sigRes = await fetch((signalUrl || liveSignalUrl()) + "?t=" + Date.now());
+            const sigRes = await fetch(url);
             if (!sigRes.ok) throw new Error("信号文件未生成 HTTP " + sigRes.status);
-            showLiveSignal(await sigRes.json());
-            setPredictBusy(false, "预测完成");
+            const sig = await sigRes.json();
+            showLiveSignal(sig);
+            if (sig.error) return;
+            setPredictBusy(false, "预测完成 · 信号日 " + (sig.signal_date || "—") +
+              " → 执行日 " + (sig.execute_date || "—"));
           }
         } catch (err) {
           clearInterval(predictPoll);
