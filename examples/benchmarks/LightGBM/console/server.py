@@ -439,6 +439,10 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
                     cmd.append(f"--recorder_id={recorder_id}")
                 if body.get("skip_update"):
                     cmd.append("--skip_update")
+                if body.get("topk") is not None:
+                    cmd.append(f"--topk={int(body['topk'])}")
+                if body.get("n_drop") is not None:
+                    cmd.append(f"--n_drop={int(body['n_drop'])}")
                 job = _start_job("predict", cmd)
                 safe = exp_name.replace("/", "_")
                 _json_response(

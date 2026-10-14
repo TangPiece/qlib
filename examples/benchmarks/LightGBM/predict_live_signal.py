@@ -5,7 +5,8 @@ Rolling ensemble experiments (``rolling_lgb_*``) only store concatenated pred;
 trainable windows live in the companion ``rolling_models_*`` experiment (logged
 as param ``exp_name`` on the ensemble recorder). This script resolves that
 window, uses OnlineToolR to extend ``pred.pkl`` to the local calendar end, then
-applies the same TopkDropout rule as the rolling yaml (topk=10, n_drop=1).
+applies the same TopkDropout rule as the training yaml (``topk`` / ``n_drop``
+from ``port_analysis_config.strategy.kwargs``, falling back to 10 / 1).
 
 Output: ``data/runs/{exp_name}_live_signal.json``
 
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import warnings
 from datetime import datetime, timezone
@@ -30,8 +32,10 @@ from qlib.constant import REG_CN
 from qlib.data import D
 from qlib.workflow import R
 from qlib.workflow.online.utils import OnlineToolR
+from ruamel.yaml import YAML
 
 DIRNAME = Path(__file__).absolute().resolve().parent
+REPO_ROOT = DIRNAME.parents[2]
 if str(DIRNAME) not in sys.path:
     sys.path.insert(0, str(DIRNAME))
 
@@ -46,6 +50,8 @@ DEFAULT_OUT_DIR = DIRNAME / "data" / "runs"
 DEFAULT_TOPK = 10
 DEFAULT_N_DROP = 1
 DEFAULT_HOLD_THRESH = 1
+
+_CONF_PATH_RE = re.compile(r"--conf_path(?:=|\s+)(\S+)")
 
 
 def _safe_name(exp_name: str) -> str:
@@ -85,6 +91,100 @@ def _rolling_models_exp_name(ensemble_rec) -> Optional[str]:
     if name.startswith("rolling_models_"):
         return name
     return None
+
+
+def _conf_path_from_argv(argv_text: str) -> Optional[Path]:
+    """Parse --conf_path from a recorded cmd-sys.argv string."""
+    m = _CONF_PATH_RE.search(argv_text or "")
+    if not m:
+        return None
+    raw = m.group(1).strip().strip("'\"")
+    if not raw:
+        return None
+    path = Path(raw)
+    candidates = []
+    if path.is_absolute():
+        candidates.append(path)
+    else:
+        candidates.extend(
+            [
+                Path.cwd() / path,
+                REPO_ROOT / path,
+                DIRNAME / path.name,
+            ]
+        )
+    for cand in candidates:
+        if cand.is_file():
+            return cand.resolve()
+    return None
+
+
+def _strategy_kwargs_from_yaml(conf_path: Path) -> Dict[str, Any]:
+    yaml = YAML(typ="safe", pure=True)
+    with conf_path.open("r", encoding="utf-8") as f:
+        conf = yaml.load(f) or {}
+    port = conf.get("port_analysis_config") or {}
+    strategy = port.get("strategy") or {}
+    kwargs = strategy.get("kwargs") or {}
+    return dict(kwargs) if isinstance(kwargs, dict) else {}
+
+
+def _strategy_params_from_recorder(ensemble_rec) -> Tuple[Optional[int], Optional[int]]:
+    """Return (topk, n_drop) from training yaml linked via cmd-sys.argv; else (None, None)."""
+    try:
+        params = ensemble_rec.list_params() or {}
+    except Exception:  # noqa: BLE001
+        return None, None
+    argv_text = params.get("cmd-sys.argv")
+    if not argv_text:
+        return None, None
+    conf_path = _conf_path_from_argv(str(argv_text))
+    if conf_path is None:
+        return None, None
+    try:
+        kwargs = _strategy_kwargs_from_yaml(conf_path)
+    except Exception as exc:  # noqa: BLE001
+        warnings.warn(f"cannot read strategy kwargs from {conf_path}: {exc}")
+        return None, None
+    topk = kwargs.get("topk")
+    n_drop = kwargs.get("n_drop")
+    try:
+        topk_i = int(topk) if topk is not None else None
+    except (TypeError, ValueError):
+        topk_i = None
+    try:
+        n_drop_i = int(n_drop) if n_drop is not None else None
+    except (TypeError, ValueError):
+        n_drop_i = None
+    return topk_i, n_drop_i
+
+
+def _resolve_topk_n_drop(
+    ensemble_rec,
+    topk: Optional[int],
+    n_drop: Optional[int],
+) -> Tuple[int, int]:
+    """CLI values win when set; otherwise use yaml from training; else defaults."""
+    yaml_topk, yaml_n_drop = (None, None)
+    if topk is None or n_drop is None:
+        yaml_topk, yaml_n_drop = _strategy_params_from_recorder(ensemble_rec)
+    resolved_topk = DEFAULT_TOPK if topk is None else int(topk)
+    resolved_n_drop = DEFAULT_N_DROP if n_drop is None else int(n_drop)
+    if topk is None and yaml_topk is not None:
+        resolved_topk = yaml_topk
+    if n_drop is None and yaml_n_drop is not None:
+        resolved_n_drop = yaml_n_drop
+    if topk is None or n_drop is None:
+        print(
+            f"strategy params: topk={resolved_topk} n_drop={resolved_n_drop}"
+            + (
+                f" (from training yaml)"
+                if (topk is None and yaml_topk is not None)
+                or (n_drop is None and yaml_n_drop is not None)
+                else " (defaults)"
+            )
+        )
+    return resolved_topk, resolved_n_drop
 
 
 def _test_segment_end(rec) -> Any:
@@ -339,8 +439,8 @@ def run(
     out_dir: Path = DEFAULT_OUT_DIR,
     provider_uri: str = "~/.qlib/qlib_data/cn_data",
     name_map_path: Path = NAME_MAP_PATH,
-    topk: int = DEFAULT_TOPK,
-    n_drop: int = DEFAULT_N_DROP,
+    topk: Optional[int] = None,
+    n_drop: Optional[int] = None,
     hold_thresh: int = DEFAULT_HOLD_THRESH,
     skip_update: bool = False,
 ) -> Path:
@@ -352,6 +452,7 @@ def run(
     models_exp, model_rec, ensemble_rec = _resolve_model_source(exp_name, recorder_id)
     model_rid = _recorder_id(model_rec)
     ens_rid = _recorder_id(ensemble_rec)
+    topk, n_drop = _resolve_topk_n_drop(ensemble_rec, topk, n_drop)
     print(
         f"ensemble={exp_name!r} recorder={ens_rid}; "
         f"model_exp={models_exp!r} model_recorder={model_rid}"
@@ -477,8 +578,18 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser.add_argument("--out_dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--name_map", type=Path, default=NAME_MAP_PATH)
     parser.add_argument("--provider_uri", default="~/.qlib/qlib_data/cn_data")
-    parser.add_argument("--topk", type=int, default=DEFAULT_TOPK)
-    parser.add_argument("--n_drop", type=int, default=DEFAULT_N_DROP)
+    parser.add_argument(
+        "--topk",
+        type=int,
+        default=None,
+        help="TopkDropout topk; default: training yaml, else 10",
+    )
+    parser.add_argument(
+        "--n_drop",
+        type=int,
+        default=None,
+        help="TopkDropout n_drop; default: training yaml, else 1",
+    )
     parser.add_argument("--hold_thresh", type=int, default=DEFAULT_HOLD_THRESH)
     parser.add_argument(
         "--skip_update",
