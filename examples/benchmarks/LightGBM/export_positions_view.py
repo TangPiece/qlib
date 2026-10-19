@@ -3,7 +3,8 @@
 
 Reads positions and analysis artifacts from an MLflow experiment recorder,
 labels hold/buy/sell, attaches stock names and buy dates, and writes
-``data/runs/{exp_name}_positions.json``. View via the console shared page::
+``examples/console/data/runs/{exp_name}_positions.json``.
+View via the shared console page::
 
     /positions_view.html?data=/data/{exp_name}_positions.json
 
@@ -31,8 +32,10 @@ from qlib.data import D
 from qlib.workflow import R
 
 DIRNAME = Path(__file__).absolute().resolve().parent
-DEFAULT_REF_DIR = DIRNAME / "data" / "ref"
-DEFAULT_OUT_DIR = DIRNAME / "data" / "runs"
+# 导出与对照数据统一放在公用控制台目录 examples/console/data
+_CONSOLE_DATA = DIRNAME.parents[1] / "console" / "data"
+DEFAULT_REF_DIR = _CONSOLE_DATA / "ref"
+DEFAULT_OUT_DIR = _CONSOLE_DATA / "runs"
 DEFAULT_EXP_NAME = "rolling_lgb_7y1y_20261009"
 NAME_MAP_PATH = DEFAULT_REF_DIR / "stock_name_map.json"
 DEFAULT_INDUSTRY_MAP = DEFAULT_REF_DIR / "csi300_sw_l1_industry_intervals.parquet"

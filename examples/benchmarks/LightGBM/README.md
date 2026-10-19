@@ -20,12 +20,12 @@
 静态 HTML + 极简本地 HTTP 服务，用于在浏览器里改结束日、更新数据、跑滚动训练、导出持仓 HTML，并浏览历史结果。
 
 ```bash
-# 在 qlib 仓库根目录，建议用 .venv
-.venv/bin/python examples/benchmarks/LightGBM/console/server.py
+# 在 qlib 仓库根目录，建议用 .venv（控制台已迁至 benchmarks 公用目录）
+.venv/bin/python examples/console/server.py
 # 浏览器打开 http://127.0.0.1:8765
 ```
 
-页面会调用本目录现有脚本（`update_cn_data_daily.py` / `rolling_7y1y.py` / `export_positions_view.py`）；历史列表优先 `data/runs/*_positions.json`，经共用页 [`console/positions_view.html`](console/positions_view.html) 加载；旧的 `*_positions_view.html` 仍可直开。同时只跑一个后台任务，日志在页面底部轮询显示。
+页面会调用本目录现有脚本（`update_cn_data_daily.py` / `rolling_7y1y.py` / `export_positions_view.py`）；历史列表优先 [`../../console/data/runs/*_positions.json`](../../console/data/runs)，经共用页 [`../../console/positions_view.html`](../../console/positions_view.html) 加载；旧的 `*_positions_view.html` 仍可直开。同时只跑一个后台任务，日志在页面底部轮询显示。
 
 ---
 
@@ -84,7 +84,7 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py
 
 回测结束后，可用 [`export_positions_view.py`](export_positions_view.py) 从 MLflow 实验读取
 持仓与分析产物，导出 **`data/runs/{exp_name}_positions.json`**（指标 + 分日持仓/买卖 + **申万一级行业权重占比**）。  
-UI 为共用页 [`console/positions_view.html`](console/positions_view.html)，**不再**为每个实验生成巨型自包含 HTML。
+UI 为共用页 [`../../console/positions_view.html`](../../console/positions_view.html)，**不再**为每个实验生成巨型自包含 HTML。
 
 行业占比依赖 [`build_csi300_industry_map.py`](build_csi300_industry_map.py) 生成的
 `data/ref/csi300_sw_l1_industry_intervals.parquet`；缺失时导出仍成功，但无行业分布。
@@ -100,14 +100,14 @@ UI 为共用页 [`console/positions_view.html`](console/positions_view.html)，*
 可选参数：
 
 - `--recorder_id`：指定 recorder；默认取该实验最新 `FINISHED` recorder
-- `--out_dir`：输出目录（默认 `examples/benchmarks/LightGBM/data/runs/`）
-- `--name_map`：股票名称缓存 JSON（默认 `data/ref/stock_name_map.json`；缺失时尝试用 akshare 生成）
-- `--industry_map`：申万一级 PIT 区间 parquet（默认 `data/ref/csi300_sw_l1_industry_intervals.parquet`）
+- `--out_dir`：输出目录（默认 `examples/console/data/runs/`）
+- `--name_map`：股票名称缓存 JSON（默认 `../../console/data/ref/stock_name_map.json`；缺失时尝试用 akshare 生成）
+- `--industry_map`：申万一级 PIT 区间 parquet（默认 `../../console/data/ref/csi300_sw_l1_industry_intervals.parquet`）
 
 产物示例：
 
-- `data/runs/rolling_lgb_7y1y_20261009_positions.json`（已被 `.gitignore` 忽略）
-- `data/ref/stock_name_map.json`（对照用原始数据，纳入 git）
+- `../../console/data/runs/rolling_lgb_7y1y_20261009_positions.json`（已被 `.gitignore` 忽略）
+- `../../console/data/ref/stock_name_map.json`（对照用原始数据，纳入 git）
 
 默认日期为**当天**（非交易日则落到 ≤ 当天的最近交易日）。左右方向键可切换交易日。买卖标签由相邻交易日持仓集合差集推算；买入日为该票进入持仓的**回测成交日**（见下节）。查看器按日展示申万一级行业权重占比（需重新导出 JSON 后才有 `industries` 字段）。  
 「复权价」为回测用的 qlib `$close`；「现价」为 `$close/$factor`（近似交易所名义收盘价）。重新导出后才有 `raw_price`。
@@ -141,7 +141,7 @@ yaml `end_time` 常被写成「今天」，日历上可能已有 T，但本地�
 
 ## 持仓页「预测」按钮（实盘信号）
 
-[`console/positions_view.html`](console/positions_view.html) 上的 **预测** 会调用 [`predict_live_signal.py`](predict_live_signal.py)：
+[`../../console/positions_view.html`](../../console/positions_view.html) 上的 **预测** 会调用 [`predict_live_signal.py`](predict_live_signal.py)：
 
 1. 用 **`OnlineToolR`** 把当前实验中带 `params.pkl`+`pred.pkl` 的最新窗标记为 online，并尽量 `update_online_pred()` 续写到本地日历末日；
 2. 取最新 **信号日** 分数，相对末日持仓套用与 yaml 一致的 TopkDropout（`topk=10`, `n_drop=1`）；
@@ -243,7 +243,7 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --force
 ```bash
 .venv/bin/python examples/benchmarks/LightGBM/build_csi300_industry_map.py \
   --qlib-dir ~/.qlib/qlib_data/cn_data \
-  --out-dir examples/benchmarks/LightGBM/data/ref
+  --out-dir examples/console/data/ref
 ```
 
 可选：`--open-end-as-cal-end` 将仍有效区间的结束日写成日历末日（默认开放端为 `9999-12-31`，再与 CSI300 在册区间求交）。
@@ -252,8 +252,8 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --force
 
 | 文件 | 说明 |
 |------|------|
-| `data/ref/csi300_sw_l1_industry_intervals.parquet` | 区间表 |
-| `data/ref/csi300_sw_l1_industry_meta.json` | 覆盖率、接口名、PIT 规则与局限 |
+| `../../console/data/ref/csi300_sw_l1_industry_intervals.parquet` | 区间表 |
+| `../../console/data/ref/csi300_sw_l1_industry_meta.json` | 覆盖率、接口名、PIT 规则与局限 |
 
 区间字段：`instrument`, `industry_code`, `industry_name`, `start_date`, `end_date`, `standard`, `standard_version`, `source`, `asof`。
 
@@ -265,7 +265,7 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --force
 - 再与 `csi300.txt` 在册区间及本地日历求交；**不会**用今日行业无日期回填整段历史。
 - 细节见 meta 中的 `pit_inference_rule` / `limitations`。
 
-对照用原始数据在 `data/ref/`（纳入 git）；训练/导出产物在 `data/runs/`（被 `.gitignore` 忽略）。
+对照用原始数据在 `../../console/data/ref/`（纳入 git）；训练/导出产物在 `../../console/data/runs/`（被 `.gitignore` 忽略）。
 
 ---
 

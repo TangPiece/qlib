@@ -35,6 +35,31 @@
     font-weight: 600;
     letter-spacing: 0.02em;
   }
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.35rem;
+  }
+  .title-row h1 { margin: 0; }
+  /* 详情页收藏：与控制台列表共用服务端 favorites */
+  #favBtn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 0.3rem 0.65rem;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  #favBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #favBtn.on {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  #favBtn:disabled { opacity: 0.45; cursor: not-allowed; }
   .meta { color: var(--muted); font-size: 0.9rem; }
   .meta strong { color: var(--accent); font-weight: 560; }
   .metrics {
@@ -233,6 +258,13 @@
   }
   #predictBtn:hover { border-color: var(--buy); }
   #predictBtn:disabled { opacity: 0.45; }
+  #applyBookBtn {
+    background: rgba(230, 180, 80, 0.12);
+    border-color: rgba(230, 180, 80, 0.45);
+    color: var(--accent);
+  }
+  #applyBookBtn:hover { border-color: var(--accent); }
+  #applyBookBtn:disabled { opacity: 0.45; }
   .live-signal {
     margin: 0 1.5rem 0.85rem;
     background: var(--panel);
@@ -292,7 +324,10 @@
 </head>
 <body>
 <header>
-  <h1>持仓日度查看</h1>
+  <div class="title-row">
+    <h1>持仓日度查看</h1>
+    <button id="favBtn" type="button" hidden title="收藏到历史列表置顶">☆ 收藏</button>
+  </div>
   <p id="loadStatus" class="meta" style="color:var(--accent)">准备加载…</p>
 <div class="meta">
     实验 <strong id="expName"></strong>
@@ -329,7 +364,8 @@
   <input id="dateInput" type="date"/>
   <select id="dateSelect"></select>
   <button id="nextBtn" type="button">后一日 →</button>
-  <button id="predictBtn" type="button" title="基于 OnlineToolR 更新预测并生成下一交易日 TopkDropout 名单">预测</button>
+  <button id="predictBtn" type="button" disabled title="本地有持仓 tip 行情即可预测下一交易日">预测</button>
+  <button id="applyBookBtn" type="button" disabled title="本地行情末日≥今天且今天已有预测信号才能写入">写入持仓</button>
   <div class="stats">
     <span>现金 <b id="cash"></b></span>
     <span>总资产 <b id="account"></b></span>
@@ -342,7 +378,7 @@
   当前选择日为<strong>回测成交日</strong>（按当日 close 撮合）；策略信号来自<strong>上一交易日</strong>
   （<code id="signalDateLabel">—</code>）。日频包通常要等成交日收盘后才有，缺当日行情时本页可能显示 0 买卖（仓位结转），那是复盘缺数，不是「当日无信号」。
   实盘应在信号日收盘后定名单、在下一交易日执行；不要等本页复盘出来再去补做已过去的成交日。
-  点「预测」生成<strong>实盘信号</strong>（信号日 → 建议执行日），与下方回测复盘表分开看。
+  「预测」：本地已有<strong>持仓 tip</strong>行情即可生成<strong>下一交易日</strong>名单（不跨日、不写账本）。「写入持仓」：本地行情末日 <strong>≥ 今天</strong>，且已有<strong>执行日=今天</strong>的预测信号。与下方回测复盘表分开看。
 </p>
 <section class="live-signal" id="liveSignalSection" hidden>
   <h2>
@@ -424,6 +460,68 @@
     document.title = "Positions · " + (data.exp_name || "");
     const dates = data.days.map(d => d.date);
     let idx = 0;
+
+    // 从 ?data=/data/xxx_positions.json 解析导出文件名，用于收藏 API
+    function resultFilenameFromDataUrl(url) {
+      try {
+        const path = String(url || "").split("?")[0];
+        const base = path.split("/").pop() || "";
+        if (base.endsWith("_positions.json") || base.endsWith("_positions_view.html")) {
+          return base;
+        }
+      } catch (_) { /* ignore */ }
+      return null;
+    }
+
+    function setFavBtnState(on) {
+      const btn = document.getElementById("favBtn");
+      if (!btn) return;
+      btn.classList.toggle("on", !!on);
+      btn.dataset.favorited = on ? "1" : "0";
+      btn.textContent = on ? "★ 已收藏" : "☆ 收藏";
+      btn.title = on ? "取消收藏" : "收藏到历史列表置顶";
+    }
+
+    async function initFavorite(filename) {
+      const btn = document.getElementById("favBtn");
+      if (!btn || !filename) return;
+      btn.hidden = false;
+      try {
+        const res = await fetch("/api/results");
+        if (res.ok) {
+          const body = await res.json();
+          const row = (body.results || []).find((r) => r.filename === filename);
+          setFavBtnState(!!(row && row.favorited));
+        } else {
+          setFavBtnState(false);
+        }
+      } catch (_) {
+        setFavBtnState(false);
+      }
+      btn.onclick = async () => {
+        const next = btn.dataset.favorited !== "1";
+        btn.disabled = true;
+        try {
+          const res = await fetch("/api/results/favorite", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename, favorited: next }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || ("HTTP " + res.status));
+          setFavBtnState(next);
+        } catch (err) {
+          // loadStatus 成功后会被移除，失败时用按钮 title 提示
+          const msg = "收藏失败: " + (err && err.message ? err.message : err);
+          btn.title = msg;
+          window.alert(msg);
+        } finally {
+          btn.disabled = false;
+        }
+      };
+    }
+
+    initFavorite(resultFilenameFromDataUrl(dataUrl));
 
     const fmt = (x, digits=4) => {
       if (x === null || x === undefined || Number.isNaN(x)) return "—";
@@ -655,7 +753,102 @@
       return "<table><thead><tr><th>代码</th><th>分数</th></tr></thead><tbody>" + rows + "</tbody></table>";
     }
 
+    let latestLiveSig = null;
+    let jobBusy = false;
+    /** /api/status 的本地行情末日；空字符串表示尚未读到 */
+    let calendarLatest = "";
+
+    /** 本地日历日 YYYY-MM-DD（浏览器时区；与服务端上海日大致一致） */
+    function localTodayStr() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + day;
+    }
+
+    /** 读本地行情末日，供预测/写入按钮判断「有没有这一天的数据」 */
+    async function loadCalendarLatest() {
+      try {
+        const res = await fetch("/api/status");
+        if (!res.ok) return;
+        const body = await res.json();
+        calendarLatest = (body.calendar && body.calendar.latest) || "";
+      } catch (_) { /* 读不到日历时按钮保持不可用 */ }
+      refreshApplyBookBtn();
+    }
+
+    /**
+     * 预测门槛用的持仓 tip。
+     * 信号文件里的 book_tip：未写入时是预测所依据的持仓日，写入后会被改成执行日。
+     */
+    function currentBookTip() {
+      const sig = latestLiveSig;
+      if (sig && sig.book_tip) return String(sig.book_tip);
+      const days = (data && data.days) || [];
+      let tip = "";
+      for (let i = 0; i < days.length; i++) {
+        const d = days[i] && days[i].date;
+        if (d && String(d) > tip) tip = String(d);
+      }
+      return tip;
+    }
+
+    /** 预测：本地有 tip 即可预测下一交易日；写入：本地末日≥今天且执行日=今天 */
+    function refreshApplyBookBtn() {
+      const applyBtn = document.getElementById("applyBookBtn");
+      const predBtn = document.getElementById("predictBtn");
+      const sig = latestLiveSig;
+      const today = localTodayStr();
+      const tip = currentBookTip();
+      let applyOk = false;
+      let applyTitle = "本地行情末日≥今天，且今天已有预测信号，才能写入";
+      let predOk = false;
+      let predTitle = "本地有持仓 tip 行情即可预测下一交易日";
+      if (jobBusy) {
+        applyTitle = "任务进行中…";
+        predTitle = "任务进行中…";
+      } else if (!calendarLatest) {
+        applyTitle = "正在读取本地行情日历";
+        predTitle = "正在读取本地行情日历";
+      } else {
+        // 预测：只要本地已有 tip（信号日）数据，就只能预测 tip 的下一交易日
+        if (!tip) {
+          predTitle = "缺少持仓 tip";
+        } else if (calendarLatest < tip) {
+          predTitle = "本地行情未到持仓 tip " + tip + "（本地末日 " + calendarLatest + "）";
+        } else {
+          predOk = true;
+          predTitle = "预测持仓 tip " + tip + " 的下一交易日（不跨日、不写账本）";
+        }
+        // 写入：本地末日 ≥ 今天，且已有执行日=今天的有效信号
+        if (!sig || sig.error) {
+          applyTitle = "请先成功预测出今天的执行信号";
+        } else if (!sig.execute_date) {
+          applyTitle = "信号缺少执行日";
+        } else if (sig.book_rolled) {
+          applyTitle = "本信号已写入 live_book";
+        } else if (calendarLatest < today) {
+          applyTitle = "本地行情末日 " + calendarLatest + " 尚未覆盖今天 " + today;
+        } else if (sig.execute_date !== today) {
+          applyTitle = "须有执行日=今天的信号（当前执行日 " + sig.execute_date + "，今天 " + today + "）";
+        } else {
+          applyOk = true;
+          applyTitle = "将今天 " + today + " 的信号写入 live_book";
+        }
+      }
+      if (applyBtn) {
+        applyBtn.disabled = !applyOk;
+        applyBtn.title = applyTitle;
+      }
+      if (predBtn) {
+        predBtn.disabled = !predOk;
+        predBtn.title = predTitle;
+      }
+    }
+
     function showLiveSignal(sig) {
+      latestLiveSig = sig || null;
       const section = document.getElementById("liveSignalSection");
       section.hidden = false;
       const hasError = !!(sig && sig.error);
@@ -673,15 +866,26 @@
       document.getElementById("liveSellTag").textContent = "(" + (hasError ? 0 : (sig.sells || []).length) + ")";
       const noteParts = [];
       if (hasError) {
-        noteParts.push("预测失败（未续算到最新交易日，请勿按旧名单下单）: " + sig.error);
+        noteParts.push("预测失败（未续算到 tip 日，请勿按旧名单下单）: " + sig.error);
+      }
+      if (!hasError && sig.book_tip) {
+        noteParts.push("持仓 tip " + sig.book_tip);
+      }
+      if (!hasError && (sig.holdings_asof || sig.holdings_source)) {
+        noteParts.push(
+          "持仓 asof " + (sig.holdings_asof || "—") +
+          " · 来源 " + (sig.holdings_source || "—") +
+          (sig.book_rolled ? " · 已写入 live_book" : "")
+        );
       }
       if (sig.note) noteParts.push(sig.note);
       if (sig.model_exp_name) noteParts.push("模型实验: " + sig.model_exp_name);
       document.getElementById("liveSignalNote").textContent = noteParts.join(" ");
       document.getElementById("liveBuyBody").innerHTML = renderLiveItems(hasError ? [] : sig.buys);
       document.getElementById("liveSellBody").innerHTML = renderLiveItems(hasError ? [] : sig.sells);
+      refreshApplyBookBtn();
       if (hasError) {
-        setPredictBusy(false, "预测失败: " + sig.error);
+        setJobBusy(false, "预测失败: " + sig.error);
       }
     }
 
@@ -693,12 +897,13 @@
         if (!res.ok) return;
         showLiveSignal(await res.json());
       } catch (_) { /* no cached signal yet */ }
+      refreshApplyBookBtn();
     }
 
-    let predictPoll = null;
-    function setPredictBusy(busy, msg) {
-      const btn = document.getElementById("predictBtn");
-      btn.disabled = !!busy;
+    let jobPoll = null;
+    function setJobBusy(busy, msg) {
+      jobBusy = !!busy;
+      refreshApplyBookBtn();
       const st = document.getElementById("livePredictStatus");
       if (msg) {
         st.hidden = false;
@@ -709,18 +914,20 @@
       }
     }
 
-    async function pollPredictJob(jobId, signalUrl) {
-      if (predictPoll) clearInterval(predictPoll);
-      predictPoll = setInterval(async () => {
+    async function pollLiveJob(jobId, signalUrl, labels) {
+      const failLabel = (labels && labels.fail) || "失败";
+      const doneLabel = (labels && labels.done) || "完成";
+      if (jobPoll) clearInterval(jobPoll);
+      jobPoll = setInterval(async () => {
         try {
           const res = await fetch("/api/jobs/" + encodeURIComponent(jobId));
           if (!res.ok) throw new Error("HTTP " + res.status);
           const job = await res.json();
           const tail = (job.log || "").split("\n").slice(-8).join("\n");
-          setPredictBusy(true, (job.kind || "predict") + " · " + job.status + "\n" + tail);
+          setJobBusy(true, (job.kind || "job") + " · " + job.status + "\n" + tail);
           if (job.status === "finished" || job.status === "failed") {
-            clearInterval(predictPoll);
-            predictPoll = null;
+            clearInterval(jobPoll);
+            jobPoll = null;
             const url = (signalUrl || liveSignalUrl()) + "?t=" + Date.now();
             if (job.status === "failed") {
               try {
@@ -730,8 +937,8 @@
                   showLiveSignal(sig);
                   if (sig.error) return;
                 }
-              } catch (_) { /* fall through to job.error */ }
-              setPredictBusy(false, "预测失败: " + (job.error || "unknown"));
+              } catch (_) { /* fall through */ }
+              setJobBusy(false, failLabel + ": " + (job.error || "unknown"));
               return;
             }
             const sigRes = await fetch(url);
@@ -739,13 +946,14 @@
             const sig = await sigRes.json();
             showLiveSignal(sig);
             if (sig.error) return;
-            setPredictBusy(false, "预测完成 · 信号日 " + (sig.signal_date || "—") +
-              " → 执行日 " + (sig.execute_date || "—"));
+            setJobBusy(false, doneLabel + " · 信号日 " + (sig.signal_date || "—") +
+              " → 执行日 " + (sig.execute_date || "—") +
+              (sig.book_rolled ? " · 已写入持仓" : " · 未写入持仓"));
           }
         } catch (err) {
-          clearInterval(predictPoll);
-          predictPoll = null;
-          setPredictBusy(false, "预测出错: " + (err && err.message ? err.message : err));
+          clearInterval(jobPoll);
+          jobPoll = null;
+          setJobBusy(false, failLabel + ": " + (err && err.message ? err.message : err));
         }
       }, 2000);
     }
@@ -753,12 +961,12 @@
     document.getElementById("predictBtn").onclick = async () => {
       const exp = data.exp_name;
       if (!exp) {
-        setPredictBusy(false, "当前 JSON 缺少 exp_name，无法预测");
+        setJobBusy(false, "当前 JSON 缺少 exp_name，无法预测");
         document.getElementById("liveSignalSection").hidden = false;
         return;
       }
       document.getElementById("liveSignalSection").hidden = false;
-      setPredictBusy(true, "正在启动预测…");
+      setJobBusy(true, "正在启动预测…");
       try {
         const res = await fetch("/api/predict", {
           method: "POST",
@@ -766,13 +974,36 @@
           body: JSON.stringify({
             exp_name: exp,
             recorder_id: data.recorder_id || undefined,
+            no_roll: true,
           }),
         });
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || ("HTTP " + res.status));
-        await pollPredictJob(body.job.id, body.signal_url);
+        await pollLiveJob(body.job.id, body.signal_url, { fail: "预测失败", done: "预测完成" });
       } catch (err) {
-        setPredictBusy(false, "启动失败: " + (err && err.message ? err.message : err));
+        setJobBusy(false, "启动失败: " + (err && err.message ? err.message : err));
+      }
+    };
+
+    document.getElementById("applyBookBtn").onclick = async () => {
+      const exp = data.exp_name;
+      if (!exp) {
+        setJobBusy(false, "当前 JSON 缺少 exp_name，无法写入持仓");
+        return;
+      }
+      document.getElementById("liveSignalSection").hidden = false;
+      setJobBusy(true, "正在写入持仓…");
+      try {
+        const res = await fetch("/api/apply_book", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ exp_name: exp }),
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || ("HTTP " + res.status));
+        await pollLiveJob(body.job.id, body.signal_url, { fail: "写入失败", done: "写入完成" });
+      } catch (err) {
+        setJobBusy(false, "启动失败: " + (err && err.message ? err.message : err));
       }
     };
 
@@ -780,6 +1011,7 @@
     renderYearly();
     idx = defaultIndex();
     render();
+    loadCalendarLatest();
     loadExistingLiveSignal();
   }
 

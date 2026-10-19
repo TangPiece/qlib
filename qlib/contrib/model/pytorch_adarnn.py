@@ -62,6 +62,11 @@ class ADARNN(Model):
         self.logger = get_module_logger("ADARNN")
         self.logger.info("ADARNN pytorch version...")
         os.environ["CUDA_VISIBLE_DEVICES"] = str(GPU)
+        # macOS 上数据加载(joblib) fork 后，PyTorch CPU 多线程 OpenMP 易在 libomp 中 SIGSEGV
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+        torch.set_num_threads(int(os.environ.get("OMP_NUM_THREADS", "1")))
 
         # set hyper-parameters.
         self.d_feat = d_feat
@@ -222,7 +227,8 @@ class ADARNN(Model):
         res["icir"] = ic.mean() / ic.std()
         res["ric"] = rank_ic.mean()
         res["ricir"] = rank_ic.mean() / rank_ic.std()
-        res["mse"] = -(pred["label"] - pred["score"]).mean()
+        # 取负的均方误差，使“越大越好”与 fit 中 valid_score > best_score 的选模逻辑一致
+        res["mse"] = -((pred["label"] - pred["score"]) ** 2).mean()
         res["loss"] = res["mse"]
         return res
 
@@ -245,16 +251,25 @@ class ADARNN(Model):
         evals_result=dict(),
         save_path=None,
     ):
+        # 诊断：定位 prepare / loader 物化阶段是否 OOM 被杀
+        self.logger.info("prepare start")
         df_train, df_valid = dataset.prepare(
             ["train", "valid"],
             col_set=["feature", "label"],
             data_key=DataHandlerLP.DK_L,
         )
+        self.logger.info("prepare done, train_rows=%d, valid_rows=%d", len(df_train), len(df_valid))
         #  splits = ['2011-06-30']
         days = df_train.index.get_level_values(level=0).unique()
         train_splits = np.array_split(days, self.n_splits)
         train_splits = [df_train[s[0] : s[-1]] for s in train_splits]
-        train_loader_list = [get_stock_loader(df, self.batch_size) for df in train_splits]
+        self.logger.info("building loaders, n_splits=%d", len(train_splits))
+        # 传入 d_feat/len_seq，避免硬编码；loader 内仅存 numpy，按样本懒转 tensor
+        train_loader_list = [
+            get_stock_loader(df, self.batch_size, d_feat=self.d_feat, len_seq=self.len_seq)
+            for df in train_splits
+        ]
+        self.logger.info("loaders ready")
 
         save_path = get_or_create_path(save_path)
         stop_steps = 0
@@ -262,10 +277,13 @@ class ADARNN(Model):
         evals_result["valid"] = []
 
         # train
-        self.logger.info("training...")
+        # 训练前再次锁定线程数，降低 fork 后 libomp 崩溃概率
+        torch.set_num_threads(int(os.environ.get("OMP_NUM_THREADS", "1")))
+        self.logger.info("training... (torch_num_threads=%d)", torch.get_num_threads())
         self.fitted = True
         best_score = -np.inf
         best_epoch = 0
+        best_param = None
         weight_mat, dist_mat = None, None
 
         for step in range(self.n_epochs):
@@ -339,25 +357,42 @@ class ADARNN(Model):
 
 
 class data_loader(Dataset):
-    def __init__(self, df):
-        self.df_feature = df["feature"]
-        self.df_label_reg = df["label"]
+    """ADARNN 训练用 Dataset：特征以 float32 numpy 常驻，按索引懒转 tensor，避免整表预物化导致 OOM。"""
+
+    def __init__(self, df, d_feat=6, len_seq=60):
+        """
+        Parameters
+        ----------
+        df : pd.DataFrame
+            含 feature / label 列组的训练分片
+        d_feat : int
+            每个时间步的特征维（Alpha360 为 6）
+        len_seq : int
+            序列长度（Alpha360 为 60）
+        """
         self.df_index = df.index
-        self.df_feature = torch.tensor(
-            self.df_feature.values.reshape(-1, 6, 60).transpose(0, 2, 1), dtype=torch.float32
-        )
-        self.df_label_reg = torch.tensor(self.df_label_reg.values.reshape(-1), dtype=torch.float32)
+        # 只存 numpy；reshape 为 [N, len_seq, d_feat]，与模型输入一致
+        feat = df["feature"].values.astype(np.float32, copy=False)
+        self.df_feature = feat.reshape(-1, d_feat, len_seq).transpose(0, 2, 1)
+        self.df_label_reg = df["label"].values.reshape(-1).astype(np.float32, copy=False)
 
     def __getitem__(self, index):
-        sample, label_reg = self.df_feature[index], self.df_label_reg[index]
+        # 按样本转 tensor，峰值内存约为一个 batch 而非全表
+        sample = torch.from_numpy(self.df_feature[index])
+        label_reg = torch.tensor(self.df_label_reg[index], dtype=torch.float32)
         return sample, label_reg
 
     def __len__(self):
         return len(self.df_feature)
 
 
-def get_stock_loader(df, batch_size, shuffle=True):
-    train_loader = DataLoader(data_loader(df), batch_size=batch_size, shuffle=shuffle)
+def get_stock_loader(df, batch_size, shuffle=True, d_feat=6, len_seq=60):
+    """构建 ADARNN DataLoader；d_feat/len_seq 传给 Dataset 做 reshape。"""
+    train_loader = DataLoader(
+        data_loader(df, d_feat=d_feat, len_seq=len_seq),
+        batch_size=batch_size,
+        shuffle=shuffle,
+    )
     return train_loader
 
 

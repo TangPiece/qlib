@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>模型训练控制台</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="header">
+    <div>
+      <h1>模型训练控制台</h1>
+      <p class="sub">本地静态页 · 共用 benchmarks 脚本</p>
+    </div>
+    <button type="button" id="btnRefresh" class="btn ghost">刷新状态</button>
+  </header>
+
+  <main class="layout">
+    <!-- 全宽状态条：指标横排，路径收在次要行 -->
+    <section class="card status-bar" id="statusCard">
+      <div class="status-grid">
+        <div><span class="label">今天</span><div id="stToday">—</div></div>
+        <div><span class="label">本地日历</span><div id="stCalendar">—</div></div>
+        <div><span class="label">YAML 结束日</span><div id="stYamlEnds">—</div></div>
+        <div><span class="label">当前任务</span><div id="stJob">空闲</div></div>
+      </div>
+      <p class="hint meta-line" id="stMeta"></p>
+    </section>
+
+    <div class="main-split">
+      <!-- 左栏：滚动配置 + 结束日 + 更新数据 -->
+      <section class="card prep-card" id="prepCard">
+        <h2>数据准备</h2>
+        <p class="hint" id="prepRollingHint" hidden>
+          当前为官方单次训练：滚动 YAML / 写入结束日仅作用于左侧滚动配置；更新数据仍可用。
+        </p>
+
+        <div class="card-section" id="prepRollingSection">
+          <h3>滚动配置</h3>
+          <label class="field">
+            <span>工作流 YAML</span>
+            <select id="configSelect"></select>
+          </label>
+          <div class="row">
+            <label class="field grow">
+              <span>结束日</span>
+              <input type="date" id="endDate" />
+            </label>
+            <button type="button" id="btnSetEnd" class="btn primary">写入 YAML</button>
+          </div>
+          <p class="hint">只改 data_handler / backtest / segments.test 右端，不改 start 与 train/valid。</p>
+        </div>
+
+        <div class="card-section">
+          <h3>更新行情</h3>
+          <div class="row checks">
+            <label><input type="checkbox" id="skipDownload" /> skip-download</label>
+            <label><input type="checkbox" id="forceDownload" /> force</label>
+          </div>
+          <button type="button" id="btnUpdateData" class="btn primary btn-block">运行 update_cn_data_daily</button>
+        </div>
+      </section>
+
+      <!-- 右栏：训练 + 导出 -->
+      <section class="card train-card" id="trainCard">
+        <h2>训练与导出</h2>
+
+        <div class="card-section">
+          <h3>执行训练</h3>
+          <label class="field">
+            <span>模型</span>
+            <select id="modelSelect"></select>
+          </label>
+          <label class="field" id="yamlField" hidden>
+            <span>官方 YAML</span>
+            <select id="yamlSelect"></select>
+          </label>
+          <p class="hint" id="modelHint" hidden>暂不支持修改参数，将使用该 YAML 中的 qlib 默认配置。</p>
+          <p class="hint" id="modelNote" hidden></p>
+          <div class="row">
+            <label class="field grow">
+              <span>exp_name</span>
+              <input type="text" id="expName" placeholder="rolling_*_YYYYMMDD" />
+            </label>
+            <label class="field narrow" id="horizonField">
+              <span>horizon</span>
+              <input type="number" id="horizon" value="1" min="1" step="1" />
+            </label>
+          </div>
+          <button type="button" id="btnTrain" class="btn primary btn-block">运行滚动训练</button>
+        </div>
+
+        <div class="card-section">
+          <h3>生成结果 HTML</h3>
+          <div class="row">
+            <label class="field grow">
+              <span>exp_name</span>
+              <input type="text" id="exportExpName" placeholder="与训练实验名一致" />
+            </label>
+            <button type="button" id="btnExport" class="btn primary">运行 export_positions_view</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card wide">
+      <div class="row between">
+        <h2>任务日志</h2>
+        <button type="button" id="btnCopyLog" class="btn ghost">复制</button>
+      </div>
+      <pre id="jobLog" class="log">尚无任务</pre>
+    </section>
+
+    <section class="card wide">
+      <div class="row between">
+        <h2>历史训练结果</h2>
+        <div class="row">
+          <button type="button" id="btnCleanupMlruns" class="btn ghost">清理未使用</button>
+          <button type="button" id="btnRefreshResults" class="btn ghost">刷新列表</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-fav"></th>
+              <th>实验名</th>
+              <th>类型</th>
+              <th>修改时间</th>
+              <th>大小</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody">
+            <tr><td colspan="6">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

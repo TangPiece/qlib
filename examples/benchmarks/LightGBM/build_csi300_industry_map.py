@@ -29,7 +29,8 @@ import requests
 
 DIRNAME = Path(__file__).absolute().resolve().parent
 DEFAULT_QLIB_DIR = Path("~/.qlib/qlib_data/cn_data").expanduser()
-DEFAULT_OUT_DIR = DIRNAME / "data" / "ref"
+# 行业映射默认写入 examples/console/data/ref
+DEFAULT_OUT_DIR = DIRNAME.parents[1] / "console" / "data" / "ref"
 OPEN_END = pd.Timestamp("9999-12-31")
 STANDARD = "SW"
 STANDARD_VERSION = "2021"

@@ -1,0 +1,100 @@
+# ADARNN Alpha360 滚动模板：7y train + 1y valid，~2y step
+# 本文件为 10 万初始资金副本（account=100000）
+# 真正滚动请用: python examples/benchmarks/ADARNN/rolling_7y1y.py --conf_path=... --exp_name=... run
+# 不要用裸 qlib.cli.run 做滚动（那只会跑首窗单次任务）
+# 建议启动前: export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1（避免 macOS libomp SIGSEGV）
+# 前提: ~/.qlib/qlib_data/cn_data 需覆盖到 end_time
+qlib_init:
+    provider_uri: "~/.qlib/qlib_data/cn_data"
+    region: cn
+    kernels: 1
+market: &market csi300
+benchmark: &benchmark SH000300
+data_handler_config: &data_handler_config
+    start_time: 2008-01-01
+    end_time: 2026-10-16
+    fit_start_time: 2008-01-01
+    fit_end_time: 2014-12-31
+    instruments: *market
+    infer_processors:
+        - class: RobustZScoreNorm
+          kwargs:
+              fields_group: feature
+              clip_outlier: true
+        - class: Fillna
+          kwargs:
+              fields_group: feature
+    learn_processors:
+        - class: DropnaLabel
+        - class: CSRankNorm
+          kwargs:
+              fields_group: label
+    label: ["Ref($close, -2) / Ref($close, -1) - 1"]
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>
+            topk: 10
+            n_drop: 1
+    backtest:
+        start_time: 2016-01-01
+        end_time: 2026-10-16
+        account: 100000
+        benchmark: *benchmark
+        exchange_kwargs:
+            limit_threshold: 0.095
+            deal_price: close
+            open_cost: 0.0005
+            close_cost: 0.0015
+            min_cost: 5
+task:
+    model:
+        class: ADARNN
+        module_path: qlib.contrib.model.pytorch_adarnn
+        kwargs:
+            d_feat: 6
+            hidden_size: 64
+            num_layers: 2
+            dropout: 0.0
+            n_epochs: 200
+            lr: 1e-3
+            # 验证 IC 通常在 10~16 epoch 见顶，20 轮耐心会白跑约 40 分钟/窗
+            early_stop: 8
+            # 256 时单线程 CPU 约 2 分钟/epoch；800 与官方基准一致，训练更快
+            batch_size: 800
+            # 按验证集 IC 选模型；与截面选股目标一致（原 loss 仅为预测偏差，不反映排序能力）
+            metric: ic
+            loss: mse
+            # 固定随机种子，便于与后续调参方案对比
+            seed: 42
+            GPU: 0
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: Alpha360
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                # 首窗模板：7y train + 1y valid；test 为全测试跨度，由 RollingGen 按 ~2y step 切分
+                train: [2008-01-01, 2014-12-31]
+                valid: [2015-01-01, 2015-12-31]
+                test: [2016-01-01, 2026-10-16]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            model: <MODEL>
+            dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            ana_long_short: False
+            ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            config: *port_analysis_config

@@ -219,48 +219,70 @@ def is_local_up_to_date(qlib_dir: Path, remote_tag: str) -> Tuple[bool, str]:
     )
 
 
+def _date_token(latest_date: str, quote: str) -> str:
+    """按原文引号风格写回日期（无引号 / 单引号 / 双引号）。"""
+    return f"{quote}{latest_date}{quote}" if quote else latest_date
+
+
 def update_config_end_times(config_path: Path, latest_date: str, dry_run: bool) -> List[str]:
     """Sync only end dates to ``latest_date`` (typically today's date).
 
     Updates ``data_handler_config.end_time``, ``backtest.end_time``, and the
     **right** endpoint of ``segments.test``. Does not modify any start_time,
     fit_* dates, or train/valid segment bounds.
+
+    兼容 LightGBM 风格（4 空格、无引号、``test: [a, b]``）与 ruamel 生成的
+    滚动 yaml（2 空格、带引号、多行 list）。
     """
     text = config_path.read_text()
     changes: List[str] = []
 
-    replacements = [
-        (
-            "data_handler_config.end_time",
-            r"(data_handler_config:[^\n]*\n(?:[^\n]*\n)*?    end_time: )(\d{4}-\d{2}-\d{2})",
-            lambda m: f"{m.group(1)}{latest_date}",
-        ),
-        (
-            "backtest.end_time",
-            r"(    backtest:\n(?:[^\n]*\n)*?        end_time: )(\d{4}-\d{2}-\d{2})",
-            lambda m: f"{m.group(1)}{latest_date}",
-        ),
-        (
-            "segments.test right endpoint",
-            r"(test:\s*\[[\d-]+,\s*)(\d{4}-\d{2}-\d{2})(\s*\])",
-            lambda m: f"{m.group(1)}{latest_date}{m.group(3)}",
-        ),
-    ]
-
-    for label, pattern, repl in replacements:
+    def _apply(label: str, pattern: str, repl, date_group: int) -> bool:
+        nonlocal text
         matched = re.search(pattern, text)
         if not matched:
             changes.append(f"{label}: NOT FOUND (no change)")
-            continue
-        old = matched.group(0)
-        new = repl(matched)
-        if old != new:
-            # show only the date part transition when possible
-            old_date = matched.group(2)
+            return False
+        old_date = matched.group(date_group)
+        new_text = re.sub(pattern, repl, text, count=1)
+        if new_text != text:
             changes.append(f"{label}: {old_date} -> {latest_date}")
         else:
             changes.append(f"{label}: already {latest_date}")
-        text = re.sub(pattern, repl, text, count=1)
+        text = new_text
+        return True
+
+    # end_time: 可选引号；缩进兼容 2/4 空格
+    _apply(
+        "data_handler_config.end_time",
+        r"(data_handler_config:[^\n]*\n(?:[^\n]*\n)*?[ \t]+end_time:[ \t]*)(['\"]?)(\d{4}-\d{2}-\d{2})\2",
+        lambda m: f"{m.group(1)}{_date_token(latest_date, m.group(2))}",
+        3,
+    )
+    _apply(
+        "backtest.end_time",
+        r"([ \t]+backtest:\n(?:[^\n]*\n)*?[ \t]+end_time:[ \t]*)(['\"]?)(\d{4}-\d{2}-\d{2})\2",
+        lambda m: f"{m.group(1)}{_date_token(latest_date, m.group(2))}",
+        3,
+    )
+
+    # segments.test 右端：先试紧凑 [a, b]，再试多行 list
+    if not _apply(
+        "segments.test right endpoint",
+        r"(test:\s*\[[^\],]+,\s*)(['\"]?)(\d{4}-\d{2}-\d{2})\2(\s*\])",
+        lambda m: f"{m.group(1)}{_date_token(latest_date, m.group(2))}{m.group(4)}",
+        3,
+    ):
+        # 去掉上一条 NOT FOUND，改用 list 形式
+        if changes and changes[-1].startswith("segments.test right endpoint: NOT FOUND"):
+            changes.pop()
+        _apply(
+            "segments.test right endpoint",
+            # group: 1=prefix+first line+second dash, 2/3=first date, 4/5=second date (quote backref \4)
+            r"([ \t]*test:\s*\n[ \t]*-[ \t]*(['\"]?)(\d{4}-\d{2}-\d{2})\2\s*\n[ \t]*-[ \t]*)(['\"]?)(\d{4}-\d{2}-\d{2})\4",
+            lambda m: f"{m.group(1)}{_date_token(latest_date, m.group(4))}",
+            5,
+        )
 
     if dry_run:
         log("[dry-run] config changes:")
