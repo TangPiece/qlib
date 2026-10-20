@@ -19,6 +19,13 @@ Example (repo root)::
 """
 from __future__ import annotations
 
+import os
+
+# macOS 上 torch 与 lightgbm 各带一份 libomp，预测加载模型时会 SIGSEGV（exit -11）
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 import argparse
 import json
 import re
@@ -705,7 +712,7 @@ def apply_book(
 ) -> Path:
     """按已有 live_signal 写入 live_book。
 
-    条件：本地行情末日 >= 今天，且信号的执行日正好是今天（当前日已有预测）。
+    条件：本地行情末日 >= 建议执行日。
     """
     qlib.init(provider_uri=provider_uri, region=REG_CN)
     out_dir = Path(out_dir)
@@ -723,16 +730,12 @@ def apply_book(
         raise RuntimeError("信号缺少 signal_date / execute_date")
 
     today = _shanghai_today()
-    today_s = today.isoformat()
     cal_latest = _local_calendar_latest()
-    # 本地最近交易日须已覆盖今天；且必须已有「执行日=今天」的预测信号
-    if not cal_latest or cal_latest < today_s:
+    # 本地行情须已覆盖建议执行日，避免在执行日行情到来前把名单写入账本
+    execute_s = str(execute_date)
+    if not cal_latest or cal_latest < execute_s:
         raise RuntimeError(
-            f"写入持仓须本地行情末日 >= 今天（本地末日 {cal_latest or '无'}，今天 {today_s}）"
-        )
-    if str(execute_date) != today_s:
-        raise RuntimeError(
-            f"写入持仓须当前日已有预测信号（信号执行日 {execute_date}，今天 {today_s}）"
+            f"写入持仓须本地行情末日 >= 建议执行日（本地末日 {cal_latest or '无'}，建议执行日 {execute_s}）"
         )
 
     # 若账本 tip 已 >= 执行日，视为已写入，禁止用旧信号再滚一次
@@ -968,14 +971,14 @@ def run(
 
     note = (
         "信号日=持仓 tip，执行日=tip 下一交易日（对齐 TopkDropout shift=1）。"
-        "本结果不是回测成交复盘。预测仅生成 tip 的下一交易日名单；写入持仓须本地行情末日>=今天且信号执行日=今天。"
+        "本结果不是回测成交复盘。预测仅生成 tip 的下一交易日名单；写入持仓须本地行情末日>=建议执行日。"
         f" 分数来自模型实验 {models_exp}。"
         f" book_tip={book_tip}；持仓来源={holdings_source}（asof={hold_date or '—'}）。"
     )
     if book_rolled:
         note += f" 已按本轮买卖滚动写入 live_book（执行日 {execute_date}）。"
     elif no_roll:
-        note += " （未写入 live_book。本地行情末日>=今天且信号执行日=今天后再点「写入持仓」。）"
+        note += " （未写入 live_book。本地行情末日>=建议执行日后再点「写入持仓」。）"
     if skip_update:
         note += " （跳过了 update_online_pred，使用已有 pred.pkl。）"
     if reset_book:
@@ -1055,7 +1058,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser.add_argument(
         "--apply_book",
         action="store_true",
-        help="按已有 live_signal 写入 live_book（须日历日>=执行日）",
+        help="按已有 live_signal 写入 live_book（须本地行情末日>=建议执行日）",
     )
     args = parser.parse_args(argv)
     if args.apply_book:

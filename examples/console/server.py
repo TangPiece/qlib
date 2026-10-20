@@ -277,6 +277,53 @@ def _read_json(handler: SimpleHTTPRequestHandler) -> Dict[str, Any]:
     return data
 
 
+def _day_market(body: Dict[str, Any]) -> Dict[str, Any]:
+    """把 {keys:[{instrument,date}]} 交给报价脚本，返回复权价、现价和行业。"""
+    raw_keys = body.get("keys") or []
+    if not isinstance(raw_keys, list):
+        raise ValueError("keys must be a list")
+    if len(raw_keys) > 800:
+        raise ValueError("too many keys")
+    keys = []
+    seen = set()
+    for item in raw_keys:
+        if not isinstance(item, dict):
+            continue
+        code = str(item.get("instrument") or "").strip().upper()
+        day = str(item.get("date") or "").strip()
+        if not _DATE_RE.match(day) or not re.fullmatch(r"[A-Z0-9]{4,12}", code):
+            continue
+        pair = (code, day)
+        if pair in seen:
+            continue
+        seen.add(pair)
+        keys.append({"instrument": code, "date": day})
+    if not keys:
+        return {"quotes": []}
+    proc = subprocess.run(
+        [sys.executable, str(LGBM_DIR / "quote_live_day.py")],
+        input=json.dumps({"keys": keys}),
+        text=True,
+        capture_output=True,
+        cwd=str(REPO_ROOT),
+        timeout=180,
+    )
+    if proc.returncode != 0:
+        tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-8:]
+        raise RuntimeError("day_market failed: " + " | ".join(tail))
+    line = ""
+    for row in (proc.stdout or "").splitlines():
+        row = row.strip()
+        if row.startswith("{"):
+            line = row
+    if not line:
+        raise RuntimeError("day_market returned no JSON")
+    payload = json.loads(line)
+    if not isinstance(payload, dict):
+        raise RuntimeError("day_market JSON must be an object")
+    return payload
+
+
 def _model_class_from_yaml(text: str) -> Optional[str]:
     """取 task.model 下第一行 class，兼容 2 空格与 4 空格缩进。"""
     in_task = False
@@ -550,7 +597,7 @@ def _get_active() -> Optional[str]:
 def _start_job(kind: str, command: List[str], env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """启动后台任务；env 会合并进当前进程环境。
 
-    训练任务（kind=train）自动注入 _SAFE_OMP_ENV，避免 macOS 多份 libomp 导致 SIGSEGV。
+    训练、预测、写入持仓会加载 torch/lightgbm，自动注入 _SAFE_OMP_ENV，避免 macOS 多份 libomp 导致 SIGSEGV。
     """
     if _get_active():
         raise RuntimeError("another job is already running")
@@ -572,10 +619,10 @@ def _start_job(kind: str, command: List[str], env: Optional[Dict[str, str]] = No
     with _jobs_lock:
         _jobs[job_id] = job
     _set_active(job_id)
-    # train：先铺 OpenMP 防护，再叠调用方 env（可覆盖单项）
+    # 先铺 OpenMP 防护，再叠调用方 env（可覆盖单项）
     run_env = {
         **os.environ,
-        **(_SAFE_OMP_ENV if kind == "train" else {}),
+        **(_SAFE_OMP_ENV if kind in ("train", "predict", "apply_book") else {}),
         **(env or {}),
     }
 
@@ -1237,8 +1284,13 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
                 )
                 return
 
+            if path == "/api/day_market":
+                # 账本日补价：子进程查复权收盘 / 现价 / 行业，本进程不 import qlib
+                _json_response(self, 200, _day_market(body))
+                return
+
             if path == "/api/apply_book":
-                # 按现有 live_signal 写入 live_book（脚本内校验：本地末日≥今天且执行日=今天）
+                # 按现有 live_signal 写入 live_book（脚本内校验：本地末日≥建议执行日）
                 exp_name = str(body.get("exp_name") or "").strip()
                 if not exp_name:
                     raise ValueError("exp_name is required")

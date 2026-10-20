@@ -12,7 +12,7 @@ market: &market csi300
 benchmark: &benchmark SH000300
 data_handler_config: &data_handler_config
     start_time: 2008-01-01
-    end_time: 2026-10-16
+    end_time: 2026-10-20
     fit_start_time: 2008-01-01
     fit_end_time: 2014-12-31
     instruments: *market
@@ -40,7 +40,7 @@ port_analysis_config: &port_analysis_config
             n_drop: 1
     backtest:
         start_time: 2016-01-01
-        end_time: 2026-10-16
+        end_time: 2026-10-20
         account: 100000
         benchmark: *benchmark
         exchange_kwargs:
@@ -82,7 +82,7 @@ task:
                 # 首窗模板：7y train + 1y valid；test 为全测试跨度，由 RollingGen 按 ~2y step 切分
                 train: [2008-01-01, 2014-12-31]
                 valid: [2015-01-01, 2015-12-31]
-                test: [2016-01-01, 2026-10-16]
+                test: [2016-01-01, 2026-10-20]
     record:
         - class: SignalRecord
           module_path: qlib.workflow.record_temp

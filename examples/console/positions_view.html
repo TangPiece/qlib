@@ -365,7 +365,7 @@
   <select id="dateSelect"></select>
   <button id="nextBtn" type="button">后一日 →</button>
   <button id="predictBtn" type="button" disabled title="本地有持仓 tip 行情即可预测下一交易日">预测</button>
-  <button id="applyBookBtn" type="button" disabled title="本地行情末日≥今天且今天已有预测信号才能写入">写入持仓</button>
+  <button id="applyBookBtn" type="button" disabled title="本地行情末日≥建议执行日才能写入">写入持仓</button>
   <div class="stats">
     <span>现金 <b id="cash"></b></span>
     <span>总资产 <b id="account"></b></span>
@@ -375,10 +375,9 @@
   </div>
 </div>
 <p class="timing-note" id="timingNote">
-  当前选择日为<strong>回测成交日</strong>（按当日 close 撮合）；策略信号来自<strong>上一交易日</strong>
-  （<code id="signalDateLabel">—</code>）。日频包通常要等成交日收盘后才有，缺当日行情时本页可能显示 0 买卖（仓位结转），那是复盘缺数，不是「当日无信号」。
+  <span id="timingLead">当前选择日为<strong>回测成交日</strong>（按当日 close 撮合）；策略信号来自<strong>上一交易日</strong>（<code id="signalDateLabel">—</code>）。日频包通常要等成交日收盘后才有，缺当日行情时本页可能显示 0 买卖（仓位结转），那是复盘缺数，不是「当日无信号」。</span>
   实盘应在信号日收盘后定名单、在下一交易日执行；不要等本页复盘出来再去补做已过去的成交日。
-  「预测」：本地已有<strong>持仓 tip</strong>行情即可生成<strong>下一交易日</strong>名单（不跨日、不写账本）。「写入持仓」：本地行情末日 <strong>≥ 今天</strong>，且已有<strong>执行日=今天</strong>的预测信号。与下方回测复盘表分开看。
+  「预测」：本地已有<strong>持仓 tip</strong>行情即可生成<strong>下一交易日</strong>名单（不跨日、不写账本）。「写入持仓」：本地行情末日 <strong>≥ 建议执行日</strong>才可写入。与下方回测复盘表分开看。
 </p>
 <section class="live-signal" id="liveSignalSection" hidden>
   <h2>
@@ -458,7 +457,8 @@
       return;
     }
     document.title = "Positions · " + (data.exp_name || "");
-    const dates = data.days.map(d => d.date);
+    /** 与 data.days 同步；写入持仓后会并入 live_book 的新日期 */
+    let dates = (data.days || []).map(d => d.date);
     let idx = 0;
 
     // 从 ?data=/data/xxx_positions.json 解析导出文件名，用于收藏 API
@@ -602,11 +602,24 @@
       }).join("");
     }
 
+    /** 回测日和账本日的说明不一样：账本没有 close 撮合 */
+    function renderTimingLead(day, signalDate) {
+      const lead = document.getElementById("timingLead");
+      if (!lead) return;
+      const dateHtml = "（<code id=\"signalDateLabel\">" + signalDate + "</code>）";
+      if (day && day.source === "live_book") {
+        lead.innerHTML = "当前选择日为<strong>写入账本的持仓快照</strong>，不是回测成交；相对上一交易日"
+          + dateHtml + "的持仓差集就是当日买卖。价格是当天收盘，数量由上一天持仓滚来。";
+        return;
+      }
+      lead.innerHTML = "当前选择日为<strong>回测成交日</strong>（按当日 close 撮合）；策略信号来自<strong>上一交易日</strong>"
+        + dateHtml + "。日频包通常要等成交日收盘后才有，缺当日行情时本页可能显示 0 买卖（仓位结转），那是复盘缺数，不是「当日无信号」。";
+    }
+
     function render() {
       const day = data.days[idx];
       const signalDate = idx > 0 ? dates[idx - 1] : "（首日无上一交易日）";
-      const signalEl = document.getElementById("signalDateLabel");
-      if (signalEl) signalEl.textContent = signalDate;
+      renderTimingLead(day, signalDate);
       document.getElementById("dateInput").value = day.date;
       document.getElementById("dateSelect").value = day.date;
       document.getElementById("cash").textContent = fmt(day.cash, 2);
@@ -718,12 +731,28 @@
     document.getElementById("avSummary").textContent =
       fmt(data.first_account_value, 2) + " → " + fmt(data.last_account_value, 2);
 
-    const sel = document.getElementById("dateSelect");
-    dates.forEach(d => {
-      const opt = document.createElement("option");
-      opt.value = d; opt.textContent = d;
-      sel.appendChild(opt);
-    });
+    /**
+     * 按日期重排 data.days，并重建日期下拉。
+     * 账本并入新执行日后调用，避免下拉仍停在回测末日。
+     */
+    function syncDatesFromDays() {
+      data.days = (data.days || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      dates = data.days.map(d => d.date);
+      const sel = document.getElementById("dateSelect");
+      const current = sel.value;
+      sel.innerHTML = "";
+      dates.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d;
+        opt.textContent = d;
+        sel.appendChild(opt);
+      });
+      if (current && dates.indexOf(current) >= 0) sel.value = current;
+      if (dates.length && data.start) {
+        data.end = dates[dates.length - 1];
+        document.getElementById("range").textContent = data.start + " → " + data.end;
+      }
+    }
 
     document.getElementById("prevBtn").onclick = () => { if (idx > 0) { idx--; render(); } };
     document.getElementById("nextBtn").onclick = () => { if (idx < dates.length - 1) { idx++; render(); } };
@@ -738,6 +767,335 @@
       const exp = data.exp_name || "";
       if (!exp) return null;
       return "/data/" + String(exp).replace(/\//g, "_") + "_live_signal.json";
+    }
+
+    /** 与信号文件同目录的滚动持仓账本 */
+    function liveBookUrl() {
+      const exp = data.exp_name || "";
+      if (!exp) return null;
+      return "/data/" + String(exp).replace(/\//g, "_") + "_live_book.json";
+    }
+
+    /** 从回测日和当前信号收集代码→名称，账本行本身没有名称 */
+    function instrumentNameMap(sig) {
+      const map = {};
+      function add(items) {
+        (items || []).forEach((it) => {
+          if (it && it.instrument && it.name) map[String(it.instrument)] = it.name;
+        });
+      }
+      (data.days || []).forEach((day) => {
+        add(day.hold);
+        add(day.buy);
+        add(day.sell);
+      });
+      if (sig && !sig.error) {
+        add(sig.buys);
+        add(sig.sells);
+        add(sig.holds);
+      }
+      return map;
+    }
+
+    /** 该日之前最近一个交易日的持仓，用来算卖出差集 */
+    function previousDayHold(date) {
+      let best = null;
+      let bestDate = "";
+      (data.days || []).forEach((d) => {
+        const ds = d && d.date ? String(d.date) : "";
+        if (!ds || ds >= date) return;
+        if (!best || ds > bestDate) {
+          best = d.hold || [];
+          bestDate = ds;
+        }
+      });
+      return best || [];
+    }
+
+    /**
+     * 把 live_book 的一日收成复盘表能渲染的快照。
+     * 卖出不读当前信号（信号文件会被下一次预测覆盖），而是上一交易日有、当日没有的代码。
+     * 价格、数量、权重先留空，随后由 fillLiveBookDays 用当天收盘价补上。
+     */
+    function liveBookDay(raw, names, prevHold) {
+      const date = String(raw.date || "");
+      const holds = (raw.hold || []).filter((x) => x && x.instrument).map((x) => {
+        const code = String(x.instrument);
+        const buyDate = x.buy_date ? String(x.buy_date) : "";
+        return {
+          instrument: code,
+          name: names[code] || "",
+          buy_date: buyDate || null,
+          // 买入日就是本执行日的，在持仓表里标成 buy
+          action: buyDate === date ? "buy" : "hold",
+          weight: null,
+          amount: null,
+          price: null,
+          raw_price: null,
+        };
+      });
+      const holdSet = {};
+      holds.forEach((h) => { holdSet[h.instrument] = true; });
+      const sells = [];
+      const seenSell = {};
+      (prevHold || []).forEach((it) => {
+        const code = it && it.instrument ? String(it.instrument) : "";
+        if (!code || holdSet[code] || seenSell[code]) return;
+        seenSell[code] = true;
+        sells.push({
+          instrument: code,
+          name: it.name || names[code] || "",
+          weight: null,
+          amount: null,
+          price: null,
+          raw_price: null,
+          return_rate: null,
+        });
+      });
+      const buys = holds.filter((h) => h.action === "buy");
+      return {
+        date: date,
+        source: "live_book",
+        cash: null,
+        account_value: null,
+        n_hold: holds.length,
+        n_buy: buys.length,
+        n_sell: sells.length,
+        hold: holds,
+        buy: buys,
+        sell: sells,
+        industries: [],
+      };
+    }
+
+    /** 执行日已经是账本快照时，不要再让写入按钮可点 */
+    function liveBookHasDate(date) {
+      const want = String(date || "");
+      if (!want) return false;
+      return (data.days || []).some((d) => d && d.source === "live_book" && String(d.date) === want);
+    }
+
+    /**
+     * 把账本里回测文件没有的日期追加进来。已有日期保持回测行，不覆盖。
+     * 按日期从早到晚合并，后一天的卖出才能对着前一天的账本持仓做差。
+     * @returns {boolean} 是否新增了日期
+     */
+    function mergeLiveBook(book, sig) {
+      const incoming = (book && book.days) || [];
+      if (!incoming.length) return false;
+      if (!data.days) data.days = [];
+      const have = {};
+      data.days.forEach((d) => {
+        if (d && d.date) have[String(d.date)] = true;
+      });
+      const names = instrumentNameMap(sig);
+      const ordered = incoming.slice().sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+      let added = false;
+      ordered.forEach((raw) => {
+        const date = raw && raw.date ? String(raw.date) : "";
+        if (!date || have[date]) return;
+        data.days.push(liveBookDay(raw, names, previousDayHold(date)));
+        have[date] = true;
+        added = true;
+      });
+      return added;
+    }
+
+    /**
+     * TopkDropout 默认 risk_degree，以及 workflow exchange_kwargs 的买卖费率。
+     * 买入金额 = 卖出后现金 × 0.95 / 买入只数；费用从现金里扣，避免总资产偏高。
+     */
+    const LIVE_RISK_DEGREE = 0.95;
+    const LIVE_CLOSE_COST = 0.0015;
+    const LIVE_OPEN_COST = 0.0005;
+    const LIVE_MIN_COST = 5;
+
+    /** 该日之前最近一个交易日的整日快照（要现金和数量，不只是代码） */
+    function previousDay(date) {
+      let best = null;
+      let bestDate = "";
+      (data.days || []).forEach((d) => {
+        const ds = d && d.date ? String(d.date) : "";
+        if (!ds || ds >= date) return;
+        if (!best || ds > bestDate) {
+          best = d;
+          bestDate = ds;
+        }
+      });
+      return best;
+    }
+
+    function quoteKey(code, date) {
+      return String(code) + "|" + String(date);
+    }
+
+    /** 买卖手续费：按成交额收，不足最低收费时用最低收费 */
+    function tradeFee(notional, rate) {
+      const fee = Math.abs(Number(notional) || 0) * rate;
+      return Math.max(fee, LIVE_MIN_COST);
+    }
+
+    /** 用持仓权重汇总行业占比；没有行业名的股票不进表 */
+    function rebuildLiveIndustries(day) {
+      const buckets = {};
+      (day.hold || []).forEach((h) => {
+        if (!h || !h.industry_name) return;
+        const key = h.industry_code || h.industry_name;
+        if (!buckets[key]) {
+          buckets[key] = {
+            industry_code: h.industry_code || "",
+            industry_name: h.industry_name,
+            weight: 0,
+            n: 0,
+          };
+        }
+        buckets[key].weight += Number(h.weight) || 0;
+        buckets[key].n += 1;
+      });
+      day.industries = Object.keys(buckets).map((k) => buckets[k])
+        .sort((a, b) => b.weight - a.weight || String(a.industry_name).localeCompare(String(b.industry_name)));
+    }
+
+    /**
+     * 用上一天的数量、现金和当天收盘价，把账本日的价格和仓位补上。
+     * 继续持有沿用数量；买入按卖出后现金均分；没有行情的标的保持「—」。
+     */
+    function applyLiveDayMarks(day, quotes) {
+      const prev = previousDay(day.date);
+      const prevHold = {};
+      ((prev && prev.hold) || []).forEach((h) => {
+        if (h && h.instrument) prevHold[String(h.instrument)] = h;
+      });
+      let cash = prev && prev.cash != null && !Number.isNaN(Number(prev.cash))
+        ? Number(prev.cash)
+        : null;
+
+      (day.sell || []).forEach((s) => {
+        const code = String(s.instrument || "");
+        const ph = prevHold[code] || {};
+        const q = quotes[quoteKey(code, day.date)];
+        const buyQ = ph.buy_date ? quotes[quoteKey(code, ph.buy_date)] : null;
+        if (ph.amount != null) s.amount = ph.amount;
+        if (ph.buy_date) s.buy_date = ph.buy_date;
+        if (!s.name && ph.name) s.name = ph.name;
+        if (q && q.price != null) {
+          s.price = q.price;
+          s.raw_price = q.raw_price;
+          s.sell_price = q.price;
+          s.sell_raw_price = q.raw_price;
+        }
+        if (s.sell_price != null && buyQ && buyQ.price) {
+          s.return_rate = s.sell_price / buyQ.price - 1;
+        }
+        if (cash != null && s.amount != null && s.sell_price != null) {
+          const notional = Number(s.amount) * Number(s.sell_price);
+          cash += notional - tradeFee(notional, LIVE_CLOSE_COST);
+        }
+      });
+
+      const buys = (day.hold || []).filter((h) => h.action === "buy");
+      const buyValue = cash != null && buys.length
+        ? cash * LIVE_RISK_DEGREE / buys.length
+        : null;
+      (day.hold || []).forEach((h) => {
+        const code = String(h.instrument || "");
+        const q = quotes[quoteKey(code, day.date)];
+        const ph = prevHold[code];
+        if (q && q.price != null) {
+          h.price = q.price;
+          h.raw_price = q.raw_price;
+        }
+        if (q && q.industry_name) {
+          h.industry_name = q.industry_name;
+          h.industry_code = q.industry_code || "";
+        }
+        if (h.action === "buy") {
+          if (buyValue != null && h.price) {
+            h.amount = buyValue / h.price;
+            if (cash != null) {
+              const notional = h.amount * h.price;
+              cash -= notional + tradeFee(notional, LIVE_OPEN_COST);
+            }
+          }
+        } else if (ph && ph.amount != null) {
+          h.amount = ph.amount;
+        }
+      });
+
+      let stockValue = 0;
+      (day.hold || []).forEach((h) => {
+        if (h.amount != null && h.price != null) stockValue += Number(h.amount) * Number(h.price);
+      });
+      if (cash != null) {
+        day.cash = cash;
+        day.account_value = cash + stockValue;
+        const account = day.account_value;
+        const putWeight = (row, px) => {
+          if (!account || row.amount == null || px == null) return;
+          row.weight = Number(row.amount) * Number(px) / account;
+        };
+        (day.hold || []).forEach((h) => putWeight(h, h.price));
+        (day.sell || []).forEach((s) => putWeight(s, s.sell_price != null ? s.sell_price : s.price));
+      }
+      rebuildLiveIndustries(day);
+    }
+
+    /** 按日期从早到晚给账本日补行情，后一天才能用到前一天滚完的现金和数量 */
+    async function fillLiveBookDays() {
+      const liveDays = (data.days || []).filter((d) => d && d.source === "live_book")
+        .slice()
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (!liveDays.length) return;
+      const keys = [];
+      const seen = {};
+      const addKey = (code, date) => {
+        if (!code || !date) return;
+        const k = quoteKey(code, date);
+        if (seen[k]) return;
+        seen[k] = true;
+        keys.push({ instrument: String(code), date: String(date) });
+      };
+      liveDays.forEach((day) => {
+        const prev = previousDay(day.date);
+        const prevByCode = {};
+        ((prev && prev.hold) || []).forEach((h) => {
+          if (h && h.instrument) prevByCode[String(h.instrument)] = h;
+        });
+        (day.hold || []).forEach((h) => addKey(h.instrument, day.date));
+        (day.sell || []).forEach((s) => {
+          addKey(s.instrument, day.date);
+          const ph = prevByCode[String(s.instrument)];
+          if (ph && ph.buy_date) addKey(s.instrument, ph.buy_date);
+        });
+      });
+      let quotes = {};
+      try {
+        const res = await fetch("/api/day_market", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys: keys }),
+        });
+        if (res.ok) {
+          const body = await res.json();
+          (body.quotes || []).forEach((q) => {
+            if (q && q.instrument && q.date) quotes[quoteKey(q.instrument, q.date)] = q;
+          });
+        }
+      } catch (_) { /* 报价失败时价格保持「—」 */ }
+      liveDays.forEach((day) => applyLiveDayMarks(day, quotes));
+    }
+
+    /** 读取 live_book；文件不存在时返回 null */
+    async function fetchLiveBook() {
+      const url = liveBookUrl();
+      if (!url) return null;
+      try {
+        const res = await fetch(url + "?t=" + Date.now());
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (_) {
+        return null;
+      }
     }
 
     function renderLiveItems(items) {
@@ -757,15 +1115,6 @@
     let jobBusy = false;
     /** /api/status 的本地行情末日；空字符串表示尚未读到 */
     let calendarLatest = "";
-
-    /** 本地日历日 YYYY-MM-DD（浏览器时区；与服务端上海日大致一致） */
-    function localTodayStr() {
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return y + "-" + m + "-" + day;
-    }
 
     /** 读本地行情末日，供预测/写入按钮判断「有没有这一天的数据」 */
     async function loadCalendarLatest() {
@@ -794,15 +1143,14 @@
       return tip;
     }
 
-    /** 预测：本地有 tip 即可预测下一交易日；写入：本地末日≥今天且执行日=今天 */
+    /** 预测：本地有 tip 即可预测下一交易日；写入：本地末日≥建议执行日 */
     function refreshApplyBookBtn() {
       const applyBtn = document.getElementById("applyBookBtn");
       const predBtn = document.getElementById("predictBtn");
       const sig = latestLiveSig;
-      const today = localTodayStr();
       const tip = currentBookTip();
       let applyOk = false;
-      let applyTitle = "本地行情末日≥今天，且今天已有预测信号，才能写入";
+      let applyTitle = "本地行情末日≥建议执行日，才能写入";
       let predOk = false;
       let predTitle = "本地有持仓 tip 行情即可预测下一交易日";
       if (jobBusy) {
@@ -821,20 +1169,19 @@
           predOk = true;
           predTitle = "预测持仓 tip " + tip + " 的下一交易日（不跨日、不写账本）";
         }
-        // 写入：本地末日 ≥ 今天，且已有执行日=今天的有效信号
+        // 写入：本地末日 ≥ 建议执行日
+        const executeDate = (sig && sig.execute_date) ? String(sig.execute_date) : "";
         if (!sig || sig.error) {
-          applyTitle = "请先成功预测出今天的执行信号";
-        } else if (!sig.execute_date) {
+          applyTitle = "请先成功预测";
+        } else if (!executeDate) {
           applyTitle = "信号缺少执行日";
-        } else if (sig.book_rolled) {
+        } else if (sig.book_rolled || liveBookHasDate(executeDate)) {
           applyTitle = "本信号已写入 live_book";
-        } else if (calendarLatest < today) {
-          applyTitle = "本地行情末日 " + calendarLatest + " 尚未覆盖今天 " + today;
-        } else if (sig.execute_date !== today) {
-          applyTitle = "须有执行日=今天的信号（当前执行日 " + sig.execute_date + "，今天 " + today + "）";
+        } else if (calendarLatest < executeDate) {
+          applyTitle = "本地行情末日 " + calendarLatest + " 尚未覆盖建议执行日 " + executeDate;
         } else {
           applyOk = true;
-          applyTitle = "将今天 " + today + " 的信号写入 live_book";
+          applyTitle = "本地行情末日 " + calendarLatest + " 已覆盖建议执行日 " + executeDate + "，写入该日持仓";
         }
       }
       if (applyBtn) {
@@ -946,6 +1293,14 @@
             const sig = await sigRes.json();
             showLiveSignal(sig);
             if (sig.error) return;
+            // 只有写入持仓会滚账本；预测不改日期下拉
+            if (job.kind === "apply_book" && sig.book_rolled) {
+              const book = await fetchLiveBook();
+              mergeLiveBook(book, sig);
+              syncDatesFromDays();
+              await fillLiveBookDays();
+              if (sig.execute_date) gotoDate(String(sig.execute_date));
+            }
             setJobBusy(false, doneLabel + " · 信号日 " + (sig.signal_date || "—") +
               " → 执行日 " + (sig.execute_date || "—") +
               (sig.book_rolled ? " · 已写入持仓" : " · 未写入持仓"));
@@ -1009,10 +1364,14 @@
 
     renderMetrics();
     renderYearly();
+    // 先并入已写入的账本日，再决定默认选中日，避免下拉停在回测末日
+    await loadExistingLiveSignal();
+    mergeLiveBook(await fetchLiveBook(), latestLiveSig);
+    syncDatesFromDays();
+    await fillLiveBookDays();
     idx = defaultIndex();
     render();
     loadCalendarLatest();
-    loadExistingLiveSignal();
   }
 
   if (document.readyState === "loading") {
