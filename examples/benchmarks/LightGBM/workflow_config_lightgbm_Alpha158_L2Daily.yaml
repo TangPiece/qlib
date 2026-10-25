@@ -1,0 +1,88 @@
+# Alpha158 + L2 百因子联合训练（258 列，标签只一份；窗口对齐 L2 覆盖）
+# 与 L2Daily 单窗同一套正则/截面处理，避免联合训再出现 2 棵树过拟合
+qlib_init:
+    provider_uri: "~/.qlib/qlib_data/cn_data"
+    region: cn
+market: &market csi300
+benchmark: &benchmark SH000300
+data_handler_config: &data_handler_config
+    start_time: 2017-01-03
+    end_time: 2022-01-28
+    fit_start_time: 2017-01-03
+    fit_end_time: 2019-12-31
+    instruments: *market
+    infer_processors:
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: feature
+              method: robust
+        - class: Fillna
+          kwargs:
+              fields_group: feature
+    learn_processors:
+        - class: DropnaLabel
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: label
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>
+            # 实测集中持仓回撤更高，联合模型保留更稳健的 50 股组合
+            topk: 50
+            n_drop: 5
+    backtest:
+        start_time: 2021-01-01
+        end_time: 2022-01-28
+        account: 100000000
+        benchmark: *benchmark
+        exchange_kwargs:
+            limit_threshold: 0.095
+            deal_price: close
+            open_cost: 0.0005
+            close_cost: 0.0015
+            min_cost: 5
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs:
+            loss: mse
+            colsample_bytree: 0.8879
+            learning_rate: 0.05
+            subsample: 0.8789
+            lambda_l1: 205.6999
+            lambda_l2: 580.9768
+            max_depth: 6
+            num_leaves: 64
+            num_threads: 20
+            early_stopping_rounds: 50
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: Alpha158L2Daily
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                train: [2017-01-03, 2019-12-31]
+                valid: [2020-01-01, 2020-12-31]
+                test: [2021-01-01, 2022-01-28]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            model: <MODEL>
+            dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            ana_long_short: False
+            ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            config: *port_analysis_config

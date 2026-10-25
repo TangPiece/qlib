@@ -68,6 +68,9 @@
     return selectedModel().kind === "rolling";
   }
 
+  // 当前滚动模型各 config key 的实验名前缀，由 /api/status 下发
+  let rollingExpPrefixes = {};
+
   function defaultExpName() {
     if (!isRollingModel()) {
       const model = selectedModel();
@@ -75,7 +78,8 @@
       const dataset = (yaml && yaml.dataset) || "default";
       return `${model.id}_${dataset}_${todayStamp()}`;
     }
-    const prefix = selectedModel().exp_prefix || "rolling";
+    const key = ($("configSelect") && $("configSelect").value) || "";
+    const prefix = (key && rollingExpPrefixes[key]) || selectedModel().exp_prefix || "rolling";
     return `${prefix}_${todayStamp()}`;
   }
 
@@ -213,6 +217,8 @@
     }
 
     $("stMeta").textContent = `python: ${data.python || ""} · config: ${data.config_path || ""}`;
+
+    if (data.exp_prefixes) rollingExpPrefixes = data.exp_prefixes;
 
     if (data.configs && isRollingModel()) {
       if (!$("configSelect").dataset.ready) {
@@ -472,7 +478,17 @@
   });
 
   $("configSelect").addEventListener("change", () => {
-    refreshStatus().catch((e) => toast(e.message, true));
+    refreshStatus()
+      .then(() => {
+        // 未手改实验名时，切换 10 万 / 1 亿等配置要换成该 key 的前缀
+        if (!$("expName").dataset.touched) {
+          $("expName").value = defaultExpName();
+          if (!$("exportExpName").dataset.touched) {
+            $("exportExpName").value = $("expName").value;
+          }
+        }
+      })
+      .catch((e) => toast(e.message, true));
   });
 
   $("modelSelect").addEventListener("change", () => {

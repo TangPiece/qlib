@@ -1,0 +1,70 @@
+{
+  "inventory": {
+    "raw_root": "/Users/900game/Desktop/ai/QuantDinger/backend_api_python/data/level2_raw",
+    "day_dirs": [
+      "20180731",
+      "20220627"
+    ],
+    "archives_7z": [
+      "20180731",
+      "20220601",
+      "20220602",
+      "20220609",
+      "20220610",
+      "20220620",
+      "20220621",
+      "20220622",
+      "20220624",
+      "20220627",
+      "20220630"
+    ]
+  },
+  "live_verify": {
+    "day": "20180731",
+    "raw_dir": true,
+    "wide_rows": 3477,
+    "markers": {
+      "trade": {
+        "status": "done",
+        "symbol_ok": 3477,
+        "symbol_fail": 0
+      },
+      "book": {
+        "status": "done",
+        "symbol_ok": 3477,
+        "symbol_fail": 0
+      },
+      "order": {
+        "status": "partial",
+        "symbol_ok": 3393,
+        "symbol_fail": 84
+      },
+      "microstructure": {
+        "status": "done",
+        "symbol_ok": 3477,
+        "symbol_fail": 0
+      }
+    },
+    "group_null_rates": {
+      "trade": 1.0,
+      "book": 0.027610008628127698,
+      "order": 0.5027733267595218,
+      "microstructure": 0.6911130284728214
+    },
+    "prepare_trades_rows": 0,
+    "raw_trade_rows": 10937,
+    "n_checked": 7,
+    "n_match": 7,
+    "n_live_trade_ok": 0,
+    "n_wide_trade_ok": 0,
+    "all_match": true,
+    "source_ok_wide_nan": false,
+    "root_cause": "trade_csv_header_leading_space",
+    "raw_columns_sample": ["万得代码", " 交易所代码", " 自然日", " 时间", " 成交价格", " 成交数量"],
+    "strip_prepare_trades": {
+      "600000.SH": 10937,
+      "000001.SZ": 23834
+    },
+    "note": "逐笔成交表头逗号后有空格，列名是「 时间」「 成交价格」。prepare_trades 找不到「时间」直接返回 0 行。行情.csv 列名无空格，所以盘口正常。列名 strip 后成交可算。"
+  }
+}

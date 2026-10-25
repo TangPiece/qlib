@@ -57,19 +57,24 @@ def _rolling_entry(
     note: str = "",
     default_horizon: int = 1,
     label: Optional[str] = None,
+    exp_prefixes: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """按统一命名规则构造一条滚动注册项。
 
     model_id = {modelkey}_rolling
     exp_prefix = {ModelDir}_{dataset}_rolling_7y1y
     config key = 7y1y / 7y1y_{suffix}
+
+    exp_prefixes 只覆盖个别 config key；未列出的 key 用模型默认前缀。
     """
     model_dir = BENCHMARKS_DIR / model_dir_name
-    modelkey = model_dir_name.lower()
+    default_prefix = f"{model_dir_name}_{dataset}_rolling_7y1y"
+    overrides = exp_prefixes or {}
     return {
         "label": label or f"{model_dir_name} 滚动",
         "script": model_dir / "rolling_7y1y.py",
-        "exp_prefix": f"{model_dir_name}_{dataset}_rolling_7y1y",
+        "exp_prefix": default_prefix,
+        "exp_prefixes": {key: overrides.get(key, default_prefix) for key in yaml_names},
         "default_horizon": default_horizon,
         "configs": {key: model_dir / fname for key, fname in yaml_names.items()},
         "env": dict(_SAFE_OMP_ENV) if use_omp else {},
@@ -109,7 +114,16 @@ ROLLING_MODELS: Dict[str, Dict[str, Any]] = {
     "doubleensemble_rolling": _rolling_entry(
         "DoubleEnsemble",
         dataset="Alpha158",
-        yaml_names={"7y1y": "workflow_config_doubleensemble_Alpha158_rolling_7y1y.yaml"},
+        yaml_names={
+            "7y1y": "workflow_config_doubleensemble_Alpha158_rolling_7y1y.yaml",
+            # Alpha360：10 万 / 1 亿两套资金，实验名前缀与 Alpha158 分开
+            "7y1y_alpha360_10w": "workflow_config_doubleensemble_Alpha360_rolling_7y1y_10w.yaml",
+            "7y1y_alpha360_10000w": "workflow_config_doubleensemble_Alpha360_rolling_7y1y_10000w.yaml",
+        },
+        exp_prefixes={
+            "7y1y_alpha360_10w": "DoubleEnsemble_Alpha360_rolling_7y1y_10w",
+            "7y1y_alpha360_10000w": "DoubleEnsemble_Alpha360_rolling_7y1y_10000w",
+        },
     ),
     "linear_rolling": _rolling_entry(
         "Linear",
@@ -226,7 +240,7 @@ _SKIP_MODEL_DIRS = frozenset({"console", "__pycache__", "_rolling"})
 _MODEL_NOTES = {
     "TFT": "官方说明需要 GPU，且仅支持 Python 3.6–3.7，仍允许执行。",
 }
-_DATASET_TOKENS = ("early_stop", "Alpha360", "Alpha158", "csi500", "multi_pass", "full")
+_DATASET_TOKENS = ("early_stop", "Alpha360", "Alpha158", "L2Daily", "csi500", "multi_pass", "full")
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _META_NAME_RE = re.compile(r"(?m)^name:\s*(.*?)\s*$")
@@ -1022,6 +1036,7 @@ def _status_payload(
         resolved_key = config_key
         yaml_out = None
         configs_out = {k: str(v.relative_to(REPO_ROOT)) for k, v in configs.items()}
+        exp_prefixes_out = dict(ROLLING_MODELS[model_id].get("exp_prefixes") or {})
     else:
         config_path = _resolve_official_yaml(model_id, yaml_name or "")
         resolved_key = None
@@ -1030,6 +1045,7 @@ def _status_payload(
             k: str(v.relative_to(REPO_ROOT))
             for k, v in _rolling_configs(DEFAULT_ROLLING_MODEL_ID).items()
         }
+        exp_prefixes_out = {}
     cal = _calendar_bounds()
     active = _get_active()
     return {
@@ -1041,6 +1057,7 @@ def _status_payload(
         "config_path": str(config_path.relative_to(REPO_ROOT)),
         "yaml_ends": _parse_yaml_ends(config_path),
         "configs": configs_out,
+        "exp_prefixes": exp_prefixes_out,
         "active_job_id": active,
         "active_job": _job_snapshot(active) if active else None,
         "python": sys.executable,
@@ -1174,12 +1191,14 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
                 if model in ROLLING_MODELS:
                     # 滚动：各模型脚本 + 对应 YAML
                     spec = ROLLING_MODELS[model]
-                    config_path = _resolve_config(
-                        body.get("config") or body.get("conf_path"), model
-                    )
+                    config_key = body.get("config") or body.get("conf_path")
+                    config_path = _resolve_config(config_key, model)
                     if not exp_name:
                         stamp = datetime.now().strftime("%Y%m%d")
-                        exp_name = f"{spec['exp_prefix']}_{stamp}"
+                        # 未传实验名时跟当前 config key 的前缀，避免 Alpha360 写成 Alpha158
+                        prefixes = spec.get("exp_prefixes") or {}
+                        prefix = prefixes.get(config_key) or spec["exp_prefix"]
+                        exp_name = f"{prefix}_{stamp}"
                     horizon = int(body.get("horizon") or spec["default_horizon"])
                     conf_rel = config_path.relative_to(REPO_ROOT)
                     cmd = [

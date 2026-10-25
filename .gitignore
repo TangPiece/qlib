@@ -57,3 +57,10 @@ node_modules/
 .venv/
 .jobs/
 /.venv.py39.bak
+
+# L2 原料与宽表（约 70G，不进 git）
+/data/level2_raw/
+/data/level2_staging/
+
+# 财务因子 staging / 日宽表
+/data/fundamental_staging/

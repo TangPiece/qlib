@@ -1,0 +1,6340 @@
+{
+  "inventory": {
+    "raw_root": "/Users/900game/Desktop/ai/QuantDinger/backend_api_python/data/level2_raw",
+    "day_dirs": [
+      "20220627"
+    ],
+    "archives_7z": [
+      "20220601",
+      "20220602",
+      "20220609",
+      "20220610",
+      "20220620",
+      "20220621",
+      "20220622",
+      "20220624",
+      "20220627",
+      "20220630"
+    ]
+  },
+  "live_verify": {
+    "day": "20220627",
+    "raw_dir": true,
+    "wide_rows": 4709,
+    "markers": {
+      "trade": {
+        "status": "done",
+        "symbol_ok": 4709,
+        "symbol_fail": 0
+      },
+      "book": {
+        "status": "partial",
+        "symbol_ok": 4708,
+        "symbol_fail": 1
+      }
+    },
+    "group_null_rates": {
+      "trade": 0.0,
+      "book": 0.0036101083032490976,
+      "order": 1.0,
+      "microstructure": 1.0
+    },
+    "prepare_trades_rows": 13550,
+    "n_checked": 7,
+    "n_match": 7,
+    "all_match": true
+  },
+  "label_counts": {
+    "healthy": 4,
+    "compute_wrote_nan": 186,
+    "incomplete": 9,
+    "live_ok": 1
+  },
+  "n_hole_list": 186,
+  "n_diagnosed": 200,
+  "days": [
+    {
+      "date": "2018-07-09",
+      "yyyymmdd": "20180709",
+      "label": "healthy",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3528,
+      "trade_null": 0.04846938775510204,
+      "book_null": 0.05668934240362812,
+      "order_null": 0.13660106899902819,
+      "micro_null": 0.05321067821067821,
+      "trade_marker": "partial",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": 13597.0,
+          "l2_vwap": 9.566296305366564,
+          "l2_obi5_mean": -0.3091429063647477,
+          "l2_kyle_lambda": 6.020148384748923e-10
+        },
+        "000001.SZ": {
+          "l2_trade_count": 46386.0,
+          "l2_vwap": 8.90104979259616,
+          "l2_obi5_mean": -0.3131127436564686,
+          "l2_kyle_lambda": 1.8342483384760772e-10
+        }
+      }
+    },
+    {
+      "date": "2018-07-10",
+      "yyyymmdd": "20180710",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3468,
+      "trade_null": 1.0,
+      "book_null": 0.0392156862745098,
+      "order_null": 0.5069204152249135,
+      "micro_null": 0.6949250288350635,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.022835934049415287,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.38291569368229816,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-11",
+      "yyyymmdd": "20180711",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3468,
+      "trade_null": 1.0,
+      "book_null": 0.037773933102652826,
+      "order_null": 0.5074147305981216,
+      "micro_null": 0.6941517248610675,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3263220157422703,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.44595173137551597,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-13",
+      "yyyymmdd": "20180713",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3469,
+      "trade_null": 1.0,
+      "book_null": 0.035260357975837944,
+      "order_null": 0.506815467611086,
+      "micro_null": 0.6936240467517493,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1474947435268021,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22069611033049982,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-16",
+      "yyyymmdd": "20180716",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3473,
+      "trade_null": 1.0,
+      "book_null": 0.0372352956574091,
+      "order_null": 0.5061494796594135,
+      "micro_null": 0.6942648483103421,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3197269869892344,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5161094360561154,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-18",
+      "yyyymmdd": "20180718",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3472,
+      "trade_null": 1.0,
+      "book_null": 0.03341013824884793,
+      "order_null": 0.5047728768926926,
+      "micro_null": 0.692867616254713,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.21275107262041065,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.018775879002514925,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-20",
+      "yyyymmdd": "20180720",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3475,
+      "trade_null": 1.0,
+      "book_null": 0.031746239372138656,
+      "order_null": 0.5039671120246659,
+      "micro_null": 0.6923741007194245,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.15292451102675422,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.011296051510471717,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-24",
+      "yyyymmdd": "20180724",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3474,
+      "trade_null": 1.0,
+      "book_null": 0.0318469670801277,
+      "order_null": 0.5040710584752035,
+      "micro_null": 0.6927042445177161,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.12120960197817837,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.13607502461006102,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-25",
+      "yyyymmdd": "20180725",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3474,
+      "trade_null": 1.0,
+      "book_null": 0.030800230282095567,
+      "order_null": 0.5033308660251665,
+      "micro_null": 0.6921285392787984,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.24073910755717612,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1610895229790588,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-26",
+      "yyyymmdd": "20180726",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3474,
+      "trade_null": 1.0,
+      "book_null": 0.029936672423719057,
+      "order_null": 0.5030841352084875,
+      "micro_null": 0.6921285392787984,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1429925478462016,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.28261525396240333,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-27",
+      "yyyymmdd": "20180727",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3476,
+      "trade_null": 1.0,
+      "book_null": 0.029344073647871116,
+      "order_null": 0.5038632253822127,
+      "micro_null": 0.691625693064128,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.05261000440226638,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.029050856538609615,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-07-31",
+      "yyyymmdd": "20180731",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3477,
+      "trade_null": 1.0,
+      "book_null": 0.027610008628127698,
+      "order_null": 0.5027733267595218,
+      "micro_null": 0.6911130284728214,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.13074262785430538,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.12525449594726473,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-01",
+      "yyyymmdd": "20180801",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3480,
+      "trade_null": 1.0,
+      "book_null": 0.027011494252873563,
+      "order_null": 0.5029556650246305,
+      "micro_null": 0.6906478578892372,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2329439985336487,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3634764591072571,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-02",
+      "yyyymmdd": "20180802",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3480,
+      "trade_null": 1.0,
+      "book_null": 0.026436781609195402,
+      "order_null": 0.5024630541871922,
+      "micro_null": 0.6905564263322884,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.04903170444295955,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.16031279433321544,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-06",
+      "yyyymmdd": "20180806",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3481,
+      "trade_null": 1.0,
+      "book_null": 0.02528009192760701,
+      "order_null": 0.5011285755324825,
+      "micro_null": 0.6903319317855371,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.18310911293634768,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.08165912776359162,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-07",
+      "yyyymmdd": "20180807",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3483,
+      "trade_null": 1.0,
+      "book_null": 0.025839793281653745,
+      "order_null": 0.50067675649071,
+      "micro_null": 0.6905488998512255,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.4224260027990308,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.07599934648236054,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-10",
+      "yyyymmdd": "20180810",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3485,
+      "trade_null": 1.0,
+      "book_null": 0.025251076040172165,
+      "order_null": 0.5009633121541299,
+      "micro_null": 0.69026998826138,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.4439185113355196,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3641058474878883,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-13",
+      "yyyymmdd": "20180813",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3485,
+      "trade_null": 1.0,
+      "book_null": 0.02534237641841659,
+      "order_null": 0.5007173601147776,
+      "micro_null": 0.6903091169949133,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.15437188890047335,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.25046695597916363,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-14",
+      "yyyymmdd": "20180814",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3485,
+      "trade_null": 1.0,
+      "book_null": 0.025251076040172165,
+      "order_null": 0.5007173601147776,
+      "micro_null": 0.690204773705491,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.0648347159972027,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.44019370866569557,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-16",
+      "yyyymmdd": "20180816",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3489,
+      "trade_null": 1.0,
+      "book_null": 0.02407566638005159,
+      "order_null": 0.5017811079719936,
+      "micro_null": 0.6897261523228849,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3206294144359131,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.045577299379617645,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-17",
+      "yyyymmdd": "20180817",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3493,
+      "trade_null": 1.0,
+      "book_null": 0.023761809332951616,
+      "order_null": 0.5023516420596295,
+      "micro_null": 0.6896520313353981,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.04477688635496662,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2612585208960905,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-08-21",
+      "yyyymmdd": "20180821",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3532,
+      "trade_null": 1.0,
+      "book_null": 0.03463142180582724,
+      "order_null": 0.5071185892250445,
+      "micro_null": 0.6934520745392773,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.11723303054960177,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.35340011490805207,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-03",
+      "yyyymmdd": "20181203",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3543,
+      "trade_null": 1.0,
+      "book_null": 0.006773920406435224,
+      "order_null": 0.49147211805975566,
+      "micro_null": 0.6846663074436148,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.5871336081464368,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.28179825092168964,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-04",
+      "yyyymmdd": "20181204",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3544,
+      "trade_null": 1.0,
+      "book_null": 0.003668171557562077,
+      "order_null": 0.491131892937762,
+      "micro_null": 0.6835240098501949,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.45681854347762557,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2199067233981195,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-05",
+      "yyyymmdd": "20181205",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3544,
+      "trade_null": 1.0,
+      "book_null": 0.005168787194746563,
+      "order_null": 0.491131892937762,
+      "micro_null": 0.6840626923866201,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.17000518184788774,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.17331132965398036,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-06",
+      "yyyymmdd": "20181206",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3545,
+      "trade_null": 1.0,
+      "book_null": 0.0040389793563277345,
+      "order_null": 0.49103364900261937,
+      "micro_null": 0.6835235286575202,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.0407818522385875,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.572713187474626,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-07",
+      "yyyymmdd": "20181207",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3548,
+      "trade_null": 1.0,
+      "book_null": 0.003945885005636978,
+      "order_null": 0.4907392494765663,
+      "micro_null": 0.6834964640770729,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.14375823490602244,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.05419137844261919,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-10",
+      "yyyymmdd": "20181210",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3552,
+      "trade_null": 1.0,
+      "book_null": 0.0045045045045045045,
+      "order_null": 0.4905888030888031,
+      "micro_null": 0.6835585585585585,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.28868192189574554,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22025805368311807,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-11",
+      "yyyymmdd": "20181211",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3550,
+      "trade_null": 1.0,
+      "book_null": 0.004788732394366197,
+      "order_null": 0.49054325955734407,
+      "micro_null": 0.6838284250960307,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.35203129979823905,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.07240821591940962,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-12",
+      "yyyymmdd": "20181212",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3550,
+      "trade_null": 1.0,
+      "book_null": 0.0030985915492957746,
+      "order_null": 0.49054325955734407,
+      "micro_null": 0.6830729833546735,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2843952168630095,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.022507521272806908,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-13",
+      "yyyymmdd": "20181213",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3552,
+      "trade_null": 1.0,
+      "book_null": 0.002815315315315315,
+      "order_null": 0.49034749034749037,
+      "micro_null": 0.6829315110565111,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.22392250571037997,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.12520658023023745,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-14",
+      "yyyymmdd": "20181214",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3553,
+      "trade_null": 1.0,
+      "book_null": 0.0028145229383619475,
+      "order_null": 0.49024968839210326,
+      "micro_null": 0.6828800245631093,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.47808169630839303,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.542770478646642,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-17",
+      "yyyymmdd": "20181217",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3553,
+      "trade_null": 1.0,
+      "book_null": 0.0033774275260343373,
+      "order_null": 0.49049093321539144,
+      "micro_null": 0.6832638231456132,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.31678269783515384,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2458929211322211,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-18",
+      "yyyymmdd": "20181218",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3550,
+      "trade_null": 1.0,
+      "book_null": 0.0030985915492957746,
+      "order_null": 0.49054325955734407,
+      "micro_null": 0.6830345710627401,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2241227617521117,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5756934065794312,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-19",
+      "yyyymmdd": "20181219",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3549,
+      "trade_null": 1.0,
+      "book_null": 0.0033812341504649195,
+      "order_null": 0.49064122690496315,
+      "micro_null": 0.6830861446246062,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.454571506282255,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.28892573715464365,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-20",
+      "yyyymmdd": "20181220",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3554,
+      "trade_null": 1.0,
+      "book_null": 0.004220596510973551,
+      "order_null": 0.49015194147439506,
+      "micro_null": 0.6834680513633806,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5257101187312905,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.14787763650760016,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-21",
+      "yyyymmdd": "20181221",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3554,
+      "trade_null": 1.0,
+      "book_null": 0.0039392234102419805,
+      "order_null": 0.49015194147439506,
+      "micro_null": 0.6832634163810304,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5508183337285971,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3103367933459991,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-24",
+      "yyyymmdd": "20181224",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3555,
+      "trade_null": 1.0,
+      "book_null": 0.00450070323488045,
+      "order_null": 0.4905364677516576,
+      "micro_null": 0.6835954481524101,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5823092781409037,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.30109534492700907,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-25",
+      "yyyymmdd": "20181225",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3551,
+      "trade_null": 1.0,
+      "book_null": 0.004505773021684032,
+      "order_null": 0.49092810878223436,
+      "micro_null": 0.6836614525997798,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2458534475639726,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.25344717180787835,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-26",
+      "yyyymmdd": "20181226",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3550,
+      "trade_null": 1.0,
+      "book_null": 0.005352112676056338,
+      "order_null": 0.490784708249497,
+      "micro_null": 0.6838924455825864,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1133134370283727,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2892734742217228,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-27",
+      "yyyymmdd": "20181227",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3548,
+      "trade_null": 1.0,
+      "book_null": 0.002818489289740699,
+      "order_null": 0.49098083427282974,
+      "micro_null": 0.6829199549041713,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1006551392567606,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.029315593248740515,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2018-12-28",
+      "yyyymmdd": "20181228",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3553,
+      "trade_null": 1.0,
+      "book_null": 0.0025330706445257528,
+      "order_null": 0.4907321780386796,
+      "micro_null": 0.6829056111352763,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.18069786175979913,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.14610586233310846,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-02",
+      "yyyymmdd": "20190102",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3557,
+      "trade_null": 1.0,
+      "book_null": 0.003092493674444757,
+      "order_null": 0.4903409775492992,
+      "micro_null": 0.6832238607611113,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.4073215471561513,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.4647090825082095,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-03",
+      "yyyymmdd": "20190103",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3559,
+      "trade_null": 1.0,
+      "book_null": 0.003652711435796572,
+      "order_null": 0.4903865451772167,
+      "micro_null": 0.6834657334797823,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.017185060407748906,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.13078793179843337,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-04",
+      "yyyymmdd": "20190104",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3559,
+      "trade_null": 1.0,
+      "book_null": 0.003652711435796572,
+      "order_null": 0.4903865451772167,
+      "micro_null": 0.6836573092543871,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.14200793691687083,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.24352811965193477,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-07",
+      "yyyymmdd": "20190107",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3558,
+      "trade_null": 1.0,
+      "book_null": 0.006183249016301293,
+      "order_null": 0.49048422066971814,
+      "micro_null": 0.6846031989370944,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2483808593192345,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1727940078823718,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-08",
+      "yyyymmdd": "20190108",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3560,
+      "trade_null": 1.0,
+      "book_null": 0.003651685393258427,
+      "order_null": 0.49052969502407706,
+      "micro_null": 0.6835035750766087,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.09335819892183267,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.25613796246139464,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-09",
+      "yyyymmdd": "20190109",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3560,
+      "trade_null": 1.0,
+      "book_null": 0.0044943820224719105,
+      "order_null": 0.49052969502407706,
+      "micro_null": 0.6838100102145046,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2132689047544871,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2716945712464907,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-10",
+      "yyyymmdd": "20190110",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3561,
+      "trade_null": 1.0,
+      "book_null": 0.002808199943836001,
+      "order_null": 0.4904320616199302,
+      "micro_null": 0.683132929973705,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.31810829836469234,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3514257720450723,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-11",
+      "yyyymmdd": "20190111",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3562,
+      "trade_null": 1.0,
+      "book_null": 0.0036496350364963502,
+      "order_null": 0.49057511831234457,
+      "micro_null": 0.68364299933643,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.14227856739527822,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.5683821149824436,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-14",
+      "yyyymmdd": "20190114",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3562,
+      "trade_null": 1.0,
+      "book_null": 0.0039303761931499155,
+      "order_null": 0.4908157535894762,
+      "micro_null": 0.6835153897197693,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.12432210684188474,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.28347415412152827,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-15",
+      "yyyymmdd": "20190115",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3560,
+      "trade_null": 1.0,
+      "book_null": 0.003089887640449438,
+      "order_null": 0.4907704654895666,
+      "micro_null": 0.6833886618998979,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3397734665505649,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.4943414932787404,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-16",
+      "yyyymmdd": "20190116",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3563,
+      "trade_null": 1.0,
+      "book_null": 0.004490597810833568,
+      "order_null": 0.49071809470350025,
+      "micro_null": 0.6835531855178221,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.10100545450198116,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.640374489217693,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-17",
+      "yyyymmdd": "20190117",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3565,
+      "trade_null": 1.0,
+      "book_null": 0.005049088359046283,
+      "order_null": 0.490763374073332,
+      "micro_null": 0.6837307152875175,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.21758288455699434,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1476382526894786,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-18",
+      "yyyymmdd": "20190118",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3563,
+      "trade_null": 1.0,
+      "book_null": 0.003929273084479371,
+      "order_null": 0.49095866244336633,
+      "micro_null": 0.6833873395759447,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.297952727644246,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.5605569673999881,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-21",
+      "yyyymmdd": "20190121",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3564,
+      "trade_null": 1.0,
+      "book_null": 0.004489337822671156,
+      "order_null": 0.4911014911014911,
+      "micro_null": 0.6836547291092746,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.37845311064499454,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1675569150537799,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-22",
+      "yyyymmdd": "20190122",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3564,
+      "trade_null": 1.0,
+      "book_null": 0.004489337822671156,
+      "order_null": 0.49134199134199136,
+      "micro_null": 0.6835271911029487,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.4011601096866715,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.12859300877366034,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-23",
+      "yyyymmdd": "20190123",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3564,
+      "trade_null": 1.0,
+      "book_null": 0.005050505050505051,
+      "order_null": 0.49158249158249157,
+      "micro_null": 0.6839225589225589,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.20317577768720427,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.15009211786660645,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-24",
+      "yyyymmdd": "20190124",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3565,
+      "trade_null": 1.0,
+      "book_null": 0.004488078541374474,
+      "order_null": 0.4914846724103386,
+      "micro_null": 0.6837179650643886,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.40803495629867537,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.5513073995090152,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-25",
+      "yyyymmdd": "20190125",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3566,
+      "trade_null": 1.0,
+      "book_null": 0.00532809871003926,
+      "order_null": 0.4913869081003125,
+      "micro_null": 0.6839468719726712,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.4145337597423091,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.4344715736265371,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-28",
+      "yyyymmdd": "20190128",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3568,
+      "trade_null": 1.0,
+      "book_null": 0.004204035874439462,
+      "order_null": 0.4911915438821268,
+      "micro_null": 0.6835889726865063,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.0051633289972277,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.12448779523089142,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-29",
+      "yyyymmdd": "20190129",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3569,
+      "trade_null": 1.0,
+      "book_null": 0.00644438217988232,
+      "order_null": 0.49109394388183963,
+      "micro_null": 0.6842507450520899,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.40349516679637687,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.10091037085182747,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-30",
+      "yyyymmdd": "20190130",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3572,
+      "trade_null": 1.0,
+      "book_null": 0.010078387458006719,
+      "order_null": 0.4910414333706607,
+      "micro_null": 0.6853685228545251,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.062367396259384124,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.04081046611349125,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-01-31",
+      "yyyymmdd": "20190131",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3573,
+      "trade_null": 1.0,
+      "book_null": 0.009795689896445563,
+      "order_null": 0.491183879093199,
+      "micro_null": 0.6858382311782816,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.5531263328692168,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.13510212754228218,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-01",
+      "yyyymmdd": "20190201",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3573,
+      "trade_null": 1.0,
+      "book_null": 0.003638399104394067,
+      "order_null": 0.4909439846467554,
+      "micro_null": 0.6834338345673359,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.4161671200222769,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.14071325011484426,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-11",
+      "yyyymmdd": "20190211",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3574,
+      "trade_null": 1.0,
+      "book_null": 0.004196978175713486,
+      "order_null": 0.4908465904548725,
+      "micro_null": 0.6839675433687745,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2977819657549292,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.028844428566677946,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-12",
+      "yyyymmdd": "20190212",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3574,
+      "trade_null": 1.0,
+      "book_null": 0.00391717963066592,
+      "order_null": 0.4908465904548725,
+      "micro_null": 0.6837258991707789,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.30809107747747,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.17280922290595294,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-13",
+      "yyyymmdd": "20190213",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3575,
+      "trade_null": 1.0,
+      "book_null": 0.005594405594405594,
+      "order_null": 0.49074925074925074,
+      "micro_null": 0.6843102352193261,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.02963625970308822,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2115044872713438,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-14",
+      "yyyymmdd": "20190214",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3576,
+      "trade_null": 1.0,
+      "book_null": 0.0047539149888143175,
+      "order_null": 0.4906519654841803,
+      "micro_null": 0.6837502542200529,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.15571370372169507,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5569663735169785,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-15",
+      "yyyymmdd": "20190215",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3575,
+      "trade_null": 1.0,
+      "book_null": 0.0036363636363636364,
+      "order_null": 0.490989010989011,
+      "micro_null": 0.6834583598219962,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1772783331529974,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.33539337894905874,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-18",
+      "yyyymmdd": "20190218",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3577,
+      "trade_null": 1.0,
+      "book_null": 0.005591277606933185,
+      "order_null": 0.4915132393466193,
+      "micro_null": 0.6846900653162884,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3125348409898759,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.4782960857504234,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-19",
+      "yyyymmdd": "20190219",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3574,
+      "trade_null": 1.0,
+      "book_null": 0.005036373810856184,
+      "order_null": 0.491086417779199,
+      "micro_null": 0.6840311339471944,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3048196968945741,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.174291422549492,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-20",
+      "yyyymmdd": "20190220",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3569,
+      "trade_null": 1.0,
+      "book_null": 0.003922667413841412,
+      "order_null": 0.4915742705039427,
+      "micro_null": 0.6835375327950279,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.00027243648998070215,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.021930285242650383,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-21",
+      "yyyymmdd": "20190221",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3574,
+      "trade_null": 1.0,
+      "book_null": 0.00391717963066592,
+      "order_null": 0.491086417779199,
+      "micro_null": 0.6835605636668871,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.09575242294741816,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.04507099217530455,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-22",
+      "yyyymmdd": "20190222",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3576,
+      "trade_null": 1.0,
+      "book_null": 0.0034446817164937972,
+      "order_null": 0.4911313518696069,
+      "micro_null": 0.6841697173073013,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2601440599024536,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.10133840765002365,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-25",
+      "yyyymmdd": "20190225",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3575,
+      "trade_null": 1.0,
+      "book_null": 0.012587412587412588,
+      "order_null": 0.49194805194805197,
+      "micro_null": 0.6881373172282264,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.021506710379618117,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.07953367408798194,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-27",
+      "yyyymmdd": "20190227",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3572,
+      "trade_null": 1.0,
+      "book_null": 0.005599104143337066,
+      "order_null": 0.4915213565829467,
+      "micro_null": 0.6841341748956531,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.09192711364030162,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.01162193460259906,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-02-28",
+      "yyyymmdd": "20190228",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3573,
+      "trade_null": 1.0,
+      "book_null": 0.0041981528127623844,
+      "order_null": 0.49142377353964256,
+      "micro_null": 0.6837137114215199,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.09436251978781977,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2542353846809669,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-01",
+      "yyyymmdd": "20190301",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3577,
+      "trade_null": 1.0,
+      "book_null": 0.004193458205199888,
+      "order_null": 0.4915132393466193,
+      "micro_null": 0.6836226395913284,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2518070114742713,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.0108946850637639,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-04",
+      "yyyymmdd": "20190304",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3577,
+      "trade_null": 1.0,
+      "book_null": 0.008386916410399776,
+      "order_null": 0.4915132393466193,
+      "micro_null": 0.6852873154243018,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.20463596826985006,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.005257287020292961,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-06",
+      "yyyymmdd": "20190306",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3573,
+      "trade_null": 1.0,
+      "book_null": 0.01119507416736636,
+      "order_null": 0.49166366798608613,
+      "micro_null": 0.6869195735694477,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1291083464290523,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3007859665576183,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-07",
+      "yyyymmdd": "20190307",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3577,
+      "trade_null": 1.0,
+      "book_null": 0.011830635118306352,
+      "order_null": 0.4915132393466193,
+      "micro_null": 0.6877779754492084,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1559773255836614,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22305871468258928,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-08",
+      "yyyymmdd": "20190308",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3579,
+      "trade_null": 1.0,
+      "book_null": 0.006146968426934898,
+      "order_null": 0.49131840498143936,
+      "micro_null": 0.6849932688155655,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.08154792220338158,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1770661820746287,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-12",
+      "yyyymmdd": "20190312",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3580,
+      "trade_null": 1.0,
+      "book_null": 0.012290502793296089,
+      "order_null": 0.49146049481245013,
+      "micro_null": 0.686604875571356,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2731370236010088,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1351933495096693,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-13",
+      "yyyymmdd": "20190313",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3577,
+      "trade_null": 1.0,
+      "book_null": 0.006429969247973162,
+      "order_null": 0.4915132393466193,
+      "micro_null": 0.6843342567413018,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22839525573577488,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.021108966193356005,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-14",
+      "yyyymmdd": "20190314",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3579,
+      "trade_null": 1.0,
+      "book_null": 0.0036322995250069852,
+      "order_null": 0.49131840498143936,
+      "micro_null": 0.6843455510680992,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3358693392906938,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.06540759221852742,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-15",
+      "yyyymmdd": "20190315",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3581,
+      "trade_null": 1.0,
+      "book_null": 0.005673884897565434,
+      "order_null": 0.4911237882474967,
+      "micro_null": 0.6843314462694524,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.23837967202450247,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.006354068863551783,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-18",
+      "yyyymmdd": "20190318",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3578,
+      "trade_null": 1.0,
+      "book_null": 0.005030743432084964,
+      "order_null": 0.49141579493731535,
+      "micro_null": 0.6844478886122263,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.03057718604565571,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2589728512722082,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-19",
+      "yyyymmdd": "20190319",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3579,
+      "trade_null": 1.0,
+      "book_null": 0.005588153115395362,
+      "order_null": 0.49131840498143936,
+      "micro_null": 0.6842820493281516,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.13019330887659875,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.47162335501869124,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-20",
+      "yyyymmdd": "20190320",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3580,
+      "trade_null": 1.0,
+      "book_null": 0.00558659217877095,
+      "order_null": 0.4912210694333599,
+      "micro_null": 0.6843956323006603,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.014755104968698939,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.12148847605140604,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-21",
+      "yyyymmdd": "20190321",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3579,
+      "trade_null": 1.0,
+      "book_null": 0.010058675607711651,
+      "order_null": 0.49131840498143936,
+      "micro_null": 0.6859711956107597,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.25528036729654685,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.17208850016239594,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-22",
+      "yyyymmdd": "20190322",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3578,
+      "trade_null": 1.0,
+      "book_null": 0.006428172163219676,
+      "order_null": 0.49141579493731535,
+      "micro_null": 0.6847146704608974,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.20241482637620922,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.20637736934444273,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-25",
+      "yyyymmdd": "20190325",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3578,
+      "trade_null": 1.0,
+      "book_null": 0.008943543879262158,
+      "order_null": 0.49285315020362536,
+      "micro_null": 0.6854514965191321,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5479589396062864,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3325813431329338,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-26",
+      "yyyymmdd": "20190326",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3574,
+      "trade_null": 1.0,
+      "book_null": 0.007274762171236709,
+      "order_null": 0.4922855544008314,
+      "micro_null": 0.6845144223431856,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.011076253084714804,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.021695675565592865,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-27",
+      "yyyymmdd": "20190327",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3573,
+      "trade_null": 1.0,
+      "book_null": 0.00783655191715645,
+      "order_null": 0.49238335132541683,
+      "micro_null": 0.6851385390428212,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.15738298673737972,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3718175647774734,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-28",
+      "yyyymmdd": "20190328",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3574,
+      "trade_null": 1.0,
+      "book_null": 0.008114157806379406,
+      "order_null": 0.4922855544008314,
+      "micro_null": 0.6851376100117007,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.347700367499929,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.14307915764077694,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-03-29",
+      "yyyymmdd": "20190329",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3576,
+      "trade_null": 1.0,
+      "book_null": 0.00727069351230425,
+      "order_null": 0.49185043144774687,
+      "micro_null": 0.6847417124262762,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2078595452193628,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.5598366821711283,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-01",
+      "yyyymmdd": "20190401",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3580,
+      "trade_null": 1.0,
+      "book_null": 0.011731843575418994,
+      "order_null": 0.4916999201915403,
+      "micro_null": 0.6869603859827323,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.09536832030098742,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.15862520633728963,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-02",
+      "yyyymmdd": "20190402",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3582,
+      "trade_null": 1.0,
+      "book_null": 0.009212730318257957,
+      "order_null": 0.49150514477147644,
+      "micro_null": 0.6855743363281052,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22998773561929794,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.25882657310759466,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-03",
+      "yyyymmdd": "20190403",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3578,
+      "trade_null": 1.0,
+      "book_null": 0.007546115148127445,
+      "order_null": 0.49189491335941865,
+      "micro_null": 0.6852228263631283,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1137685420386077,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1328581093627067,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-04",
+      "yyyymmdd": "20190404",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3580,
+      "trade_null": 1.0,
+      "book_null": 0.008938547486033519,
+      "order_null": 0.49146049481245013,
+      "micro_null": 0.6854748603351956,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.03194195592579563,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.34493705735612373,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-09",
+      "yyyymmdd": "20190409",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3583,
+      "trade_null": 1.0,
+      "book_null": 0.007256488975718672,
+      "order_null": 0.4911686136916391,
+      "micro_null": 0.6848374901682186,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.30458030314019063,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2011874342310427,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-10",
+      "yyyymmdd": "20190410",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3585,
+      "trade_null": 1.0,
+      "book_null": 0.007252440725244073,
+      "order_null": 0.49097429766885836,
+      "micro_null": 0.6849118803093699,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.42330272716977263,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.00943432744317944,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-11",
+      "yyyymmdd": "20190411",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3583,
+      "trade_null": 1.0,
+      "book_null": 0.009210159084566006,
+      "order_null": 0.4914078386029265,
+      "micro_null": 0.6852307614238957,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.010480996267974269,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1477792827418566,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-12",
+      "yyyymmdd": "20190412",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3585,
+      "trade_null": 1.0,
+      "book_null": 0.007252440725244073,
+      "order_null": 0.49097429766885836,
+      "micro_null": 0.6847597312032458,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.11468201661142718,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1341755998480058,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-15",
+      "yyyymmdd": "20190415",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3587,
+      "trade_null": 1.0,
+      "book_null": 0.006412043490381935,
+      "order_null": 0.4914970727627544,
+      "micro_null": 0.6842005220873356,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.0946078811252747,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.023145604630194383,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-18",
+      "yyyymmdd": "20190418",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3593,
+      "trade_null": 1.0,
+      "book_null": 0.006123016977456165,
+      "order_null": 0.4906763150570554,
+      "micro_null": 0.6844116084305342,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.23971501800312836,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.13049344433311774,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-19",
+      "yyyymmdd": "20190419",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3594,
+      "trade_null": 1.0,
+      "book_null": 0.005843071786310518,
+      "order_null": 0.49057953732411164,
+      "micro_null": 0.6844488288561744,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.16463465750233047,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.09056287931788258,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-22",
+      "yyyymmdd": "20190422",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3595,
+      "trade_null": 1.0,
+      "book_null": 0.0072322670375521555,
+      "order_null": 0.49072123981720644,
+      "micro_null": 0.6846124668099633,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5802345401929642,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.46039684804705955,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-23",
+      "yyyymmdd": "20190423",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3592,
+      "trade_null": 1.0,
+      "book_null": 0.005846325167037862,
+      "order_null": 0.49077314667515115,
+      "micro_null": 0.6845135654990889,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.11399182834853357,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.10240632966594698,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-24",
+      "yyyymmdd": "20190424",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3595,
+      "trade_null": 1.0,
+      "book_null": 0.006764445568339866,
+      "order_null": 0.49072123981720644,
+      "micro_null": 0.68476419269187,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.026025784833078724,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.058975269412615675,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-25",
+      "yyyymmdd": "20190425",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3588,
+      "trade_null": 1.0,
+      "book_null": 0.005852842809364548,
+      "order_null": 0.4913999044433827,
+      "micro_null": 0.6843012060403365,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.12312122272740432,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1233511187686619,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-26",
+      "yyyymmdd": "20190426",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3592,
+      "trade_null": 1.0,
+      "book_null": 0.011414253897550112,
+      "order_null": 0.49101177219217307,
+      "micro_null": 0.6861839441182426,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.32869491613482527,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.11150684437349401,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-29",
+      "yyyymmdd": "20190429",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3585,
+      "trade_null": 1.0,
+      "book_null": 0.014314695067833142,
+      "order_null": 0.4928870292887029,
+      "micro_null": 0.6886395334094079,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2393310058287605,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2245542977691252,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-04-30",
+      "yyyymmdd": "20190430",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3570,
+      "trade_null": 1.0,
+      "book_null": 0.017366946778711485,
+      "order_null": 0.49339735894357745,
+      "micro_null": 0.6882480264833206,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.30745839677472686,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.24428983585570013,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-06",
+      "yyyymmdd": "20190506",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3589,
+      "trade_null": 1.0,
+      "book_null": 0.024240735580941766,
+      "order_null": 0.4917804402340485,
+      "micro_null": 0.6959649433876238,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.11251290970227126,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.33094987733361153,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-07",
+      "yyyymmdd": "20190507",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3588,
+      "trade_null": 1.0,
+      "book_null": 0.018115942028985508,
+      "order_null": 0.4916387959866221,
+      "micro_null": 0.6885578189926016,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.011100374931575804,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.16968713745078012,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-09",
+      "yyyymmdd": "20190509",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3590,
+      "trade_null": 1.0,
+      "book_null": 0.012256267409470752,
+      "order_null": 0.491683247115002,
+      "micro_null": 0.6862750063307166,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1838441554808535,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.08925304884227575,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-10",
+      "yyyymmdd": "20190510",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3591,
+      "trade_null": 1.0,
+      "book_null": 0.011417432470064048,
+      "order_null": 0.4915861081274615,
+      "micro_null": 0.6863750284802916,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.17559482924637895,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.21886584068428927,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-13",
+      "yyyymmdd": "20190513",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3591,
+      "trade_null": 1.0,
+      "book_null": 0.009468114731272625,
+      "order_null": 0.49230218403150733,
+      "micro_null": 0.6856282119440014,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.23215329351142722,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.35502517035535885,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-14",
+      "yyyymmdd": "20190514",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3589,
+      "trade_null": 1.0,
+      "book_null": 0.008916132627472834,
+      "order_null": 0.4917804402340485,
+      "micro_null": 0.6853263760480255,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.06637182859255326,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.07091573428123456,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-15",
+      "yyyymmdd": "20190515",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3591,
+      "trade_null": 1.0,
+      "book_null": 0.007885876306928939,
+      "order_null": 0.4918248000954768,
+      "micro_null": 0.6854256854256854,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.09299584818150437,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1564624533736374,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-16",
+      "yyyymmdd": "20190516",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3594,
+      "trade_null": 1.0,
+      "book_null": 0.007234279354479688,
+      "order_null": 0.4917720009539709,
+      "micro_null": 0.6850938432741438,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.4017827685672306,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3595258321328514,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-17",
+      "yyyymmdd": "20190517",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3596,
+      "trade_null": 1.0,
+      "book_null": 0.007508342602892102,
+      "order_null": 0.4915779437470205,
+      "micro_null": 0.6849276974416018,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.022067181378686775,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3266792650498182,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-20",
+      "yyyymmdd": "20190520",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3597,
+      "trade_null": 1.0,
+      "book_null": 0.011120378092855158,
+      "order_null": 0.4921958775169784,
+      "micro_null": 0.6863927009881973,
+      "trade_marker": "done",
+      "book_marker": "partial",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.08879515789410233,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.30985927858773854,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-21",
+      "yyyymmdd": "20190521",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3595,
+      "trade_null": 1.0,
+      "book_null": 0.008066759388038943,
+      "order_null": 0.4916749453606199,
+      "micro_null": 0.6852320141610823,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.19654626986163978,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.04975890476302678,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-22",
+      "yyyymmdd": "20190522",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3597,
+      "trade_null": 1.0,
+      "book_null": 0.008618293021962747,
+      "order_null": 0.4917192898844275,
+      "micro_null": 0.685179568832613,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.6059950853463274,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5271870748504365,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-23",
+      "yyyymmdd": "20190523",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3599,
+      "trade_null": 1.0,
+      "book_null": 0.008891358710752986,
+      "order_null": 0.49176358512285157,
+      "micro_null": 0.6853545176690495,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.13967988318514907,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2714602921913852,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-24",
+      "yyyymmdd": "20190524",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3599,
+      "trade_null": 1.0,
+      "book_null": 0.007224228952486802,
+      "order_null": 0.4915254237288136,
+      "micro_null": 0.684925105458587,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.039990150102074906,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.10943590762370264,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-27",
+      "yyyymmdd": "20190527",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3604,
+      "trade_null": 1.0,
+      "book_null": 0.009156492785793563,
+      "order_null": 0.4912795306801966,
+      "micro_null": 0.6857027545151851,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.015915221815054878,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2066797992546281,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-28",
+      "yyyymmdd": "20190528",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3603,
+      "trade_null": 1.0,
+      "book_null": 0.010635076829914466,
+      "order_null": 0.49137623409063874,
+      "micro_null": 0.6858804531577221,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.17779104603730492,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.21557965366920803,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-29",
+      "yyyymmdd": "20190529",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3605,
+      "trade_null": 1.0,
+      "book_null": 0.008599167822468794,
+      "order_null": 0.491182880919358,
+      "micro_null": 0.6852729794477367,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.4370985415848447,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3357239587327825,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-30",
+      "yyyymmdd": "20190530",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3604,
+      "trade_null": 1.0,
+      "book_null": 0.007857431137120372,
+      "order_null": 0.4912795306801966,
+      "micro_null": 0.6850343053173242,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1646903810212245,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.47487744814244387,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-05-31",
+      "yyyymmdd": "20190531",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3606,
+      "trade_null": 1.0,
+      "book_null": 0.008042151968940654,
+      "order_null": 0.4910862847634894,
+      "micro_null": 0.6850829425704633,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2665591664829187,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.20088449805571704,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-03",
+      "yyyymmdd": "20190603",
+      "label": "healthy",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3613,
+      "trade_null": 0.004995189329537517,
+      "book_null": 0.010240797121505675,
+      "order_null": 0.10240797121505674,
+      "micro_null": 0.008403995672193845,
+      "trade_marker": "partial",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": 19441.0,
+          "l2_vwap": 11.226733608021208,
+          "l2_obi5_mean": -0.4450126750833134,
+          "l2_kyle_lambda": 7.08171217430662e-10
+        },
+        "000001.SZ": {
+          "l2_trade_count": 61595.0,
+          "l2_vwap": 12.008785615279981,
+          "l2_obi5_mean": 0.21566640648247812,
+          "l2_kyle_lambda": 1.115039392437143e-10
+        }
+      }
+    },
+    {
+      "date": "2019-06-04",
+      "yyyymmdd": "20190604",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3606,
+      "trade_null": 1.0,
+      "book_null": 0.008042151968940654,
+      "order_null": 0.49132398383646303,
+      "micro_null": 0.6850829425704633,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3721187674510388,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1914453261896995,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-05",
+      "yyyymmdd": "20190605",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3605,
+      "trade_null": 1.0,
+      "book_null": 0.007212205270457697,
+      "order_null": 0.491182880919358,
+      "micro_null": 0.6848190644307149,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.424567148626303,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3000717327671712,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-06",
+      "yyyymmdd": "20190606",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3607,
+      "trade_null": 1.0,
+      "book_null": 0.00748544496811755,
+      "order_null": 0.49098974216800667,
+      "micro_null": 0.6849812233787836,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.5652868500477084,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.031319529193581844,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-11",
+      "yyyymmdd": "20190611",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3607,
+      "trade_null": 1.0,
+      "book_null": 0.008594399778209038,
+      "order_null": 0.49098974216800667,
+      "micro_null": 0.6858633465231746,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.27415988991770746,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.18303308857854417,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-12",
+      "yyyymmdd": "20190612",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3607,
+      "trade_null": 1.0,
+      "book_null": 0.008039922373163293,
+      "order_null": 0.49098974216800667,
+      "micro_null": 0.6850694356932228,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3534791892761894,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.017785490329313335,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-13",
+      "yyyymmdd": "20190613",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3607,
+      "trade_null": 1.0,
+      "book_null": 0.0064647024724651565,
+      "order_null": 0.49098974216800667,
+      "micro_null": 0.6850064268971948,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.41166100858749444,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.23849048548820237,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-14",
+      "yyyymmdd": "20190614",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3608,
+      "trade_null": 1.0,
+      "book_null": 0.00582039911308204,
+      "order_null": 0.4911308203991131,
+      "micro_null": 0.6839976819189679,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2559951274574816,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1683449480130667,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-18",
+      "yyyymmdd": "20190618",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3609,
+      "trade_null": 1.0,
+      "book_null": 0.0072042116929897475,
+      "order_null": 0.4910343189644935,
+      "micro_null": 0.6845890324693317,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.38273535037829853,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.25101206731154935,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-19",
+      "yyyymmdd": "20190619",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3610,
+      "trade_null": 1.0,
+      "book_null": 0.00775623268698061,
+      "order_null": 0.49093787099327263,
+      "micro_null": 0.6851170989675145,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.4650418615764152,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.09720829053977345,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-20",
+      "yyyymmdd": "20190620",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3610,
+      "trade_null": 1.0,
+      "book_null": 0.006648199445983379,
+      "order_null": 0.49117530668777204,
+      "micro_null": 0.6845630823470159,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3812857827615165,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.13882973579983515,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-21",
+      "yyyymmdd": "20190621",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3611,
+      "trade_null": 1.0,
+      "book_null": 0.019662143450567708,
+      "order_null": 0.4913162163231396,
+      "micro_null": 0.6893708617607814,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.08069215510725306,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22099972246146243,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-24",
+      "yyyymmdd": "20190624",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3613,
+      "trade_null": 1.0,
+      "book_null": 0.008580127318018268,
+      "order_null": 0.49112332450278756,
+      "micro_null": 0.6851395214251567,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.26150300863086856,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.09745311518502603,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-25",
+      "yyyymmdd": "20190625",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3613,
+      "trade_null": 1.0,
+      "book_null": 0.005535566011624689,
+      "order_null": 0.4913605630461429,
+      "micro_null": 0.6841204740457439,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3416463957902327,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1843666732409548,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-26",
+      "yyyymmdd": "20190626",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3614,
+      "trade_null": 1.0,
+      "book_null": 0.006087437742114001,
+      "order_null": 0.49126413155190135,
+      "micro_null": 0.6845223122201539,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.12539977543254685,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.15381996286513608,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-27",
+      "yyyymmdd": "20190627",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3616,
+      "trade_null": 1.0,
+      "book_null": 0.006913716814159292,
+      "order_null": 0.4913084702907712,
+      "micro_null": 0.6846339501206757,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.11538469994576853,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.40225574085302684,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-06-28",
+      "yyyymmdd": "20190628",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3618,
+      "trade_null": 1.0,
+      "book_null": 0.004975124378109453,
+      "order_null": 0.4913527600094764,
+      "micro_null": 0.6837529524096688,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.20531787002925675,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1752509933955458,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-01",
+      "yyyymmdd": "20190701",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3618,
+      "trade_null": 1.0,
+      "book_null": 0.008379818081310619,
+      "order_null": 0.49158967069414833,
+      "micro_null": 0.6855746519925624,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.30443273121556474,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.026968672209874468,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-02",
+      "yyyymmdd": "20190702",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3618,
+      "trade_null": 1.0,
+      "book_null": 0.00552791597567717,
+      "order_null": 0.4913527600094764,
+      "micro_null": 0.6841926729986432,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.47030815716031804,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.31380013093847137,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-04",
+      "yyyymmdd": "20190704",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3616,
+      "trade_null": 1.0,
+      "book_null": 0.004701327433628319,
+      "order_null": 0.49154551201011376,
+      "micro_null": 0.6836283185840708,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.12073320306253621,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2665576675141436,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-05",
+      "yyyymmdd": "20190705",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3619,
+      "trade_null": 1.0,
+      "book_null": 0.004144791378833932,
+      "order_null": 0.49149330912248845,
+      "micro_null": 0.6836142580823432,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22545941243714848,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.015800426207942156,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-09",
+      "yyyymmdd": "20190709",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3614,
+      "trade_null": 1.0,
+      "book_null": 0.004703929164360819,
+      "order_null": 0.49197565024903156,
+      "micro_null": 0.6837299391256226,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.38842921267172836,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.028733192665058006,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-11",
+      "yyyymmdd": "20190711",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3614,
+      "trade_null": 1.0,
+      "book_null": 0.004427227448810182,
+      "order_null": 0.49197565024903156,
+      "micro_null": 0.6835915882678473,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.01888857404234019,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.00999145510161867,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-12",
+      "yyyymmdd": "20190712",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3617,
+      "trade_null": 1.0,
+      "book_null": 0.0049764998617638926,
+      "order_null": 0.4916860855484024,
+      "micro_null": 0.6838037549953503,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.18262224919480036,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.24363582084189211,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-15",
+      "yyyymmdd": "20190715",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3618,
+      "trade_null": 1.0,
+      "book_null": 0.004975124378109453,
+      "order_null": 0.4913527600094764,
+      "micro_null": 0.6839414040906578,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.18232120859424625,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2479089429537247,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-16",
+      "yyyymmdd": "20190716",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3618,
+      "trade_null": 1.0,
+      "book_null": 0.0041459369817578775,
+      "order_null": 0.49158967069414833,
+      "micro_null": 0.6836147545102769,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1633621146535848,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5791624438473312,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-17",
+      "yyyymmdd": "20190717",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3616,
+      "trade_null": 1.0,
+      "book_null": 0.004701327433628319,
+      "order_null": 0.4917825537294564,
+      "micro_null": 0.6836786001609011,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.025946320186149365,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2004717011049648,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-18",
+      "yyyymmdd": "20190718",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3617,
+      "trade_null": 1.0,
+      "book_null": 0.003870611003594139,
+      "order_null": 0.4916860855484024,
+      "micro_null": 0.6832256767285797,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.10318057817737797,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3433308908036027,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-19",
+      "yyyymmdd": "20190719",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3617,
+      "trade_null": 1.0,
+      "book_null": 0.004147083218136578,
+      "order_null": 0.4916860855484024,
+      "micro_null": 0.6833764797546937,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.13038195926917198,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3547630974807579,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-22",
+      "yyyymmdd": "20190722",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3618,
+      "trade_null": 1.0,
+      "book_null": 0.002763957987838585,
+      "order_null": 0.49158967069414833,
+      "micro_null": 0.683288104929896,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.039892928460333855,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.4125842405536388,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-24",
+      "yyyymmdd": "20190724",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3619,
+      "trade_null": 1.0,
+      "book_null": 0.005250069079856314,
+      "order_null": 0.4917301543441361,
+      "micro_null": 0.6839784973247256,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.03383699989312821,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1144829374317833,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-25",
+      "yyyymmdd": "20190725",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3620,
+      "trade_null": 1.0,
+      "book_null": 0.004696132596685083,
+      "order_null": 0.4916337805840568,
+      "micro_null": 0.6837393269713712,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.32054896603621347,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.17975067125076447,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-26",
+      "yyyymmdd": "20190726",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3621,
+      "trade_null": 1.0,
+      "book_null": 0.004142502071251036,
+      "order_null": 0.4917741744585158,
+      "micro_null": 0.6835505008661595,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.16263253039941672,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3442651622303453,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-29",
+      "yyyymmdd": "20190729",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3649,
+      "trade_null": 1.0,
+      "book_null": 0.004384762948753083,
+      "order_null": 0.49543906353991307,
+      "micro_null": 0.683499838062732,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2077673486504825,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.004378961126334127,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-07-31",
+      "yyyymmdd": "20190731",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3650,
+      "trade_null": 1.0,
+      "book_null": 0.005566625155666252,
+      "order_null": 0.49534246575342467,
+      "micro_null": 0.6838854296388543,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.12347913349149031,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3210204393195099,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-16",
+      "yyyymmdd": "20190816",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3656,
+      "trade_null": 1.0,
+      "book_null": 0.0035557986870897156,
+      "order_null": 0.4961706783369803,
+      "micro_null": 0.683384722498508,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.2466652121703182,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.005650490844045632,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-19",
+      "yyyymmdd": "20190819",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3654,
+      "trade_null": 1.0,
+      "book_null": 0.007749912922326715,
+      "order_null": 0.4963640628665259,
+      "micro_null": 0.6853012887495646,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1279781017658595,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.07423284037244866,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-20",
+      "yyyymmdd": "20190820",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3654,
+      "trade_null": 1.0,
+      "book_null": 0.0060207991242474,
+      "order_null": 0.4963640628665259,
+      "micro_null": 0.6842190376673135,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.234837336958408,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.030908734763812232,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-21",
+      "yyyymmdd": "20190821",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3654,
+      "trade_null": 1.0,
+      "book_null": 0.002736726874657909,
+      "order_null": 0.4963640628665259,
+      "micro_null": 0.6831243469174504,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.015679330529055055,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3694911684135407,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-22",
+      "yyyymmdd": "20190822",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3654,
+      "trade_null": 1.0,
+      "book_null": 0.0030103995621237,
+      "order_null": 0.4963640628665259,
+      "micro_null": 0.6833855799373041,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.16242802733280318,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.055759729862381646,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-23",
+      "yyyymmdd": "20190823",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3654,
+      "trade_null": 1.0,
+      "book_null": 0.0035577449370552817,
+      "order_null": 0.4963640628665259,
+      "micro_null": 0.6835224162810369,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.10991612564769453,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.19841017394302893,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-26",
+      "yyyymmdd": "20190826",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3657,
+      "trade_null": 1.0,
+      "book_null": 0.0038282745419742957,
+      "order_null": 0.4965428337044416,
+      "micro_null": 0.6834961592959953,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22542387998535324,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5405460092730316,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-27",
+      "yyyymmdd": "20190827",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3658,
+      "trade_null": 1.0,
+      "book_null": 0.004373974849644614,
+      "order_null": 0.4962118253534328,
+      "micro_null": 0.6838809085938665,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.231205223127766,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.00821184990177413,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-28",
+      "yyyymmdd": "20190828",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3660,
+      "trade_null": 1.0,
+      "book_null": 0.004918032786885246,
+      "order_null": 0.4962529274004684,
+      "micro_null": 0.6840660705414804,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.015604831740606522,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.009368025922876081,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-29",
+      "yyyymmdd": "20190829",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3659,
+      "trade_null": 1.0,
+      "book_null": 0.003006285870456409,
+      "order_null": 0.49634951001444577,
+      "micro_null": 0.6834082834356133,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.3716151071665791,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.34627283534427,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-08-30",
+      "yyyymmdd": "20190830",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3663,
+      "trade_null": 1.0,
+      "book_null": 0.004641004641004641,
+      "order_null": 0.4961974961974962,
+      "micro_null": 0.6837167746258656,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.29063213708554064,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.052146823364534176,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2019-12-27",
+      "yyyymmdd": "20191227",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3743,
+      "trade_null": 1.0,
+      "book_null": 0.004893983921501955,
+      "order_null": 0.5005534139918324,
+      "micro_null": 0.6837612027299443,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.006357310909575921,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.28943449848374936,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2020-04-14",
+      "yyyymmdd": "20200414",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3799,
+      "trade_null": 1.0,
+      "book_null": 0.00482184306875015,
+      "order_null": 0.5038543977738502,
+      "micro_null": 0.684091507334466,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.28794918895638555,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.32068130588788574,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2020-04-15",
+      "yyyymmdd": "20200415",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3801,
+      "trade_null": 1.0,
+      "book_null": 0.006314127861089187,
+      "order_null": 0.5038899537715639,
+      "micro_null": 0.6843414412475186,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.22172827980509052,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.02869197137586529,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2020-07-06",
+      "yyyymmdd": "20200706",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3866,
+      "trade_null": 1.0,
+      "book_null": 0.014050228095753186,
+      "order_null": 0.5069100583844505,
+      "micro_null": 0.6878615435263133,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.31057413828805813,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.1796924615436157,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2020-07-07",
+      "yyyymmdd": "20200707",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3867,
+      "trade_null": 1.0,
+      "book_null": 0.013529397935914615,
+      "order_null": 0.507480882189959,
+      "micro_null": 0.6872369936760937,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.09610411329541119,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.1475779452844128,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2020-08-04",
+      "yyyymmdd": "20200804",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 3906,
+      "trade_null": 1.0,
+      "book_null": 0.008960573476702509,
+      "order_null": 0.5097651964011412,
+      "micro_null": 0.6857980728948471,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.2845527009407258,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.01978716684469919,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2020-09-22",
+      "yyyymmdd": "20200922",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 4004,
+      "trade_null": 1.0,
+      "book_null": 0.006743256743256743,
+      "order_null": 0.512987012987013,
+      "micro_null": 0.6840999909181728,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.5470717047942625,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.08082915128952585,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2020-09-28",
+      "yyyymmdd": "20200928",
+      "label": "compute_wrote_nan",
+      "in_hole_list": true,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 4021,
+      "trade_null": 1.0,
+      "book_null": 0.0074608306391444916,
+      "order_null": 0.5135538423277791,
+      "micro_null": 0.6846781668965205,
+      "trade_marker": "done",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": 0.10206554512276479,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": null,
+          "l2_vwap": null,
+          "l2_obi5_mean": -0.3385349633248041,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2021-01-04",
+      "yyyymmdd": "20210104",
+      "label": "healthy",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 4127,
+      "trade_null": 0.001696147322510298,
+      "book_null": 0.007103993655968456,
+      "order_null": 0.11921492609643809,
+      "micro_null": 0.005540013657290129,
+      "trade_marker": "partial",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": 30567.0,
+          "l2_vwap": 9.639079067891064,
+          "l2_obi5_mean": -0.014838433500096478,
+          "l2_kyle_lambda": 4.0962030666973e-10
+        },
+        "000001.SZ": {
+          "l2_trade_count": 119328.0,
+          "l2_vwap": 18.60540305863321,
+          "l2_obi5_mean": 0.4502070024306211,
+          "l2_kyle_lambda": 1.1016400225886083e-10
+        }
+      }
+    },
+    {
+      "date": "2022-01-28",
+      "yyyymmdd": "20220128",
+      "label": "healthy",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": false,
+      "has_wide": true,
+      "n_symbols": 4630,
+      "trade_null": 0.0012958963282937365,
+      "book_null": 0.004751619870410367,
+      "order_null": 0.042054921320580065,
+      "micro_null": 0.0035931670920871786,
+      "trade_marker": "partial",
+      "book_marker": "done",
+      "order_marker": "partial",
+      "micro_marker": "done",
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": 21493.0,
+          "l2_vwap": 8.461576966836619,
+          "l2_obi5_mean": 0.2775851045524331,
+          "l2_kyle_lambda": 2.022414195669405e-10
+        },
+        "000001.SZ": {
+          "l2_trade_count": 144813.0,
+          "l2_vwap": 16.086946613135865,
+          "l2_obi5_mean": 0.6138822354040333,
+          "l2_kyle_lambda": 7.039227866785602e-11
+        }
+      }
+    },
+    {
+      "date": "2022-06-01",
+      "yyyymmdd": "20220601",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    },
+    {
+      "date": "2022-06-02",
+      "yyyymmdd": "20220602",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    },
+    {
+      "date": "2022-06-09",
+      "yyyymmdd": "20220609",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    },
+    {
+      "date": "2022-06-10",
+      "yyyymmdd": "20220610",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    },
+    {
+      "date": "2022-06-20",
+      "yyyymmdd": "20220620",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    },
+    {
+      "date": "2022-06-21",
+      "yyyymmdd": "20220621",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    },
+    {
+      "date": "2022-06-22",
+      "yyyymmdd": "20220622",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    },
+    {
+      "date": "2022-06-24",
+      "yyyymmdd": "20220624",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    },
+    {
+      "date": "2022-06-27",
+      "yyyymmdd": "20220627",
+      "label": "live_ok",
+      "in_hole_list": false,
+      "raw_dir": true,
+      "raw_7z": true,
+      "has_wide": true,
+      "n_symbols": 4709,
+      "trade_null": 0.0,
+      "book_null": 0.0036101083032490976,
+      "order_null": 1.0,
+      "micro_null": 1.0,
+      "trade_marker": "done",
+      "book_marker": "partial",
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {
+        "600000.SH": {
+          "l2_trade_count": 13550.0,
+          "l2_vwap": 7.982933731692647,
+          "l2_obi5_mean": -0.244590695319837,
+          "l2_kyle_lambda": null
+        },
+        "000001.SZ": {
+          "l2_trade_count": 94483.0,
+          "l2_vwap": 14.468790549261865,
+          "l2_obi5_mean": -0.40340709915661005,
+          "l2_kyle_lambda": null
+        }
+      }
+    },
+    {
+      "date": "2022-06-30",
+      "yyyymmdd": "20220630",
+      "label": "incomplete",
+      "in_hole_list": false,
+      "raw_dir": false,
+      "raw_7z": true,
+      "has_wide": false,
+      "n_symbols": 0,
+      "trade_null": null,
+      "book_null": null,
+      "order_null": null,
+      "micro_null": null,
+      "trade_marker": null,
+      "book_marker": null,
+      "order_marker": null,
+      "micro_marker": null,
+      "sample": {}
+    }
+  ]
+}

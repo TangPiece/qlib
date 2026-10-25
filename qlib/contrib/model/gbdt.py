@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+import sys
+
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -21,6 +23,12 @@ class LGBModel(ModelFT, LightGBMFInt):
             raise NotImplementedError
         self.params = {"objective": loss, "verbosity": -1}
         self.params.update(kwargs)
+        # macOS 上 numpy/sklearn 与 lightgbm 各链接一份 libomp。
+        # yaml 里的 num_threads>1 会在 Dataset 构建时于 __kmp_suspend_64 SIGSEGV，环境变量压不住。
+        if sys.platform == "darwin":
+            requested = self.params.get("num_threads")
+            if requested is None or int(requested) != 1:
+                self.params["num_threads"] = 1
         self.early_stopping_rounds = early_stopping_rounds
         self.num_boost_round = num_boost_round
         self.model = None

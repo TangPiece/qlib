@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 
 from qlib.contrib.data.loader import Alpha158DL, Alpha360DL
+from .l2_daily import get_l2_feature_config
 from ...data.dataset.handler import DataHandlerLP
 from ...data.dataset.processor import Processor
 from ...utils import get_callable_kwargs
@@ -155,3 +156,19 @@ class Alpha158(DataHandlerLP):
 class Alpha158vwap(Alpha158):
     def get_label_config(self):
         return ["Ref($vwap, -2)/Ref($vwap, -1) - 1"], ["LABEL0"]
+
+
+class L2Daily(Alpha158):
+    """只用 100 个预计算 L2 日频因子，标签与 Alpha158 相同。"""
+
+    def get_feature_config(self):
+        return get_l2_feature_config()
+
+
+class Alpha158L2Daily(Alpha158):
+    """Alpha158 的 158 列再拼 100 个 L2 因子；标签只保留一份。"""
+
+    def get_feature_config(self):
+        fields, names = super().get_feature_config()
+        l2_fields, l2_names = get_l2_feature_config()
+        return fields + l2_fields, names + l2_names

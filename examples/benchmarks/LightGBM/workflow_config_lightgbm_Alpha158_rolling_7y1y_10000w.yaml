@@ -7,7 +7,7 @@ data_handler_config: &data_handler_config
     # Must not use calendars/day.txt first day (2000-01-04, idx=0):
     # RollingGen trunc_segments asserts align_idx(train_start) > 0.
     start_time: 2000-01-05
-    end_time: 2026-10-19
+    end_time: 2026-10-21
     fit_start_time: 2000-01-05
     fit_end_time: 2014-12-31
     instruments: *market
@@ -21,7 +21,7 @@ port_analysis_config: &port_analysis_config
             n_drop: 5
     backtest:
         start_time: 2016-01-01
-        end_time: 2026-10-19
+        end_time: 2026-10-21
         account: 100000000
         benchmark: *benchmark
         exchange_kwargs:
@@ -56,7 +56,7 @@ task:
                 # First rolling window template: long train + 1y valid; test span is full horizon
                 train: [2000-01-05, 2014-12-31]
                 valid: [2015-01-01, 2015-12-31]
-                test: [2016-01-01, 2026-10-19]
+                test: [2016-01-01, 2026-10-21]
     record:
         - class: SignalRecord
           module_path: qlib.workflow.record_temp
