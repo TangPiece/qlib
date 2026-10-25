@@ -126,6 +126,30 @@ def _group_all_nan(result: dict[str, Any], columns: list[str]) -> bool:
     return all(math.isnan(v) for v in values)
 
 
+def _required_sources_missing(
+    books_root: Path,
+    trade_date: str,
+    code: str,
+    factor_group: str,
+) -> bool:
+    """缺该组必要明细。停牌只有空行情、没有逐笔成交，不算计算失败。"""
+    if factor_group == GROUP_TRADE:
+        return source_file_path(books_root, trade_date, code, "逐笔成交") is None
+    if factor_group == GROUP_ORDER:
+        return (
+            source_file_path(books_root, trade_date, code, "逐笔委托") is None
+            and source_file_path(books_root, trade_date, code, "逐笔成交") is None
+        )
+    if factor_group == GROUP_BOOK:
+        return source_file_path(books_root, trade_date, code, "行情") is None
+    if factor_group == GROUP_MICROSTRUCTURE:
+        return all(
+            source_file_path(books_root, trade_date, code, name) is None
+            for name in ("行情", "逐笔成交", "逐笔委托")
+        )
+    return False
+
+
 def _append_symbol_result(
     *,
     trade_date: str,
@@ -135,9 +159,27 @@ def _append_symbol_result(
     columns: list[str],
     rows: list[dict[str, Any]],
     status_rows: list[dict[str, Any]],
+    books_root: Path | None = None,
 ) -> tuple[int, int]:
-    """把单股结果写入 rows/status_rows，返回 (ok_delta, fail_delta)。"""
+    """把单股结果写入 rows/status_rows，返回 (ok_delta, fail_delta)。
+
+    缺必要源文件记 skipped，不抬失败率，避免 2017 年停牌把整组打成 partial。
+    """
     if result is None or _group_all_nan(result, columns):
+        if (
+            result is None
+            and books_root is not None
+            and _required_sources_missing(books_root, trade_date, code, factor_group)
+        ):
+            status_rows.append(
+                {
+                    "symbol": code,
+                    "factor_group": factor_group,
+                    "status": "skipped",
+                    "source_version": "",
+                }
+            )
+            return 0, 0
         status_rows.append(
             {
                 "symbol": code,
@@ -194,6 +236,7 @@ def calc_group_day(
                 columns=columns,
                 rows=rows,
                 status_rows=status_rows,
+                books_root=books_root,
             )
             serial_ok += d_ok
             serial_fail += d_fail
@@ -236,6 +279,7 @@ def calc_group_day(
                         columns=columns,
                         rows=rows,
                         status_rows=status_rows,
+                        books_root=books_root,
                     )
                     ok += d_ok
                     fail += d_fail

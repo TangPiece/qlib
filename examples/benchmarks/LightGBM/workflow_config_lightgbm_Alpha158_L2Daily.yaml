@@ -11,7 +11,11 @@ data_handler_config: &data_handler_config
     fit_start_time: 2017-01-03
     fit_end_time: 2019-12-31
     instruments: *market
+    # 无 L2 成交的停牌日整行丢掉，避免 Fillna 把空 L2 填成中位数污染联合模型
     infer_processors:
+        - class: DropnaCols
+          kwargs:
+              col_list: ["l2_trade_count"]
         - class: CSZScoreNorm
           kwargs:
               fields_group: feature

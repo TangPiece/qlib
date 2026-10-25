@@ -111,6 +111,32 @@ class DropnaLabel(DropnaProcessor):
         return False
 
 
+class DropnaCols(Processor):
+    """Drop rows where any named column is NaN.
+
+    Used for L2: drop days without usable trades before Fillna, so suspended
+    names are not imputed as the cross-sectional median.
+    """
+
+    def __init__(self, col_list=()):
+        self.col_list = list(col_list)
+
+    def __call__(self, df):
+        if df is None or df.empty or not self.col_list:
+            return df
+        wanted = set(self.col_list)
+        if isinstance(df.columns, pd.MultiIndex):
+            subset = [col for col in df.columns if col[-1] in wanted]
+        else:
+            subset = [col for col in self.col_list if col in df.columns]
+        if not subset:
+            return df
+        return df.dropna(subset=subset)
+
+    def readonly(self):
+        return True
+
+
 class DropCol(Processor):
     def __init__(self, col_list=[]):
         self.col_list = col_list

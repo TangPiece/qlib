@@ -11,8 +11,11 @@ data_handler_config: &data_handler_config
     fit_start_time: 2017-01-03
     fit_end_time: 2019-12-31
     instruments: *market
-    # L2 量纲混杂，按日截面标准化后再填空，避免金额/价格列主导分裂
+    # 无逐笔成交的停牌日先丢掉，再截面标准化/填空，避免被填成当天中位数
     infer_processors:
+        - class: DropnaCols
+          kwargs:
+              col_list: ["l2_trade_count"]
         - class: CSZScoreNorm
           kwargs:
               fields_group: feature

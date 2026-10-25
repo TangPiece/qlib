@@ -75,6 +75,75 @@ def test_empty_trades_are_all_nan_fail() -> None:
     assert math.isnan(float(result["l2_trade_count"]))
 
 
+def test_missing_trade_source_is_skipped_not_failed(tmp_path: Path) -> None:
+    """没有逐笔成交文件时记 skipped，不抬失败率。"""
+    from qlib.contrib.data.l2_daily.engine import _append_symbol_result
+
+    day = tmp_path / "20170104" / "000029.SZ"
+    day.mkdir(parents=True)
+    (day / "行情.csv").write_text("x", encoding="utf-8")
+    rows: list[dict] = []
+    status_rows: list[dict] = []
+    ok, fail = _append_symbol_result(
+        trade_date="20170104",
+        code="000029.SZ",
+        factor_group="trade",
+        result=None,
+        columns=["l2_trade_count"],
+        rows=rows,
+        status_rows=status_rows,
+        books_root=tmp_path,
+    )
+    assert (ok, fail) == (0, 0)
+    assert rows == []
+    assert status_rows[0]["status"] == "skipped"
+
+
+def test_drop_rows_without_trade_source(tmp_path: Path) -> None:
+    """宽表丢掉缺逐笔成交的股票；缺源率按目录统计。"""
+    from qlib.contrib.data.l2_daily.qa import (
+        drop_rows_without_trade_source,
+        trade_source_miss_rate,
+    )
+
+    day = tmp_path / "20170104"
+    ok_dir = day / "000001.SZ"
+    miss_dir = day / "000029.SZ"
+    ok_dir.mkdir(parents=True)
+    miss_dir.mkdir()
+    (ok_dir / "逐笔成交.csv").write_text("t", encoding="utf-8")
+    (miss_dir / "行情.csv").write_text("q", encoding="utf-8")
+    wide = pd.DataFrame(
+        {
+            "symbol": ["000001.SZ", "000029.SZ"],
+            "l2_trade_count": [10.0, float("nan")],
+        }
+    )
+    kept = drop_rows_without_trade_source(wide, tmp_path, "20170104")
+    assert list(kept["symbol"]) == ["000001.SZ"]
+    assert trade_source_miss_rate(tmp_path, "20170104", ["000001.SZ", "000029.SZ"]) == 0.5
+
+
+def test_dropna_cols_drops_missing_trade_count() -> None:
+    """Fillna 之前丢掉 l2_trade_count 为空的行。"""
+    from qlib.data.dataset.processor import DropnaCols
+
+    frame = pd.DataFrame(
+        {
+            "l2_trade_count": [10.0, float("nan"), 3.0],
+            "l2_vwap": [1.0, 2.0, float("nan")],
+        }
+    )
+    out = DropnaCols(col_list=["l2_trade_count"])(frame)
+    assert list(out.index) == [0, 2]
+    multi = pd.DataFrame(
+        [[10.0, 1.0], [float("nan"), 2.0]],
+        columns=pd.MultiIndex.from_tuples([("feature", "l2_trade_count"), ("feature", "l2_vwap")]),
+    )
+    out_multi = DropnaCols(col_list=["l2_trade_count"])(multi)
+    assert len(out_multi) == 1
+
+
 def test_delete_day_sources_keep_archive(tmp_path: Path) -> None:
     """失败只删解压目录；通过才连 7z 一起删。"""
     from qlib.contrib.data.l2_daily.prepare import delete_day_sources

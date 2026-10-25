@@ -166,6 +166,21 @@ def run_one_day(
             factor_version=factor_version,
         )
 
+    # 停牌占位不进宽表，也不计入空值率；缺源过多则视为坏档。
+    codes = list_codes(books_root, trade_date)
+    miss_rate = qa.trade_source_miss_rate(books_root, trade_date, codes)
+    if miss_rate >= qa.TRADE_SOURCE_MISS_MAX:
+        summary["failed"] = int(summary["failed"]) + 1
+        summary["status"] = "failed"
+        summary["error"] = f"逐笔成交缺源率 {miss_rate:.3f} ≥ {qa.TRADE_SOURCE_MISS_MAX}"
+        print(f"[{trade_date}] 质检失败: {summary['error']}", flush=True)
+        _recycle_day_sources(
+            trade_date, books_root, delete_sources=delete_sources, keep_archive=True, summary=summary
+        )
+        return summary
+    if merged is not None and not merged.empty:
+        merged = qa.drop_rows_without_trade_source(merged, books_root, trade_date)
+
     if merged is None or merged.empty:
         summary["failed"] = int(summary["failed"]) + 1
         summary["status"] = "failed"

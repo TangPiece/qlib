@@ -12,14 +12,37 @@ import pandas as pd
 from .catalog import ALL_GROUPS, factor_ids_for_group
 from ._prep import prepare_trades
 from .csv_io import read_csv_bytes
-from .engine import calc_group_for_symbol, source_file_path
+from .engine import calc_group_for_symbol, list_codes, source_file_path
 from .prepare import default_qa_dir
 
 TRADE_NULL_MAX = 0.05
 BOOK_NULL_MAX = 0.20
 GROUP_FAIL_NULL = 0.95
+# 缺逐笔成交超过该比例视为坏档，而不是普通停牌。
+TRADE_SOURCE_MISS_MAX = 0.25
 SAMPLE_CODES = ("600000.SH", "000001.SZ")
 COMPARE_FIELDS = ("l2_trade_count", "l2_vwap")
+
+
+def has_trade_source(raw_root: Path, day: str, code: str) -> bool:
+    """是否存在逐笔成交 CSV/Parquet。停牌占位通常只有空行情。"""
+    return source_file_path(raw_root, day, code, "逐笔成交") is not None
+
+
+def trade_source_miss_rate(raw_root: Path, day: str, codes: list[str]) -> float:
+    """当日股票里缺逐笔成交的比例。"""
+    if not codes:
+        return 1.0
+    miss = sum(1 for code in codes if not has_trade_source(raw_root, day, code))
+    return miss / len(codes)
+
+
+def drop_rows_without_trade_source(wide: pd.DataFrame, raw_root: Path, day: str) -> pd.DataFrame:
+    """宽表只留有逐笔成交文件的股票，避免停牌空行进 dump/训练。"""
+    if wide is None or wide.empty or "symbol" not in wide.columns:
+        return wide
+    keep = [has_trade_source(raw_root, day, str(code)) for code in wide["symbol"]]
+    return wide.loc[keep].reset_index(drop=True)
 
 
 def group_null_rates(wide: pd.DataFrame) -> dict[str, float]:
@@ -110,6 +133,7 @@ def check_day(
         "group_null_rates": rates,
         "samples": samples,
         "errors": errors,
+        "trade_source_miss_rate": trade_source_miss_rate(raw_root, day, list_codes(raw_root, day)),
     }
     out_dir = Path(qa_dir) if qa_dir is not None else default_qa_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
