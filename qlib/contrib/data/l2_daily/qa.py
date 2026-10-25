@@ -25,7 +25,7 @@ COMPARE_FIELDS = ("l2_trade_count", "l2_vwap")
 
 
 def has_trade_source(raw_root: Path, day: str, code: str) -> bool:
-    """是否存在逐笔成交 CSV/Parquet。停牌占位通常只有空行情。"""
+    """是否存在逐笔成交 CSV。停牌占位通常只有空行情。"""
     return source_file_path(raw_root, day, code, "逐笔成交") is not None
 
 
@@ -69,10 +69,7 @@ def _prepare_rows(raw_root: Path, day: str, code: str) -> int:
     path = source_file_path(raw_root, day, code, "逐笔成交")
     if path is None:
         return 0
-    if path.suffix.lower() == ".csv":
-        trades = read_csv_bytes(path.read_bytes(), "逐笔成交")
-    else:
-        trades = pd.read_parquet(path)
+    trades = read_csv_bytes(path.read_bytes(), "逐笔成交")
     return int(len(prepare_trades(trades, code)))
 
 

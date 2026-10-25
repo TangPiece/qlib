@@ -1,18 +1,26 @@
 """本地日/月 Parquet 与 R2 按日备份。storage_uri 只存逻辑键。"""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 
 from .catalog import FACTOR_VERSION, factor_ids, wide_columns
+from .r2_env import load_r2_env
 
 _log = logging.getLogger(__name__)
 _uploader = None
 _client = None
+# 上传失败 / 日失败账本，与 _markers 并列，不进 R2。
+R2_FAILED_NAME = "_r2_failed.json"
+# 文件名沿用 _qa_failed.json，条目用 kind 区分质检/解压/计算。
+QA_FAILED_NAME = "_qa_failed.json"
+DAY_FAIL_KINDS = ("qa", "extract", "compute")
 
 
 def set_r2_uploader(uploader) -> None:
@@ -159,7 +167,8 @@ def write_status(
 
 
 def upload_day_to_r2(root: Path, trade_date: str, *, factor_version: int = FACTOR_VERSION) -> str | None:
-    """上传日宽表到 R2，返回逻辑 storage_uri。未配置时返回逻辑键但不上传。"""
+    """上传日宽表到 R2，返回逻辑键。未配置返回 None；put 失败抛错。"""
+    load_r2_env()
     path = day_path(root, trade_date, factor_version=factor_version)
     if not path.is_file():
         return None
@@ -169,13 +178,163 @@ def upload_day_to_r2(root: Path, trade_date: str, *, factor_version: int = FACTO
         _uploader(key, payload)
         return key
     if not _r2_configured():
-        return key
+        return None
     try:
         _r2_client().put_object(Bucket=_bucket(), Key=key, Body=payload)
     except Exception:
         _log.warning("l2_daily R2 上传失败 %s", trade_date, exc_info=True)
-        return key
+        raise
     return key
+
+
+def r2_failed_path(root: Path) -> Path:
+    """上传失败账本路径：{output}/_r2_failed.json。"""
+    return Path(root) / R2_FAILED_NAME
+
+
+def _read_r2_failed(root: Path) -> dict[str, object]:
+    """读账本；坏文件当空。"""
+    path = r2_failed_path(root)
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_r2_failed(root: Path, payload: dict[str, object]) -> None:
+    """原子写账本。"""
+    path = r2_failed_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
+def mark_r2_failed(
+    root: Path,
+    trade_date: str,
+    error: object,
+    *,
+    factor_version: int = FACTOR_VERSION,
+) -> None:
+    """记下某日上传失败，供之后 reupload --failed。"""
+    payload = _read_r2_failed(root)
+    payload[str(trade_date)] = {
+        "error": str(error)[:500],
+        "key": logical_day_key(trade_date, factor_version=factor_version),
+        "updated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+    }
+    _write_r2_failed(root, payload)
+
+
+def clear_r2_failed(root: Path, trade_date: str) -> None:
+    """上传成功后清掉该日失败记录。"""
+    payload = _read_r2_failed(root)
+    if str(trade_date) not in payload:
+        return
+    payload.pop(str(trade_date), None)
+    if payload:
+        _write_r2_failed(root, payload)
+        return
+    r2_failed_path(root).unlink(missing_ok=True)
+
+
+def list_r2_failed(root: Path) -> list[str]:
+    """账本里的失败交易日，升序。"""
+    return sorted(day for day in _read_r2_failed(root) if str(day).isdigit() and len(str(day)) == 8)
+
+
+def qa_failed_path(root: Path) -> Path:
+    """日失败账本：{output}/_qa_failed.json（含 qa/extract/compute）。"""
+    return Path(root) / QA_FAILED_NAME
+
+
+def _normalize_fail_kind(kind: object) -> str:
+    """缺 kind 的旧记录当质检失败。"""
+    value = str(kind or "qa").strip().lower()
+    return value if value in DAY_FAIL_KINDS else "qa"
+
+
+def _day_fail_kind(item: object) -> str:
+    """从账本条目读 kind；非 dict 或缺失都当 qa。"""
+    if isinstance(item, dict):
+        return _normalize_fail_kind(item.get("kind"))
+    return "qa"
+
+
+def _read_qa_failed(root: Path) -> dict[str, object]:
+    """读日失败账本；坏文件当空。"""
+    path = qa_failed_path(root)
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_qa_failed(root: Path, payload: dict[str, object]) -> None:
+    """原子写日失败账本。"""
+    path = qa_failed_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
+def mark_day_failed(root: Path, trade_date: str, error: object, *, kind: str = "qa") -> None:
+    """记下某日失败（qa/extract/compute），供之后统一处理。"""
+    payload = _read_qa_failed(root)
+    payload[str(trade_date)] = {
+        "error": str(error)[:500],
+        "kind": _normalize_fail_kind(kind),
+        "updated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+    }
+    _write_qa_failed(root, payload)
+
+
+def mark_qa_failed(root: Path, trade_date: str, error: object) -> None:
+    """兼容旧名：记下质检失败。"""
+    mark_day_failed(root, trade_date, error, kind="qa")
+
+
+def clear_day_failed(root: Path, trade_date: str) -> None:
+    """发布成功后清掉该日失败记录。"""
+    payload = _read_qa_failed(root)
+    if str(trade_date) not in payload:
+        return
+    payload.pop(str(trade_date), None)
+    if payload:
+        _write_qa_failed(root, payload)
+        return
+    qa_failed_path(root).unlink(missing_ok=True)
+
+
+def clear_qa_failed(root: Path, trade_date: str) -> None:
+    """兼容旧名：清掉该日失败记录。"""
+    clear_day_failed(root, trade_date)
+
+
+def list_day_failed(root: Path, *, kind: str | None = None) -> list[str]:
+    """日失败账本里的交易日，升序；kind 可筛 qa/extract/compute。"""
+    wanted = None if kind is None else _normalize_fail_kind(kind)
+    dates: list[str] = []
+    for day, item in _read_qa_failed(root).items():
+        if not (str(day).isdigit() and len(str(day)) == 8):
+            continue
+        if wanted is not None and _day_fail_kind(item) != wanted:
+            continue
+        dates.append(str(day))
+    return sorted(dates)
+
+
+def list_qa_failed(root: Path) -> list[str]:
+    """账本里 kind=qa（含旧记录）的交易日。"""
+    return list_day_failed(root, kind="qa")
 
 
 def _day_parquet_files(directory: Path) -> list[Path]:
@@ -385,6 +544,7 @@ def reupload_local_days(
     uploaded: list[str] = []
     missing: list[str] = []
     deleted_old: list[str] = []
+    r2_failed: list[str] = []
 
     for trade_date in selected:
         new_path = day_path(out_root, trade_date, factor_version=factor_version)
@@ -405,8 +565,17 @@ def reupload_local_days(
         if path.resolve() != new_path.resolve():
             new_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(path), str(new_path))
-        uri = upload_day_to_r2(out_root, trade_date, factor_version=factor_version)
+        # 单日 put 失败记账并继续后面的天，不阻断补传。
+        try:
+            uri = upload_day_to_r2(out_root, trade_date, factor_version=factor_version)
+        except Exception as exc:
+            _log.warning("l2_daily 补传失败 %s", trade_date, exc_info=True)
+            mark_r2_failed(out_root, trade_date, exc, factor_version=factor_version)
+            r2_failed.append(trade_date)
+            print(f"[{trade_date}] R2 上传失败，已标记，后续继续", flush=True)
+            continue
         if uri:
+            clear_r2_failed(out_root, trade_date)
             uploaded.append(uri)
             print(f"[{trade_date}] uploaded {uri}", flush=True)
         else:
@@ -427,9 +596,16 @@ def reupload_local_days(
         "dates": selected,
         "uploaded": uploaded,
         "missing": missing,
+        "r2_failed": r2_failed,
         "deleted_old": deleted_old,
         "dry_run": dry_run,
     }
+
+
+def r2_configured() -> bool:
+    """四个 R2 变量都非空才算配好。会先尝试 load 本仓库 .env。"""
+    load_r2_env()
+    return _r2_configured()
 
 
 def _r2_configured() -> bool:

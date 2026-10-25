@@ -1,4 +1,4 @@
-"""按日加载明细并计算指定因子组。优先 CSV，回退 Parquet。"""
+"""按日加载明细并计算指定因子组。只读 CSV。"""
 from __future__ import annotations
 
 import logging
@@ -28,22 +28,19 @@ from .util import is_equity
 _log = logging.getLogger(__name__)
 _FILE_TYPES = ("行情", "逐笔成交", "逐笔委托")
 _PROGRESS_EVERY = 100
-
-
-def book_path(root: Path, date: str, code: str, ftype: str) -> Path:
-    """明细 parquet 回退路径。"""
-    return Path(root) / str(date) / str(code) / f"{ftype}.parquet"
+_GROUP_SOURCES = {
+    GROUP_TRADE: ("逐笔成交",),
+    GROUP_BOOK: ("行情",),
+    GROUP_ORDER: ("逐笔委托", "逐笔成交"),
+    GROUP_MICROSTRUCTURE: ("行情", "逐笔成交", "逐笔委托"),
+}
 
 
 def source_file_path(root: Path, date: str, code: str, ftype: str) -> Path | None:
-    """优先 CSV，其次 Parquet；都不存在返回 None。"""
-    day_code = Path(root) / str(date) / str(code)
-    csv_path = day_code / f"{ftype}.csv"
+    """只认 CSV；不存在返回 None。"""
+    csv_path = Path(root) / str(date) / str(code) / f"{ftype}.csv"
     if csv_path.is_file():
         return csv_path
-    parquet_path = book_path(root, date, code, ftype)
-    if parquet_path.is_file():
-        return parquet_path
     return None
 
 
@@ -55,43 +52,117 @@ def list_codes(books_root: Path, trade_date: str) -> list[str]:
     return sorted(child.name for child in day.iterdir() if child.is_dir() and is_equity(child.name))
 
 
+def _needed_ftypes(factor_groups: list[str]) -> tuple[str, ...]:
+    needed: list[str] = []
+    seen: set[str] = set()
+    for group in factor_groups:
+        for ftype in _GROUP_SOURCES.get(group, _FILE_TYPES):
+            if ftype not in seen:
+                seen.add(ftype)
+                needed.append(ftype)
+    return tuple(needed)
+
+
+def load_symbol_frames(
+    books_root: Path,
+    trade_date: str,
+    code: str,
+    ftypes: tuple[str, ...] | list[str],
+) -> dict[str, pd.DataFrame | None]:
+    """按类型读明细；缺文件为 None，避免把停牌误当成空表。"""
+    frames: dict[str, pd.DataFrame | None] = {}
+    for ftype in ftypes:
+        path = source_file_path(books_root, trade_date, code, ftype)
+        if path is None:
+            frames[ftype] = None
+            continue
+        frames[ftype] = _read_path(path, ftype)
+    return frames
+
+
+def _calc_group_from_frames(
+    frames: dict[str, pd.DataFrame | None],
+    code: str,
+    factor_group: str,
+) -> dict[str, Any] | None:
+    """用已读入的帧算一组。缺必要源返回 None。"""
+    if factor_group == GROUP_TRADE:
+        trades = frames.get("逐笔成交")
+        if trades is None:
+            return None
+        return calc_trade_factors(trades, code)
+    if factor_group == GROUP_BOOK:
+        snap = frames.get("行情")
+        if snap is None:
+            return None
+        return calc_book_factors(snap)
+    if factor_group == GROUP_ORDER:
+        orders = frames.get("逐笔委托")
+        trades = frames.get("逐笔成交")
+        empty_orders = orders is None or orders.empty
+        empty_trades = trades is None or trades.empty
+        if empty_orders and empty_trades:
+            return None
+        return calc_order_factors(
+            orders if orders is not None else pd.DataFrame(),
+            trades if trades is not None else pd.DataFrame(),
+            code,
+        )
+    if factor_group == GROUP_MICROSTRUCTURE:
+        snap = frames.get("行情")
+        trades = frames.get("逐笔成交")
+        orders = frames.get("逐笔委托")
+        if all(frame is None or frame.empty for frame in (snap, trades, orders)):
+            return None
+        return calc_microstructure_factors(
+            snap if snap is not None else pd.DataFrame(),
+            trades if trades is not None else pd.DataFrame(),
+            orders if orders is not None else pd.DataFrame(),
+            code,
+        )
+    raise ValueError(f"unknown factor_group: {factor_group}")
+
+
+def calc_groups_for_symbol(
+    books_root: Path,
+    trade_date: str,
+    code: str,
+    factor_groups: list[str],
+) -> dict[str, dict[str, Any] | None]:
+    """一只股票一次读齐所需明细，再算多个组。"""
+    frames = load_symbol_frames(books_root, trade_date, code, _needed_ftypes(factor_groups))
+    out: dict[str, dict[str, Any] | None] = {}
+    for factor_group in factor_groups:
+        try:
+            row = _calc_group_from_frames(frames, code, factor_group)
+        except Exception:
+            _log.warning("l2_daily 计算失败 %s %s %s", trade_date, code, factor_group, exc_info=True)
+            row = None
+        if row is not None:
+            row["trade_date"] = str(trade_date)
+            row["symbol"] = str(code)
+        out[factor_group] = row
+    return out
+
+
 def calc_group_for_symbol(
     books_root: Path,
     trade_date: str,
     code: str,
     factor_group: str,
 ) -> dict[str, Any] | None:
-    """计算一只股票一个组；缺关键输入返回 None。"""
-    try:
-        if factor_group == GROUP_TRADE:
-            trades = _read_local(books_root, trade_date, code, "逐笔成交")
-            row = calc_trade_factors(trades, code)
-        elif factor_group == GROUP_BOOK:
-            snap = _read_local(books_root, trade_date, code, "行情")
-            row = calc_book_factors(snap)
-        elif factor_group == GROUP_ORDER:
-            orders = _optional_frame(books_root, trade_date, code, "逐笔委托")
-            trades = _optional_frame(books_root, trade_date, code, "逐笔成交")
-            if orders.empty and trades.empty:
-                return None
-            row = calc_order_factors(orders, trades, code)
-        elif factor_group == GROUP_MICROSTRUCTURE:
-            frames = _load_any(books_root, trade_date, code)
-            if frames is None:
-                return None
-            row = calc_microstructure_factors(
-                frames["行情"], frames["逐笔成交"], frames["逐笔委托"], code
-            )
-        else:
-            raise ValueError(f"unknown factor_group: {factor_group}")
-    except FileNotFoundError:
-        return None
-    except Exception:
-        _log.warning("l2_daily 计算失败 %s %s %s", trade_date, code, factor_group, exc_info=True)
-        return None
-    row["trade_date"] = str(trade_date)
-    row["symbol"] = str(code)
-    return row
+    """计算一只股票一个组；缺关键输入返回 None。质检抽样走这条。"""
+    return calc_groups_for_symbol(books_root, trade_date, code, [factor_group]).get(factor_group)
+
+
+def calc_groups_for_symbol_worker(
+    trade_date: str,
+    code: str,
+    books_root: str,
+    factor_groups: list[str],
+) -> dict[str, dict[str, Any] | None]:
+    """子进程入口：一股多组。"""
+    return calc_groups_for_symbol(Path(books_root), trade_date, code, factor_groups)
 
 
 def calc_group_for_symbol_worker(
@@ -100,7 +171,7 @@ def calc_group_for_symbol_worker(
     books_root: str,
     factor_group: str,
 ) -> dict[str, Any] | None:
-    """子进程入口。"""
+    """子进程入口：一股一组。"""
     return calc_group_for_symbol(Path(books_root), trade_date, code, factor_group)
 
 
@@ -204,6 +275,109 @@ def _append_symbol_result(
     return 1, 0
 
 
+def _empty_group_buckets(
+    factor_groups: list[str],
+) -> dict[str, tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], int, int]]:
+    """每组一个 (rows, status_rows, columns, ok, fail)。"""
+    buckets: dict[str, tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], int, int]] = {}
+    for group in factor_groups:
+        buckets[group] = ([], [], factor_ids_for_group(group), 0, 0)
+    return buckets
+
+
+def _absorb_symbol_groups(
+    *,
+    trade_date: str,
+    code: str,
+    results: dict[str, dict[str, Any] | None],
+    buckets: dict[str, tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], int, int]],
+    books_root: Path,
+) -> None:
+    """把一只股票的多组结果写入各桶。"""
+    for group, (rows, status_rows, columns, ok, fail) in list(buckets.items()):
+        d_ok, d_fail = _append_symbol_result(
+            trade_date=trade_date,
+            code=code,
+            factor_group=group,
+            result=results.get(group),
+            columns=columns,
+            rows=rows,
+            status_rows=status_rows,
+            books_root=books_root,
+        )
+        buckets[group] = (rows, status_rows, columns, ok + d_ok, fail + d_fail)
+
+
+def calc_groups_day(
+    books_root: Path,
+    trade_date: str,
+    factor_groups: list[str],
+    *,
+    codes: list[str] | None = None,
+    workers: int = 1,
+) -> dict[str, tuple[list[dict[str, Any]], list[dict[str, Any]], int, int]]:
+    """一天内按股票一次读齐，多组同算。返回 {group: (rows, status_rows, ok, fail)}。"""
+    selected = codes if codes is not None else list_codes(books_root, trade_date)
+    groups = list(factor_groups)
+    buckets = _empty_group_buckets(groups)
+    total = len(selected)
+    pool_workers = max(1, int(workers))
+
+    def _run_serial() -> None:
+        for done, code in enumerate(selected, start=1):
+            results = calc_groups_for_symbol(books_root, trade_date, code, groups)
+            _absorb_symbol_groups(
+                trade_date=trade_date,
+                code=code,
+                results=results,
+                buckets=buckets,
+                books_root=books_root,
+            )
+            _emit_symbol_progress(trade_date, "factors", done, total)
+
+    if pool_workers <= 1 or total <= 1:
+        _run_serial()
+    else:
+        root_str = str(books_root)
+        try:
+            pool = ProcessPoolExecutor(max_workers=min(pool_workers, total))
+        except PermissionError:
+            print(f"[{trade_date}] 进程池不可用，回退串行 factors", flush=True)
+            _run_serial()
+        else:
+            with pool:
+                futures = [
+                    pool.submit(calc_groups_for_symbol_worker, trade_date, code, root_str, groups)
+                    for code in selected
+                ]
+                for done, (code, future) in enumerate(zip(selected, futures), start=1):
+                    try:
+                        results = future.result()
+                    except Exception:
+                        _log.warning(
+                            "l2_daily 并行计算异常 %s %s",
+                            trade_date,
+                            code,
+                            exc_info=True,
+                        )
+                        results = {group: None for group in groups}
+                    _absorb_symbol_groups(
+                        trade_date=trade_date,
+                        code=code,
+                        results=results,
+                        buckets=buckets,
+                        books_root=books_root,
+                    )
+                    _emit_symbol_progress(trade_date, "factors", done, total)
+
+    out: dict[str, tuple[list[dict[str, Any]], list[dict[str, Any]], int, int]] = {}
+    for group, (rows, status_rows, _columns, ok, fail) in buckets.items():
+        rows.sort(key=lambda item: str(item.get("symbol") or ""))
+        status_rows.sort(key=lambda item: str(item.get("symbol") or ""))
+        out[group] = (rows, status_rows, ok, fail)
+    return out
+
+
 def calc_group_day(
     books_root: Path,
     trade_date: str,
@@ -213,106 +387,23 @@ def calc_group_day(
     workers: int = 1,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, int]:
     """返回 (factor_rows, status_rows, ok, fail)。"""
-    selected = codes if codes is not None else list_codes(books_root, trade_date)
-    rows: list[dict[str, Any]] = []
-    status_rows: list[dict[str, Any]] = []
-    ok = 0
-    fail = 0
-    columns = factor_ids_for_group(factor_group)
-    total = len(selected)
-    pool_workers = max(1, int(workers))
+    return calc_groups_day(
+        books_root,
+        trade_date,
+        [factor_group],
+        codes=codes,
+        workers=workers,
+    )[factor_group]
 
-    def _run_serial() -> tuple[int, int]:
-        """单进程逐股计算，供 workers=1 或进程池不可用时回退。"""
-        serial_ok = 0
-        serial_fail = 0
-        for done, code in enumerate(selected, start=1):
-            result = calc_group_for_symbol(books_root, trade_date, code, factor_group)
-            d_ok, d_fail = _append_symbol_result(
-                trade_date=trade_date,
-                code=code,
-                factor_group=factor_group,
-                result=result,
-                columns=columns,
-                rows=rows,
-                status_rows=status_rows,
-                books_root=books_root,
-            )
-            serial_ok += d_ok
-            serial_fail += d_fail
-            _emit_symbol_progress(trade_date, factor_group, done, total)
-        return serial_ok, serial_fail
 
-    if pool_workers <= 1 or total <= 1:
-        ok, fail = _run_serial()
-    else:
-        root_str = str(books_root)
-        try:
-            pool = ProcessPoolExecutor(max_workers=min(pool_workers, total))
-        except PermissionError:
-            # 沙箱/受限环境可能读不到 SC_SEM_NSEMS_MAX
-            print(f"[{trade_date}] 进程池不可用，回退串行 {factor_group}", flush=True)
-            ok, fail = _run_serial()
-        else:
-            with pool:
-                futures = [
-                    pool.submit(calc_group_for_symbol_worker, trade_date, code, root_str, factor_group)
-                    for code in selected
-                ]
-                for done, (code, future) in enumerate(zip(selected, futures), start=1):
-                    try:
-                        result = future.result()
-                    except Exception:
-                        _log.warning(
-                            "l2_daily 并行计算异常 %s %s %s",
-                            trade_date,
-                            code,
-                            factor_group,
-                            exc_info=True,
-                        )
-                        result = None
-                    d_ok, d_fail = _append_symbol_result(
-                        trade_date=trade_date,
-                        code=code,
-                        factor_group=factor_group,
-                        result=result,
-                        columns=columns,
-                        rows=rows,
-                        status_rows=status_rows,
-                        books_root=books_root,
-                    )
-                    ok += d_ok
-                    fail += d_fail
-                    _emit_symbol_progress(trade_date, factor_group, done, total)
-
-    rows.sort(key=lambda item: str(item.get("symbol") or ""))
-    status_rows.sort(key=lambda item: str(item.get("symbol") or ""))
-    return rows, status_rows, ok, fail
+def _read_path(path: Path, ftype: str) -> pd.DataFrame:
+    """读本地 CSV 明细。"""
+    return read_csv_bytes(path.read_bytes(), ftype)
 
 
 def _read_local(root: Path, date: str, code: str, ftype: str) -> pd.DataFrame:
-    """只读本地文件：CSV 优先，其次 Parquet。"""
+    """只读本地 CSV。"""
     path = source_file_path(root, date, code, ftype)
     if path is None:
         raise FileNotFoundError(Path(root) / str(date) / str(code) / f"{ftype}.csv")
-    if path.suffix.lower() == ".csv":
-        return read_csv_bytes(path.read_bytes(), ftype)
-    return pd.read_parquet(path)
-
-
-def _optional_frame(root: Path, date: str, code: str, ftype: str) -> pd.DataFrame:
-    try:
-        return _read_local(root, date, code, ftype)
-    except FileNotFoundError:
-        return pd.DataFrame()
-
-
-def _load_any(root: Path, date: str, code: str) -> dict[str, pd.DataFrame] | None:
-    frames = {
-        "行情": _optional_frame(root, date, code, "行情"),
-        "逐笔成交": _optional_frame(root, date, code, "逐笔成交"),
-        "逐笔委托": _optional_frame(root, date, code, "逐笔委托"),
-    }
-    if all(frame.empty for frame in frames.values()):
-        return None
-    return frames
+    return _read_path(path, ftype)

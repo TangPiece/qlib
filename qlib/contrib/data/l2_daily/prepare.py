@@ -1,4 +1,4 @@
-"""解压准备与日期发现。不转明细 Parquet，只保证当日 CSV 目录可用。"""
+"""解压准备与日期发现。保证当日 CSV 目录可用。"""
 from __future__ import annotations
 
 import json
@@ -8,6 +8,53 @@ import time
 from pathlib import Path
 
 from .extract import extract_archive
+
+# 因子实际读取的三类 CSV。
+DETAIL_TYPES = ("行情", "逐笔成交", "逐笔委托")
+DEFAULT_DOWNLOAD_POLL_SEC = 60
+
+
+def download_poll_seconds() -> int:
+    """下载等待间隔，秒。LEVEL2_DOWNLOAD_POLL_SEC 可改。"""
+    raw = os.getenv("LEVEL2_DOWNLOAD_POLL_SEC", str(DEFAULT_DOWNLOAD_POLL_SEC)).strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return DEFAULT_DOWNLOAD_POLL_SEC
+
+
+def _date_prefix(name: str) -> str | None:
+    """文件名开头的 YYYYMMDD。"""
+    stem = str(name).split(".")[0]
+    if stem.isdigit() and len(stem) == 8:
+        return stem
+    return None
+
+
+def _is_downloading_name(name: str) -> bool:
+    """百度云/aria2/part 未完成标记。完整 .7z 不算。"""
+    lower = str(name).lower()
+    if lower.endswith(".7z") and lower.count(".") == 1:
+        return False
+    return "downloading" in lower or lower.endswith(".aria2") or lower.endswith(".part")
+
+
+def discover_downloading_dates(raw_root: Path, only: list[str] | None = None) -> list[str]:
+    """扫描未下完的日期文件，例如 YYYYMMDD.7z.baiduyun.p.downloading。"""
+    root = Path(raw_root)
+    dates: list[str] = []
+    if root.is_dir():
+        for path in root.iterdir():
+            if not path.is_file() or not _is_downloading_name(path.name):
+                continue
+            day = _date_prefix(path.name)
+            if day:
+                dates.append(day)
+    dates = sorted(set(dates))
+    if only:
+        wanted = set(only)
+        dates = [day for day in dates if day in wanted]
+    return dates
 
 
 def _qlib_root() -> Path:
@@ -63,18 +110,29 @@ def discover_7z_dates(raw_root: Path, only: list[str] | None = None) -> list[str
     return dates
 
 
-def day_has_csv(raw_root: Path, trade_date: str) -> bool:
+def day_has_sources(raw_root: Path, trade_date: str) -> bool:
+    """有因子用到的三类 CSV 即视为已解压。"""
     day = Path(raw_root) / str(trade_date)
     if not day.is_dir():
         return False
-    return any(day.rglob("*.csv"))
+    for child in day.iterdir():
+        if not child.is_dir():
+            continue
+        if any((child / f"{ftype}.csv").is_file() for ftype in DETAIL_TYPES):
+            return True
+    return False
+
+
+def day_has_csv(raw_root: Path, trade_date: str) -> bool:
+    """兼容旧名：只认 CSV。"""
+    return day_has_sources(raw_root, trade_date)
 
 
 def ensure_day_csv(trade_date: str, raw_root: Path, *, dry_run: bool = False) -> Path:
     """保证 {raw_root}/{date}/ 下有 CSV。已有则跳过；否则解压 {date}.7z。"""
     root = Path(raw_root)
     day_dir = root / str(trade_date)
-    if day_has_csv(root, trade_date):
+    if day_has_sources(root, trade_date):
         return day_dir
     seven_z = root / f"{trade_date}.7z"
     if not seven_z.is_file():

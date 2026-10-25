@@ -9,6 +9,7 @@ from pathlib import Path
 from .catalog import ALL_GROUPS, FACTOR_VERSION
 from . import prepare, storage
 from .pipeline import run, run_batch
+from .r2_env import load_r2_env
 
 DEFAULT_WORKERS = 8
 
@@ -21,8 +22,15 @@ def _default_workers() -> int:
         return DEFAULT_WORKERS
 
 
-def _parse_explicit_dates(args: argparse.Namespace) -> list[str]:
-    """解析 --dates 或 --start/--end；区间只收 raw 里已有的日目录/.7z。"""
+def _parse_explicit_dates(
+    args: argparse.Namespace,
+    *,
+    from_factors: bool = False,
+) -> list[str]:
+    """解析 --dates 或 --start/--end。
+
+    默认扫 raw 日目录/.7z；from_factors 时扫本地宽表（reupload 用）。
+    """
     if args.dates:
         return [item.strip() for item in args.dates.split(",") if item.strip()]
     if args.start and args.end:
@@ -30,6 +38,13 @@ def _parse_explicit_dates(args: argparse.Namespace) -> list[str]:
         end = str(args.end)
         if not (start.isdigit() and end.isdigit() and len(start) == 8 and len(end) == 8):
             raise SystemExit("--start/--end 需要 YYYYMMDD")
+        if from_factors:
+            root = Path(args.output) if args.output else storage.default_root()
+            return [
+                day
+                for day in storage.discover_local_day_dates(root, factor_version=args.factor_version)
+                if start <= day <= end
+            ]
         root = Path(args.raw_dir) if args.raw_dir else prepare.default_raw_root()
         dates: list[str] = []
         if root.is_dir():
@@ -44,7 +59,7 @@ def _parse_explicit_dates(args: argparse.Namespace) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     """与旧 QuantDinger CLI 对齐；不调用 dump bin。"""
-    parser = argparse.ArgumentParser(description="L2 百因子日频：解压(可选)→CSV 直算→质检→本地/R2。不写 bin。")
+    parser = argparse.ArgumentParser(description="L2 百因子日频：解压→CSV 直算（按股票四组同算）→质检→本地/R2。不写 bin。")
     parser.add_argument("command", nargs="?", default="", help="all | reupload | prune-sources | YYYYMMDD")
     parser.add_argument("--dates", default="", help="逗号分隔交易日 YYYYMMDD")
     parser.add_argument("--start", default="", help="起始交易日 YYYYMMDD")
@@ -60,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-delete", action="store_true", help="算完不回收解压目录/.7z")
     parser.add_argument("--delete-sources", action="store_true", help="兼容旧开关：默认就会回收")
     parser.add_argument("--keep-old-r2", action="store_true", help="reupload 时保留 R2 旧键")
+    parser.add_argument("--failed", action="store_true", help="reupload 只传账本里失败的日期")
     parser.add_argument("--local-only", action="store_true", help="只处理已解压目录")
     parser.add_argument("--7z-only", action="store_true", dest="z7_only", help="只处理 .7z")
     parser.add_argument("--dry-run", action="store_true", help="只调度/解压预览，不算因子")
@@ -67,6 +83,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--factor-version", type=int, default=FACTOR_VERSION)
     args = parser.parse_args(argv)
     workers = max(1, int(args.workers))
+    load_r2_env()
+    print(
+        f"R2 configured={storage.r2_configured()} prefix={storage.r2_prefix()}",
+        flush=True,
+    )
+    if not args.no_r2 and not storage.r2_configured():
+        print("R2 未配置，只写本地", flush=True)
 
     groups = [g.strip() for g in args.groups.split(",") if g.strip()] or None
     if groups:
@@ -88,16 +111,29 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "reupload":
-        dates = _parse_explicit_dates(args)
+        out_root = Path(args.output) if args.output else storage.default_root()
+        # --failed 只扫账本；可与 --start/--end 或 --dates 求交。空账本不要回退成全量上传。
+        if args.failed:
+            dates = storage.list_r2_failed(out_root)
+            if args.dates:
+                wanted = {item.strip() for item in args.dates.split(",") if item.strip()}
+                dates = [day for day in dates if day in wanted]
+            elif args.start and args.end:
+                start, end = str(args.start), str(args.end)
+                if not (start.isdigit() and end.isdigit() and len(start) == 8 and len(end) == 8):
+                    raise SystemExit("--start/--end 需要 YYYYMMDD")
+                dates = [day for day in dates if start <= day <= end]
+        else:
+            dates = _parse_explicit_dates(args, from_factors=True)
         summary = storage.reupload_local_days(
             output,
-            dates=dates or None,
+            dates=dates if args.failed or dates else None,
             factor_version=args.factor_version,
             delete_old_r2=not args.keep_old_r2,
             dry_run=args.dry_run,
         )
         print(summary, flush=True)
-        return 1 if summary.get("missing") else 0
+        return 1 if summary.get("missing") or summary.get("r2_failed") else 0
 
     batch_mode = args.command == "all" or (not args.command and not args.dates and not (args.start and args.end))
 

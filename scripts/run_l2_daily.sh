@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# L2 百因子：解压(可选) → CSV 直算 → 质检 → 本地/R2 Parquet。不写 qlib bin。
+# L2 百因子：解压 → CSV 直算（按股票四组同算）→ 质检 → 本地/R2 宽表。不写 qlib bin。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,18 +20,23 @@ usage() {
   run_l2_daily.sh all [start 选项] | status | tail | stop
   run_l2_daily.sh DATE [start 选项] | status | tail | stop
   run_l2_daily.sh --start YYYYMMDD --end YYYYMMDD [选项]
+  run_l2_daily.sh reupload --start YYYYMMDD --end YYYYMMDD
+  run_l2_daily.sh reupload --failed
 
   all     扫描 data/level2_raw：已解压 CSV 优先，再逐日解压 .7z，
-          CSV 算百因子 → 质检通过后才写本地/R2。
+          按股票四组同算 CSV → 质检通过后才写本地/R2。
           一天结束就删解压目录；质检通过才连 .7z 一起删。--no-delete 全留。
-          每波结束后立刻重扫：有尚未处理的新 .7z/日目录则续批，无则结束
+          每波结束后立刻重扫：有尚未处理的新 .7z/日目录则续批。
+          若只剩下载中文件（如 .baiduyun.p.downloading）则等待下完再续。
+          单日解压/计算/质检失败都记入账本、删解压留 7z，不阻断后续。
+          --force 才重跑账本里的日期。stop 可中断等待。
   DATE    单日 YYYYMMDD
 
 选项:
   --groups trade,book,order,microstructure
   --raw-dir DIR
   --output DIR
-  --workers N          同一日×组内按股票并行进程数（默认 8 或 LEVEL2_L2_DAILY_WORKERS）
+  --workers N          按股票四组同算的进程数（默认 8 或 LEVEL2_L2_DAILY_WORKERS）
   --force
   --no-r2
   --no-compact
@@ -41,12 +46,14 @@ usage() {
   --local-only
   --7z-only
   --dry-run
+  --failed             reupload 只补传账本里失败的日期
 
 示例:
   ./scripts/run_l2_daily.sh all
   ./scripts/run_l2_daily.sh all --workers 4
   ./scripts/run_l2_daily.sh 20180731 --force --no-delete
   ./scripts/run_l2_daily.sh prune-sources
+  ./scripts/run_l2_daily.sh reupload --failed
   ./scripts/run_l2_daily.sh all status
   ./scripts/run_l2_daily.sh all tail
 USAGE
@@ -212,8 +219,8 @@ PY
 main() {
   [[ $# -ge 1 ]] || { usage; exit 1; }
 
-  # 允许直接传 --start/--end 或 prune-sources 前台跑（不走后台）
-  if [[ "$1" == --* || "$1" == "prune-sources" ]]; then
+  # 允许直接传 --start/--end、prune-sources、reupload 前台跑（不走后台）
+  if [[ "$1" == --* || "$1" == "prune-sources" || "$1" == "reupload" ]]; then
     cd "${ROOT}"
     exec "${PY}" -m "${MODULE}" "$@"
   fi
