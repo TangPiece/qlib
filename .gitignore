@@ -64,3 +64,6 @@ node_modules/
 
 # 财务因子 staging / 日宽表
 /data/fundamental_staging/
+
+# 评估结果
+/examples/benchmarks/LightGBM/eval_output/
