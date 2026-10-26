@@ -12,8 +12,9 @@ import pandas as pd
 from .catalog import ALL_GROUPS, factor_ids_for_group
 from ._prep import prepare_trades
 from .csv_io import read_csv_bytes
-from .engine import calc_group_for_symbol, list_codes, source_file_path
+from .engine import calc_group_for_symbol, list_codes, resolve_code_dir, source_file_path
 from .prepare import default_qa_dir
+from .util import canonical_symbol, is_equity
 
 TRADE_NULL_MAX = 0.05
 BOOK_NULL_MAX = 0.20
@@ -73,6 +74,58 @@ def _prepare_rows(raw_root: Path, day: str, code: str) -> int:
     return int(len(prepare_trades(trades, code)))
 
 
+def _sample_dir_codes(raw_day: Path) -> list[str]:
+    """SAMPLE_CODES 解析成真实目录名，避免 600000.SH 对不上 600000.sh。"""
+    if not raw_day.is_dir():
+        return []
+    found: list[str] = []
+    for sample in SAMPLE_CODES:
+        actual = resolve_code_dir(raw_day, sample)
+        if actual is not None:
+            found.append(actual)
+    return found
+
+
+def _as_row(hit: pd.DataFrame | pd.Series) -> pd.Series:
+    """loc 遇到重复 index 会返回 DataFrame，取最后一行。"""
+    if isinstance(hit, pd.DataFrame):
+        return hit.iloc[-1]
+    return hit
+
+
+def _wide_row(indexed: pd.DataFrame, code: str) -> pd.Series | None:
+    """宽表按 symbol 取值，优先规范名，避免命中残留的空 .sh 行。"""
+    canon = canonical_symbol(code)
+    if canon in indexed.index:
+        return _as_row(indexed.loc[canon])
+    if code in indexed.index:
+        return _as_row(indexed.loc[code])
+    target = str(code).lower()
+    for key in indexed.index:
+        if str(key).lower() == target:
+            return _as_row(indexed.loc[key])
+    return None
+
+
+def _index_by_canonical(frame: pd.DataFrame) -> pd.DataFrame:
+    """用规范化 symbol 做索引，供盘口覆盖比较。"""
+    if "symbol" not in frame.columns:
+        return frame
+    out = frame.copy()
+    out["symbol"] = [canonical_symbol(item) if pd.notna(item) else item for item in out["symbol"]]
+    return out.set_index("symbol")
+
+
+def _value_missing(value: Any) -> bool:
+    """NaN / 非有限数视为空。"""
+    if pd.isna(value):
+        return True
+    try:
+        return not math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return True
+
+
 def check_day(
     *,
     day: str,
@@ -91,31 +144,48 @@ def check_day(
     if rates.get("book", 1.0) >= BOOK_NULL_MAX:
         errors.append(f"book 空值率 {rates['book']:.3f} ≥ {BOOK_NULL_MAX}")
 
-    indexed = wide.set_index("symbol") if "symbol" in wide.columns else wide
+    indexed = _index_by_canonical(wide) if "symbol" in wide.columns else wide
     raw_day = Path(raw_root) / day
-    codes = [c for c in SAMPLE_CODES if (raw_day / c).is_dir()]
-    others = sorted(p.name for p in raw_day.iterdir() if p.is_dir() and p.name not in codes) if raw_day.is_dir() else []
+    # 读文件用目录真名；宽表查找用规范化代码，兼容 20170510 小写目录。
+    codes = _sample_dir_codes(raw_day)
+    # 随机样本只抽 A 股，避免 ETF/基金有成交却不进宽表（如 159919.SZ）。
+    others = (
+        sorted(
+            p.name
+            for p in raw_day.iterdir()
+            if p.is_dir() and p.name not in codes and is_equity(p.name)
+        )
+        if raw_day.is_dir()
+        else []
+    )
     rng = np.random.default_rng(int(day) if day.isdigit() else 0)
     extra = [str(x) for x in rng.choice(others, size=min(3, len(others)), replace=False)] if others else []
     samples = []
     for code in codes + extra:
         prep = _prepare_rows(raw_root, day, code)
         live = calc_group_for_symbol(raw_root, day, code, "trade") or {}
-        table = indexed.loc[code] if code in indexed.index else None
-        row = {"symbol": code, "prepare_trades": prep}
+        table = _wide_row(indexed, code)
+        display = canonical_symbol(code)
+        row = {"symbol": display, "prepare_trades": prep}
         for field in COMPARE_FIELDS:
             live_val = live.get(field, float("nan"))
             table_val = table[field] if table is not None and field in table.index else float("nan")
             match = _close(live_val, table_val)
             row[field] = {"live": None if pd.isna(live_val) else float(live_val), "wide": None if pd.isna(table_val) else float(table_val), "match": match}
-            if prep > 0 and (pd.isna(table_val) or not math.isfinite(float(table_val))):
-                errors.append(f"{code} {field} 现算/宽表为空，但 prepare_trades={prep}")
+            live_empty = _value_missing(live_val)
+            wide_empty = _value_missing(table_val)
+            if prep > 0 and live_empty and wide_empty:
+                errors.append(f"{display} {field} 现算/宽表为空，但 prepare_trades={prep}")
+            elif prep > 0 and wide_empty:
+                errors.append(f"{display} {field} 宽表为空，但 prepare_trades={prep}")
+            elif prep > 0 and live_empty:
+                errors.append(f"{display} {field} 现算为空，但 prepare_trades={prep}")
             elif prep > 0 and not match:
-                errors.append(f"{code} {field} 现算与宽表不一致")
+                errors.append(f"{display} {field} 现算与宽表不一致")
         samples.append(row)
 
     if old_wide is not None and not old_wide.empty and "l2_obi5_mean" in old_wide.columns and "l2_obi5_mean" in wide.columns:
-        old_idx = old_wide.set_index("symbol") if "symbol" in old_wide.columns else old_wide
+        old_idx = _index_by_canonical(old_wide) if "symbol" in old_wide.columns else old_wide
         common = indexed.index.intersection(old_idx.index)
         if len(common):
             old_ok = old_idx.loc[common, "l2_obi5_mean"].notna().mean()

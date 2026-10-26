@@ -101,7 +101,10 @@ class LGBModel(ModelFT, LightGBMFInt):
         if self.model is None:
             raise ValueError("model is not fitted yet!")
         x_test = dataset.prepare(segment, col_set="feature", data_key=DataHandlerLP.DK_I)
-        return pd.Series(self.model.predict(x_test.values), index=x_test.index)
+        # 训练侧已把 num_threads 压成 1，但 PredictForMat 仍会 __kmpc_fork_call，
+        # 和 sklearn 那份 libomp 撞在 __kmp_suspend_64 上 SIGSEGV。
+        predict_kwargs = {"num_threads": 1} if sys.platform == "darwin" else {}
+        return pd.Series(self.model.predict(x_test.values, **predict_kwargs), index=x_test.index)
 
     def finetune(self, dataset: DatasetH, num_boost_round=10, verbose_eval=20, reweighter=None):
         """

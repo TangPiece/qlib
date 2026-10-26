@@ -22,6 +22,12 @@ def market_of(code: str) -> str:
     return "SH" if text[:1] in "69" else "SZ"
 
 
+def canonical_symbol(code: str) -> str:
+    """统一成 600000.SH / 000001.SZ，避免万得目录大小写把同一只股票拆成两行。"""
+    num = str(code).split(".")[0]
+    return f"{num}.{market_of(num)}"
+
+
 def is_equity(code: str) -> bool:
     """A 股：深市 0/3、沪市 6。基金和可转债不进入因子。"""
     text = str(code).split(".")[0]

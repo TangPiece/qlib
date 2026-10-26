@@ -76,6 +76,135 @@ def test_empty_trades_are_all_nan_fail() -> None:
     assert math.isnan(float(result["l2_trade_count"]))
 
 
+def test_canonical_symbol_normalizes_suffix() -> None:
+    """万得目录大小写不稳，写入宽表必须统一成 .SH/.SZ。"""
+    from qlib.contrib.data.l2_daily.util import canonical_symbol
+
+    assert canonical_symbol("600000.sh") == "600000.SH"
+    assert canonical_symbol("000001.sz") == "000001.SZ"
+    assert canonical_symbol("600000.SH") == "600000.SH"
+
+
+def test_canonicalize_panel_collapses_case_duplicates() -> None:
+    """旧 .sh 空行和 .SH 实值折成一行，非空优先。"""
+    from qlib.contrib.data.l2_daily.storage import canonicalize_panel
+
+    frame = pd.DataFrame(
+        [
+            {"trade_date": "20170510", "symbol": "600000.sh", "l2_trade_count": float("nan"), "l2_vwap": float("nan")},
+            {"trade_date": "20170510", "symbol": "600000.SH", "l2_trade_count": 12586.0, "l2_vwap": 14.7},
+        ]
+    )
+    out = canonicalize_panel(frame)
+    assert len(out) == 1
+    assert out.iloc[0]["symbol"] == "600000.SH"
+    assert out.iloc[0]["l2_trade_count"] == 12586.0
+    assert out.iloc[0]["l2_vwap"] == 14.7
+
+
+def test_merge_group_columns_folds_lowercase_existing() -> None:
+    """existing 小写 + incoming 规范名只留一行，新旧列都在。"""
+    from qlib.contrib.data.l2_daily.storage import merge_group_columns
+
+    existing = pd.DataFrame(
+        [
+            {
+                "trade_date": "20170510",
+                "symbol": "600000.sh",
+                "l2_trade_count": 12586.0,
+                "l2_vwap": 14.7,
+                "l2_obi5_mean": 0.1,
+            }
+        ]
+    )
+    incoming = [{"trade_date": "20170510", "symbol": "600000.SH", "l2_obi5_mean": 0.9}]
+    merged = merge_group_columns(existing, incoming, ["l2_obi5_mean"], "20170510")
+    assert len(merged) == 1
+    assert merged.iloc[0]["symbol"] == "600000.SH"
+    assert merged.iloc[0]["l2_trade_count"] == 12586.0
+    assert merged.iloc[0]["l2_obi5_mean"] == 0.9
+
+
+def test_zero_byte_quote_skips_book_keeps_trade(tmp_path: Path) -> None:
+    """0 字节行情当缺源：book skipped，成交仍算，进程不抛。"""
+    from qlib.contrib.data.l2_daily.catalog import ALL_GROUPS, GROUP_BOOK, factor_ids_for_group
+    from qlib.contrib.data.l2_daily.engine import (
+        _append_symbol_result,
+        calc_groups_for_symbol,
+        source_file_path,
+    )
+
+    code_dir = tmp_path / "20170510" / "600519.sh"
+    code_dir.mkdir(parents=True)
+    (code_dir / "行情.csv").write_bytes(b"")
+    _write_gb18030(
+        code_dir / "逐笔成交.csv",
+        "时间,成交价格,成交数量,成交代码,BS标志,叫买序号,叫卖序号\n"
+        "093000001,100000,200,0,B,1,2\n",
+    )
+    assert source_file_path(tmp_path, "20170510", "600519.sh", "行情") is None
+    results = calc_groups_for_symbol(tmp_path, "20170510", "600519.sh", list(ALL_GROUPS))
+    assert results["trade"] is not None
+    assert results["trade"]["l2_trade_count"] == 1
+    assert results["book"] is None
+
+    rows: list[dict] = []
+    status_rows: list[dict] = []
+    ok, fail = _append_symbol_result(
+        trade_date="20170510",
+        code="600519.sh",
+        factor_group=GROUP_BOOK,
+        result=None,
+        columns=factor_ids_for_group(GROUP_BOOK),
+        rows=rows,
+        status_rows=status_rows,
+        books_root=tmp_path,
+    )
+    assert (ok, fail) == (0, 0)
+    assert status_rows[0]["status"] == "skipped"
+    assert status_rows[0]["symbol"] == "600519.SH"
+
+
+def test_check_day_matches_lowercase_wide_symbol(tmp_path: Path) -> None:
+    """宽表 600000.sh 也能对上 SAMPLE_CODES 的 600000.SH。"""
+    from qlib.contrib.data.l2_daily.catalog import wide_columns
+    from qlib.contrib.data.l2_daily.engine import calc_group_for_symbol
+    from qlib.contrib.data.l2_daily.qa import check_day
+    from qlib.contrib.data.l2_daily.util import canonical_symbol
+
+    day = "20170510"
+    _write_gb18030(
+        tmp_path / day / "600000.sh" / "逐笔成交.csv",
+        "时间,成交价格,成交数量,成交代码,BS标志,叫买序号,叫卖序号\n"
+        "093000001,147000,100,0,B,1,2\n"
+        "093100001,148000,100,0,S,3,4\n",
+    )
+    # ETF 有成交但不进宽表；随机样本不能抽到它，否则会误报宽表为空。
+    _write_gb18030(
+        tmp_path / day / "159919.sz" / "逐笔成交.csv",
+        "时间,成交价格,成交数量,成交代码,BS标志,叫买序号,叫卖序号\n"
+        "093000001,100000,50,0,B,1,2\n",
+    )
+    live = calc_group_for_symbol(tmp_path, day, "600000.sh", "trade")
+    assert live is not None
+    row = {col: 1.0 for col in wide_columns()}
+    row["trade_date"] = day
+    row["symbol"] = "600000.sh"
+    row["l2_trade_count"] = live["l2_trade_count"]
+    row["l2_vwap"] = live["l2_vwap"]
+    report = check_day(
+        day=day,
+        wide=pd.DataFrame([row]),
+        raw_root=tmp_path,
+        old_wide=None,
+        qa_dir=tmp_path / "qa",
+    )
+    assert report["ok"], report["errors"]
+    sample = next(item for item in report["samples"] if canonical_symbol(item["symbol"]) == "600000.SH")
+    assert sample["l2_trade_count"]["match"]
+    assert sample["l2_vwap"]["match"]
+
+
 def test_missing_trade_source_is_skipped_not_failed(tmp_path: Path) -> None:
     """没有逐笔成交文件时记 skipped，不抬失败率。"""
     from qlib.contrib.data.l2_daily.engine import _append_symbol_result

@@ -1,0 +1,85 @@
+{
+  "ok": true,
+  "date": "20180328",
+  "n_symbols": 3241,
+  "group_null_rates": {
+    "trade": 0.0,
+    "book": 0.004936747917309472,
+    "order": 0.10241548023096927,
+    "microstructure": 0.0028891195197890663
+  },
+  "samples": [
+    {
+      "symbol": "600000.SH",
+      "prepare_trades": 10818,
+      "l2_trade_count": {
+        "live": 10818.0,
+        "wide": 10818.0,
+        "match": true
+      },
+      "l2_vwap": {
+        "live": 11.615302321362899,
+        "wide": 11.615302321362899,
+        "match": true
+      }
+    },
+    {
+      "symbol": "000001.SZ",
+      "prepare_trades": 45201,
+      "l2_trade_count": {
+        "live": 45201.0,
+        "wide": 45201.0,
+        "match": true
+      },
+      "l2_vwap": {
+        "live": 10.928097191907808,
+        "wide": 10.928097191907808,
+        "match": true
+      }
+    },
+    {
+      "symbol": "300393.SZ",
+      "prepare_trades": 1262,
+      "l2_trade_count": {
+        "live": 1262.0,
+        "wide": 1262.0,
+        "match": true
+      },
+      "l2_vwap": {
+        "live": 33.43241557223264,
+        "wide": 33.43241557223264,
+        "match": true
+      }
+    },
+    {
+      "symbol": "002650.SZ",
+      "prepare_trades": 0,
+      "l2_trade_count": {
+        "live": null,
+        "wide": null,
+        "match": true
+      },
+      "l2_vwap": {
+        "live": null,
+        "wide": null,
+        "match": true
+      }
+    },
+    {
+      "symbol": "601398.SH",
+      "prepare_trades": 77148,
+      "l2_trade_count": {
+        "live": 77148.0,
+        "wide": 77148.0,
+        "match": true
+      },
+      "l2_vwap": {
+        "live": 6.011925225434583,
+        "wide": 6.011925225434583,
+        "match": true
+      }
+    }
+  ],
+  "errors": [],
+  "trade_source_miss_rate": 0.07320560480411782
+}

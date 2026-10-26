@@ -23,7 +23,7 @@ from .groups import (
     calc_order_factors,
     calc_trade_factors,
 )
-from .util import is_equity
+from .util import canonical_symbol, is_equity
 
 _log = logging.getLogger(__name__)
 _FILE_TYPES = ("行情", "逐笔成交", "逐笔委托")
@@ -36,16 +36,40 @@ _GROUP_SOURCES = {
 }
 
 
-def source_file_path(root: Path, date: str, code: str, ftype: str) -> Path | None:
-    """只认 CSV；不存在返回 None。"""
-    csv_path = Path(root) / str(date) / str(code) / f"{ftype}.csv"
-    if csv_path.is_file():
-        return csv_path
+def _usable_csv(path: Path) -> bool:
+    """存在且非 0 字节才当源文件。万得停牌占位常是空行情.csv。"""
+    try:
+        return path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def resolve_code_dir(day_dir: Path, code: str) -> str | None:
+    """按大小写不敏感找到真实目录名；没有则 None。"""
+    if not day_dir.is_dir():
+        return None
+    target = str(code).lower()
+    for child in day_dir.iterdir():
+        if child.is_dir() and child.name.lower() == target:
+            return child.name
     return None
 
 
+def source_file_path(root: Path, date: str, code: str, ftype: str) -> Path | None:
+    """只认非空 CSV；不存在或 0 字节返回 None。大小写不对时回退真实目录。"""
+    day_dir = Path(root) / str(date)
+    csv_path = day_dir / str(code) / f"{ftype}.csv"
+    if _usable_csv(csv_path):
+        return csv_path
+    actual = resolve_code_dir(day_dir, code)
+    if actual is None or actual == str(code):
+        return None
+    csv_path = day_dir / actual / f"{ftype}.csv"
+    return csv_path if _usable_csv(csv_path) else None
+
+
 def list_codes(books_root: Path, trade_date: str) -> list[str]:
-    """列出当日股票代码。"""
+    """列出当日股票代码（目录真名，供读文件）。"""
     day = Path(books_root) / str(trade_date)
     if not day.is_dir():
         return []
@@ -69,14 +93,18 @@ def load_symbol_frames(
     code: str,
     ftypes: tuple[str, ...] | list[str],
 ) -> dict[str, pd.DataFrame | None]:
-    """按类型读明细；缺文件为 None，避免把停牌误当成空表。"""
+    """按类型读明细；缺文件或空 CSV 为 None，避免把停牌误当成空表。"""
     frames: dict[str, pd.DataFrame | None] = {}
     for ftype in ftypes:
         path = source_file_path(books_root, trade_date, code, ftype)
         if path is None:
             frames[ftype] = None
             continue
-        frames[ftype] = _read_path(path, ftype)
+        try:
+            frames[ftype] = _read_path(path, ftype)
+        except pd.errors.EmptyDataError:
+            # 0 字节或无列表头：当缺源，不让一只坏行情打死成交。
+            frames[ftype] = None
     return frames
 
 
@@ -235,7 +263,9 @@ def _append_symbol_result(
     """把单股结果写入 rows/status_rows，返回 (ok_delta, fail_delta)。
 
     缺必要源文件记 skipped，不抬失败率，避免 2017 年停牌把整组打成 partial。
+    宽表/账本 symbol 用规范化代码，读文件仍用传入的目录真名。
     """
+    symbol = canonical_symbol(code)
     if result is None or _group_all_nan(result, columns):
         if (
             result is None
@@ -244,7 +274,7 @@ def _append_symbol_result(
         ):
             status_rows.append(
                 {
-                    "symbol": code,
+                    "symbol": symbol,
                     "factor_group": factor_group,
                     "status": "skipped",
                     "source_version": "",
@@ -253,20 +283,20 @@ def _append_symbol_result(
             return 0, 0
         status_rows.append(
             {
-                "symbol": code,
+                "symbol": symbol,
                 "factor_group": factor_group,
                 "status": "failed",
                 "source_version": "",
             }
         )
         return 0, 1
-    slim = {"trade_date": trade_date, "symbol": code}
+    slim = {"trade_date": trade_date, "symbol": symbol}
     for column in columns:
         slim[column] = result.get(column, float("nan"))
     rows.append(slim)
     status_rows.append(
         {
-            "symbol": code,
+            "symbol": symbol,
             "factor_group": factor_group,
             "status": "done",
             "source_version": "",

@@ -12,6 +12,7 @@ import pandas as pd
 
 from .catalog import FACTOR_VERSION, factor_ids, wide_columns
 from .r2_env import load_r2_env
+from .util import canonical_symbol
 
 _log = logging.getLogger(__name__)
 _uploader = None
@@ -76,11 +77,34 @@ def month_part_path(root: Path, yyyymm: str, *, factor_version: int = FACTOR_VER
     return root / version_segment(factor_version) / yyyymm[:4] / yyyymm / "part-000.parquet"
 
 
+def _coalesce_series(series: pd.Series):
+    """同一 key 多行时取最后一个非空，避免旧 .sh 空行盖住新值。"""
+    valid = series.dropna()
+    if valid.empty:
+        return series.iloc[-1]
+    return valid.iloc[-1]
+
+
+def canonicalize_panel(frame: pd.DataFrame | None, keys: list[str] | None = None) -> pd.DataFrame:
+    """symbol 统一成 .SH/.SZ，并把大小写重复行折成一行。"""
+    if frame is None or frame.empty or "symbol" not in frame.columns:
+        return frame if frame is not None else pd.DataFrame()
+    out = frame.copy()
+    out["symbol"] = [canonical_symbol(item) if pd.notna(item) else item for item in out["symbol"]]
+    if keys is None:
+        keys = ["trade_date", "symbol"] if "trade_date" in out.columns else ["symbol"]
+    keys = [key for key in keys if key in out.columns]
+    if not keys or not out.duplicated(subset=keys).any():
+        return out
+    grouped = out.groupby(keys, as_index=False, sort=False)
+    return grouped.agg({col: _coalesce_series for col in out.columns if col not in keys})
+
+
 def read_day(root: Path, trade_date: str, *, factor_version: int = FACTOR_VERSION) -> pd.DataFrame | None:
     path = day_path(root, trade_date, factor_version=factor_version)
     if not path.is_file():
         return None
-    return pd.read_parquet(path)
+    return canonicalize_panel(pd.read_parquet(path))
 
 
 def write_day(
@@ -97,6 +121,7 @@ def write_day(
         panel["trade_date"] = str(trade_date)
     if "symbol" not in panel.columns:
         raise ValueError("frame 缺少 symbol")
+    panel = canonicalize_panel(panel)
     for column in columns:
         if column not in panel.columns:
             panel[column] = float("nan")
@@ -114,11 +139,11 @@ def merge_group_columns(
     group_columns: list[str],
     trade_date: str,
 ) -> pd.DataFrame:
-    """按 symbol 合并一组新列到日宽表。"""
+    """按规范化 symbol 合并一组新列到日宽表。"""
     incoming = pd.DataFrame(rows)
     if incoming.empty:
         if existing is not None:
-            return existing
+            return canonicalize_panel(existing)
         empty = pd.DataFrame(columns=wide_columns())
         return empty
     incoming["trade_date"] = str(trade_date)
@@ -127,16 +152,18 @@ def merge_group_columns(
         if column not in incoming.columns and column not in ("trade_date", "symbol"):
             incoming[column] = float("nan")
     incoming = incoming[[c for c in keep if c in incoming.columns]]
+    incoming = canonicalize_panel(incoming)
 
     if existing is None or existing.empty:
         base = incoming
     else:
+        existing = canonicalize_panel(existing)
         base = existing.drop(columns=[c for c in group_columns if c in existing.columns], errors="ignore")
         base = base.merge(incoming, on=["trade_date", "symbol"], how="outer")
     for column in wide_columns():
         if column not in base.columns:
             base[column] = float("nan")
-    return base[wide_columns()]
+    return canonicalize_panel(base[wide_columns()])
 
 
 def write_status(
@@ -148,16 +175,16 @@ def write_status(
 ) -> Path:
     """写入/合并逐股×组状态。"""
     path = status_path(root, trade_date, factor_version=factor_version)
-    frame = pd.DataFrame(status_rows)
+    status_keys = ["symbol", "factor_group"]
+    frame = canonicalize_panel(pd.DataFrame(status_rows), keys=status_keys)
     if path.is_file() and not frame.empty:
-        old = pd.read_parquet(path)
+        old = canonicalize_panel(pd.read_parquet(path), keys=status_keys)
         # 同 symbol+group 覆盖
-        key = ["symbol", "factor_group"]
-        old = old.set_index(key)
-        frame = frame.set_index(key)
+        old = old.set_index(status_keys)
+        frame = frame.set_index(status_keys)
         old.update(frame)
         combined = pd.concat([old, frame[~frame.index.isin(old.index)]])
-        frame = combined.reset_index()
+        frame = canonicalize_panel(combined.reset_index(), keys=status_keys)
     elif frame.empty and path.is_file():
         return path
     temporary = path.with_suffix(".parquet.tmp")
