@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>收藏共同持仓</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="header">
+    <div>
+      <div class="title-row">
+        <h1>收藏共同持仓</h1>
+      </div>
+      <p class="meta" id="commonHoldMeta">加载中…</p>
+    </div>
+    <a class="btn ghost" href="/" rel="noopener">返回控制台</a>
+  </header>
+
+  <div class="controls">
+    <button type="button" id="btnCommonPrev" disabled>上一日</button>
+    <input type="date" id="commonHoldDate" />
+    <button type="button" id="btnCommonNext" disabled>下一日</button>
+    <div class="stats" id="commonHoldHint">正在计算共同持仓…</div>
+  </div>
+
+  <main class="page-main">
+    <section class="hold" id="commonHoldCard">
+      <h2>共同持仓 <span class="tag" id="commonHoldCount">—</span></h2>
+      <div class="table-wrap" id="commonHoldTableWrap">
+        <table>
+          <thead id="commonHoldHead">
+            <tr><th>代码</th><th>名称</th></tr>
+          </thead>
+          <tbody id="commonHoldBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="commonHoldEmpty">正在计算共同持仓…</div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      // 空字符串表示让服务端取并集末日
+      let commonHoldDate = "";
+
+      function toast(msg, isError = false) {
+        const el = $("toast");
+        el.hidden = false;
+        el.textContent = msg;
+        el.classList.toggle("error", !!isError);
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => {
+          el.hidden = true;
+        }, 4200);
+      }
+
+      async function api(path) {
+        const res = await fetch(path, { headers: { "Content-Type": "application/json" } });
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (_) {
+          data = { error: `HTTP ${res.status}` };
+        }
+        if (!res.ok) {
+          throw new Error((data && data.error) || `HTTP ${res.status}`);
+        }
+        return data;
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function showEmpty(text) {
+        $("commonHoldTableWrap").hidden = true;
+        const empty = $("commonHoldEmpty");
+        empty.hidden = false;
+        empty.textContent = text;
+      }
+
+      function showTable() {
+        $("commonHoldTableWrap").hidden = false;
+        $("commonHoldEmpty").hidden = true;
+      }
+
+      /** 拉取收藏结果的按日共同持仓。 */
+      async function refreshCommonHoldings(date) {
+        const hint = $("commonHoldHint");
+        $("btnCommonPrev").disabled = true;
+        $("btnCommonNext").disabled = true;
+        hint.hidden = false;
+        hint.textContent = "正在计算共同持仓…";
+        showEmpty("正在计算共同持仓…");
+        const params = new URLSearchParams();
+        if (date) params.set("date", date);
+        const qs = params.toString();
+        const data = await api(`/api/favorites/common-holdings${qs ? `?${qs}` : ""}`);
+        renderCommonHoldings(data);
+        return data;
+      }
+
+      /** 用接口数据渲染表；买入日列随当前收藏实验动态生成。 */
+      function renderCommonHoldings(data) {
+        const favs = data.favorites || [];
+        const range = data.range;
+        const date = data.date || "";
+        commonHoldDate = date;
+        const dateInput = $("commonHoldDate");
+        if (date) dateInput.value = date;
+        if (range && range.start && range.end) {
+          dateInput.min = range.start;
+          dateInput.max = range.end;
+        } else {
+          dateInput.removeAttribute("min");
+          dateInput.removeAttribute("max");
+        }
+
+        const bits = [];
+        bits.push(`<strong>${favs.length}</strong> 个收藏`);
+        if (date) bits.push(`当日共同 <strong>${data.n_common || 0}</strong> 只`);
+        if (range && range.start && range.end) {
+          bits.push(`${range.start} ~ ${range.end}`);
+        }
+        $("commonHoldMeta").innerHTML = bits.join(" · ");
+        $("commonHoldCount").textContent = `${data.n_common || 0} 只`;
+
+        const hint = $("commonHoldHint");
+        const holdings = data.holdings || [];
+        if (data.hint) {
+          hint.hidden = false;
+          hint.textContent = data.hint;
+        } else if (date && !holdings.length && favs.length >= 2) {
+          hint.hidden = false;
+          hint.textContent = "该日没有共同持仓";
+        } else {
+          hint.hidden = true;
+          hint.textContent = "";
+        }
+
+        $("btnCommonPrev").disabled = !data.prev_date;
+        $("btnCommonNext").disabled = !data.next_date;
+        $("btnCommonPrev").dataset.date = data.prev_date || "";
+        $("btnCommonNext").dataset.date = data.next_date || "";
+
+        const cols = favs.map((f) => f.exp_name);
+        $("commonHoldHead").innerHTML = `<tr><th>代码</th><th>名称</th>${cols
+          .map((c) => `<th>${escapeHtml(c)} 买入日</th>`)
+          .join("")}</tr>`;
+
+        if (favs.length < 2) {
+          showEmpty(data.hint || "至少收藏 2 个训练结果才能计算共同持仓");
+          return;
+        }
+        if (!holdings.length) {
+          showEmpty("该日没有共同持仓");
+          return;
+        }
+        showTable();
+        $("commonHoldBody").innerHTML = holdings
+          .map((h) => {
+            const cells = cols
+              .map((exp) => `<td class="buy-date">${escapeHtml((h.buy_dates && h.buy_dates[exp]) || "—")}</td>`)
+              .join("");
+            return `<tr><td>${escapeHtml(h.instrument)}</td><td>${escapeHtml(h.name || "")}</td>${cells}</tr>`;
+          })
+          .join("");
+      }
+
+      $("btnCommonPrev").addEventListener("click", () => {
+        const date = $("btnCommonPrev").dataset.date;
+        if (!date) return;
+        refreshCommonHoldings(date).catch((e) => toast(e.message, true));
+      });
+      $("btnCommonNext").addEventListener("click", () => {
+        const date = $("btnCommonNext").dataset.date;
+        if (!date) return;
+        refreshCommonHoldings(date).catch((e) => toast(e.message, true));
+      });
+      $("commonHoldDate").addEventListener("change", () => {
+        const date = $("commonHoldDate").value;
+        if (!date) return;
+        refreshCommonHoldings(date).catch((e) => toast(e.message, true));
+      });
+
+      refreshCommonHoldings(commonHoldDate).catch((e) => toast(e.message, true));
+    })();
+  </script>
+</body>
+</html>

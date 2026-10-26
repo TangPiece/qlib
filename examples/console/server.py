@@ -19,11 +19,11 @@ import subprocess
 import sys
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
-from urllib.parse import unquote, urlparse
+from typing import Any, Dict, List, Optional, Set, Tuple
+from urllib.parse import parse_qs, unquote, urlparse
 
 CONSOLE_DIR = Path(__file__).absolute().resolve().parent  # examples/console
 EXAMPLES_DIR = CONSOLE_DIR.parent
@@ -253,6 +253,11 @@ _jobs: Dict[str, Dict[str, Any]] = {}
 _active_job_id: Optional[str] = None
 # History delete touches the export file and mlruns together.
 _results_lock = threading.Lock()
+# 共同持仓按 (文件名, mtime) 缓存瘦结果，避免每次刷新都 json.load 上百 MB。
+_common_holdings_lock = threading.Lock()
+_common_holdings_cache: Optional[Dict[str, Any]] = None
+# 单文件 date→持仓 缓存；收藏增删时只重做交集。
+_day_holds_cache: Dict[Tuple[str, float], Dict[str, Dict[str, Dict[str, str]]]] = {}
 
 
 def _load_update_module():
@@ -812,6 +817,280 @@ def _resolve_result_file(filename: str) -> Path:
     return target
 
 
+def _favorite_position_files() -> List[Tuple[str, Path, float]]:
+    """当前仍存在的收藏 *_positions.json，按文件名排序。"""
+    out: List[Tuple[str, Path, float]] = []
+    for name in sorted(_load_favorites()):
+        if not name.endswith(_RESULT_JSON_SUFFIX):
+            continue
+        path = DATA_DIR / name
+        if not path.is_file():
+            continue
+        out.append((name, path, path.stat().st_mtime))
+    return out
+
+
+def _extract_day_holds(path: Path) -> Dict[str, Dict[str, Dict[str, str]]]:
+    """从一份导出 JSON 抽出 date → instrument → {name, buy_date}。
+
+    买入日优先用字段；缺省时沿用连续持有区间的首日（等价 count_day 往回数）。
+    """
+    with path.open("r", encoding="utf-8") as fh:
+        payload = json.load(fh)
+    days = payload.get("days") if isinstance(payload, dict) else None
+    if not isinstance(days, list):
+        return {}
+    out: Dict[str, Dict[str, Dict[str, str]]] = {}
+    last_buy: Dict[str, str] = {}
+    for day in days:
+        if not isinstance(day, dict):
+            continue
+        date = str(day.get("date") or "").strip()
+        if not _DATE_RE.match(date):
+            continue
+        today: Dict[str, Dict[str, str]] = {}
+        for item in day.get("hold") or []:
+            if not isinstance(item, dict):
+                continue
+            inst = str(item.get("instrument") or "").strip()
+            if not inst:
+                continue
+            buy = str(item.get("buy_date") or "").strip()
+            # 缺 buy_date 时：仍持有则沿用首日，否则把当天当买入日
+            if not _DATE_RE.match(buy):
+                buy = last_buy.get(inst) or date
+            today[inst] = {"name": str(item.get("name") or "").strip(), "buy_date": buy}
+        last_buy = {inst: info["buy_date"] for inst, info in today.items()}
+        out[date] = today
+    return out
+
+
+def _cached_day_holds(name: str, path: Path, mtime: float) -> Dict[str, Dict[str, Dict[str, str]]]:
+    """按 (文件名, mtime) 复用单文件持仓摘要；同文件旧 mtime 丢弃。"""
+    key = (name, mtime)
+    cached = _day_holds_cache.get(key)
+    if cached is not None:
+        return cached
+    holds = _extract_day_holds(path)
+    _day_holds_cache[key] = holds
+    for old in [item for item in _day_holds_cache if item[0] == name and item != key]:
+        _day_holds_cache.pop(old, None)
+    return holds
+
+
+def _live_book_path(positions_name: str) -> Path:
+    """与回测导出对应的 live_book 路径。"""
+    return DATA_DIR / f"{_result_exp_name(positions_name)}_live_book.json"
+
+
+def _merge_live_book_holds(
+    holds: Dict[str, Dict[str, Dict[str, str]]],
+    book_path: Path,
+) -> Dict[str, Dict[str, Dict[str, str]]]:
+    """把 live_book 的 hold 追加到回测摘要；已有日期不覆盖。"""
+    if not book_path.is_file():
+        return holds
+    try:
+        with book_path.open("r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+    except Exception:  # noqa: BLE001
+        return holds
+    days = payload.get("days") if isinstance(payload, dict) else None
+    if not isinstance(days, list):
+        return holds
+    merged = dict(holds)
+    last_buy: Dict[str, str] = {}
+    for day in days:
+        if not isinstance(day, dict):
+            continue
+        date = str(day.get("date") or "").strip()
+        if not _DATE_RE.match(date) or date in merged:
+            continue
+        today: Dict[str, Dict[str, str]] = {}
+        for item in day.get("hold") or []:
+            if not isinstance(item, dict):
+                continue
+            inst = str(item.get("instrument") or "").strip()
+            if not inst:
+                continue
+            buy = str(item.get("buy_date") or "").strip()
+            if not _DATE_RE.match(buy):
+                buy = last_buy.get(inst) or date
+            today[inst] = {"name": str(item.get("name") or "").strip(), "buy_date": buy}
+        last_buy = {inst: info["buy_date"] for inst, info in today.items()}
+        merged[date] = today
+    return merged
+
+
+def _common_holdings_cache_key(
+    files: List[Tuple[str, Path, float]],
+) -> Tuple[Tuple[str, float, float], ...]:
+    """收藏文件 + 对应 live_book 的 mtime，账本更新后失效。"""
+    parts: List[Tuple[str, float, float]] = []
+    for name, _path, mtime in files:
+        book = _live_book_path(name)
+        book_mtime = book.stat().st_mtime if book.is_file() else 0.0
+        parts.append((name, mtime, book_mtime))
+    return tuple(parts)
+
+
+def _build_common_holdings_index() -> Dict[str, Any]:
+    """缓存各收藏的按日持仓摘要（含 live_book）；当天交集按需算。"""
+    files = _favorite_position_files()
+    cache_key = _common_holdings_cache_key(files)
+    favorites = [{"filename": name, "exp_name": _result_exp_name(name)} for name, _path, _mtime in files]
+    empty = {
+        "key": cache_key,
+        "favorites": favorites,
+        "range": None,
+        "per_file": [],
+        "hint": "至少收藏 2 个训练结果才能计算共同持仓",
+    }
+    if len(files) < 2:
+        return empty
+
+    per_file: List[Tuple[str, Dict[str, Dict[str, Dict[str, str]]]]] = []
+    loaded_favs: List[Dict[str, str]] = []
+    skipped: List[str] = []
+    for name, path, _mtime in files:
+        try:
+            holds = _cached_day_holds(name, path, _mtime)
+        except Exception:  # noqa: BLE001
+            skipped.append(name)
+            continue
+        exp_name = _result_exp_name(name)
+        holds = _merge_live_book_holds(holds, _live_book_path(name))
+        per_file.append((exp_name, holds))
+        loaded_favs.append({"filename": name, "exp_name": exp_name})
+    if len(per_file) < 2:
+        hint = "至少收藏 2 个训练结果才能计算共同持仓"
+        if skipped:
+            hint = f"有 {len(skipped)} 个收藏文件无法读取，有效结果不足 2 个"
+        return {
+            "key": cache_key,
+            "favorites": loaded_favs,
+            "range": None,
+            "per_file": [],
+            "hint": hint,
+        }
+
+    # 并集起止，只给日期框和默认末日用，不预扫每天交集
+    all_dates: List[str] = []
+    for _exp, holds in per_file:
+        all_dates.extend(holds.keys())
+    dates = sorted(all_dates)
+    hint = None
+    if skipped:
+        hint = f"已跳过无法读取的 {len(skipped)} 个收藏文件"
+    elif not dates:
+        hint = "收藏结果没有持仓日期"
+    return {
+        "key": cache_key,
+        "favorites": loaded_favs,
+        "range": {"start": dates[0], "end": dates[-1]} if dates else None,
+        "per_file": per_file,
+        "hint": hint,
+    }
+
+
+def _common_holdings_index() -> Dict[str, Any]:
+    """返回缓存的共同持仓索引；收藏、导出或 live_book 变更后重建。"""
+    global _common_holdings_cache
+    files = _favorite_position_files()
+    cache_key = _common_holdings_cache_key(files)
+    with _common_holdings_lock:
+        cached = _common_holdings_cache
+        if cached and cached.get("key") == cache_key:
+            return cached
+        built = _build_common_holdings_index()
+        _common_holdings_cache = built
+        return built
+
+
+def _shift_iso_date(day: str, delta_days: int) -> str:
+    """自然日加减；day 必须是 YYYY-MM-DD。"""
+    dt = datetime.strptime(day, "%Y-%m-%d").date()
+    return (dt + timedelta(days=delta_days)).isoformat()
+
+
+def _holdings_on_date(
+    per_file: List[Tuple[str, Dict[str, Dict[str, Dict[str, str]]]]],
+    date: str,
+) -> List[Dict[str, Any]]:
+    """某一自然日：所有收藏 hold.instrument 的交集；缺当天数据视为空仓。"""
+    if not per_file:
+        return []
+    inst_sets = [set((holds.get(date) or {}).keys()) for _exp, holds in per_file]
+    common_inst = set.intersection(*inst_sets)
+    holdings: List[Dict[str, Any]] = []
+    for inst in sorted(common_inst):
+        buy_dates: Dict[str, str] = {}
+        name = ""
+        for exp, holds in per_file:
+            info = (holds.get(date) or {}).get(inst) or {}
+            buy_dates[exp] = info.get("buy_date") or ""
+            if not name and info.get("name"):
+                name = info["name"]
+        holdings.append({"instrument": inst, "name": name, "buy_dates": buy_dates})
+    return holdings
+
+
+def _common_holdings_payload(raw_date: str) -> Dict[str, Any]:
+    """组装共同持仓接口：只算选定自然日，翻页为 ±1 天。"""
+    date = (raw_date or "").strip()
+    if date and not _DATE_RE.match(date):
+        raise ValueError("date must be YYYY-MM-DD")
+    index = _common_holdings_index()
+    favorites = list(index.get("favorites") or [])
+    range_info = index.get("range")
+    hint = index.get("hint")
+    per_file = list(index.get("per_file") or [])
+
+    today = datetime.now().date().isoformat()
+    if range_info:
+        range_info = {
+            "start": range_info["start"],
+            "end": max(range_info["end"], today),
+        }
+    if len(favorites) < 2 or not range_info:
+        return {
+            "favorites": favorites,
+            "range": range_info,
+            "date": date or today,
+            "prev_date": None,
+            "next_date": None,
+            "n_common": 0,
+            "holdings": [],
+            "hint": hint or "至少收藏 2 个训练结果才能计算共同持仓",
+        }
+
+    # 未指定日期时默认今天，可往回翻到数据最早日
+    chosen = date if date else today
+    holdings = _holdings_on_date(per_file, chosen)
+    start = range_info["start"]
+    end = range_info["end"]
+    prev_date = _shift_iso_date(chosen, -1)
+    next_date = _shift_iso_date(chosen, 1)
+    if prev_date < start:
+        prev_date = None
+    # 超过今天不能再往后翻
+    if next_date > today:
+        next_date = None
+    day_hint = hint
+    if not holdings and not day_hint:
+        day_hint = "该日没有共同持仓"
+    return {
+        "favorites": favorites,
+        "range": range_info,
+        "date": chosen,
+        "prev_date": prev_date,
+        "next_date": next_date,
+        "n_common": len(holdings),
+        "holdings": holdings,
+        "hint": day_hint,
+    }
+
+
 def _read_meta_name(exp_dir: Path) -> Optional[str]:
     """Read the experiment name from an MLflow file-store meta.yaml."""
     meta = exp_dir / "meta.yaml"
@@ -1077,8 +1356,6 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
         path = unquote(parsed.path)
 
         if path == "/api/status":
-            from urllib.parse import parse_qs
-
             qs = parse_qs(parsed.query)
             model = (qs.get("model") or [DEFAULT_ROLLING_MODEL_ID])[0]
             configs = _rolling_configs(model if model in ROLLING_MODELS else DEFAULT_ROLLING_MODEL_ID)
@@ -1103,6 +1380,15 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             _json_response(self, 200, {"results": _list_results()})
             return
 
+        if path == "/api/favorites/common-holdings":
+            qs = parse_qs(parsed.query)
+            raw_date = (qs.get("date") or [""])[0].strip()
+            try:
+                _json_response(self, 200, _common_holdings_payload(raw_date))
+            except Exception as exc:  # noqa: BLE001
+                _json_response(self, 400, {"error": str(exc)})
+            return
+
         if path.startswith("/api/jobs/"):
             job_id = path[len("/api/jobs/") :].strip("/")
             snap = _job_snapshot(job_id)
@@ -1115,6 +1401,9 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
 
         if path == "/positions_view.html":
             return self._serve_file(CONSOLE_DIR / "positions_view.html", "text/html; charset=utf-8")
+
+        if path == "/common_holdings.html":
+            return self._serve_file(CONSOLE_DIR / "common_holdings.html", "text/html; charset=utf-8")
 
         if path.startswith("/static/"):
             rel = path[len("/static/") :]
