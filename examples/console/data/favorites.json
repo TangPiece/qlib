@@ -1,9 +1,9 @@
 {
   "filenames": [
     "ADARNN_Alpha360_rolling_7y1y_20261018_positions.json",
+    "LightGBM_Alpha158_rolling_7y1y_1m_20261029_positions.json",
     "LightGBM_Alpha158_rolling_7y1y_20261019_positions.json",
     "LightGBM_Alpha158_rolling_7y1y_20261021_positions.json",
-    "XGBoost_Alpha158_rolling_7y1y_20261020_positions.json",
-    "rolling_lgb_7y1y_20261016_positions.json"
+    "XGBoost_Alpha158_rolling_7y1y_20261020_positions.json"
   ]
 }
