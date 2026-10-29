@@ -8,6 +8,9 @@
   let jobBusy = false;
   // 切换滚动模型时强制用 status.configs 重建左侧下拉
   let lastRollingModelId = null;
+  // 同一配置下用户改过 horizon 后，状态刷新不再覆盖
+  let horizonTouched = false;
+  let lastHorizonKey = "";
 
   function toast(msg, isError = false) {
     const el = $("toast");
@@ -188,6 +191,20 @@
     sel.dataset.ready = "1";
   }
 
+  /** 切换工作流 YAML 时写入该文件的 horizon；同一配置下保留用户刚改的数字。 */
+  function applyStatusHorizon(data) {
+    const input = $("horizon");
+    if (!input || !isRollingModel() || data.horizon == null) return;
+    const key = `${data.model || ""}:${data.config_key || ""}`;
+    if (key !== lastHorizonKey) {
+      lastHorizonKey = key;
+      horizonTouched = false;
+    }
+    if (!horizonTouched) {
+      input.value = String(data.horizon);
+    }
+  }
+
   function renderStatus(data) {
     $("stToday").textContent = data.today || "—";
     const cal = data.calendar || {};
@@ -225,6 +242,8 @@
         fillConfigSelect(data.configs, data.config_key);
       }
     }
+
+    applyStatusHorizon(data);
 
     if (data.today && !$("endDate").value) {
       $("endDate").value = data.today;
@@ -475,6 +494,10 @@
       .finally(() => {
         btn.disabled = false;
       });
+  });
+
+  $("horizon").addEventListener("input", () => {
+    horizonTouched = true;
   });
 
   $("configSelect").addEventListener("change", () => {

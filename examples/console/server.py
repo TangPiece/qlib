@@ -89,7 +89,12 @@ ROLLING_MODELS: Dict[str, Dict[str, Any]] = {
         dataset="Alpha158",
         yaml_names={
             "7y1y": "workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml",
+            "7y1y_1m": "workflow_config_lightgbm_Alpha158_rolling_7y1y_1m.yaml",
             "7y1y_10000w": "workflow_config_lightgbm_Alpha158_rolling_7y1y_10000w.yaml",
+        },
+        # 20 日预测实验名与隔日 7y1y 分开
+        exp_prefixes={
+            "7y1y_1m": "LightGBM_Alpha158_rolling_7y1y_1m",
         },
         use_omp=True,
     ),
@@ -531,6 +536,19 @@ def _resolve_config(key_or_path: Optional[str], model_id: Optional[str] = None) 
     if not path.exists():
         raise FileNotFoundError(f"config not found: {path}")
     return path
+
+
+def _yaml_horizon(config_path: Path, fallback: int) -> int:
+    """读取 yaml 顶层 horizon；缺失或非法时用模型默认值。"""
+    if not config_path.is_file():
+        return fallback
+    text = config_path.read_text(encoding="utf-8", errors="replace")
+    # 只认文件顶层，避免注释或嵌套字段里的数字
+    match = re.search(r"(?m)^horizon:\s*(\d+)\s*$", text)
+    if not match:
+        return fallback
+    value = int(match.group(1))
+    return value if value >= 1 else fallback
 
 
 def _parse_yaml_ends(config_path: Path) -> Dict[str, Optional[str]]:
@@ -1316,6 +1334,8 @@ def _status_payload(
         yaml_out = None
         configs_out = {k: str(v.relative_to(REPO_ROOT)) for k, v in configs.items()}
         exp_prefixes_out = dict(ROLLING_MODELS[model_id].get("exp_prefixes") or {})
+        horizon_fallback = int(ROLLING_MODELS[model_id].get("default_horizon") or 1)
+        horizon_out = _yaml_horizon(config_path, horizon_fallback)
     else:
         config_path = _resolve_official_yaml(model_id, yaml_name or "")
         resolved_key = None
@@ -1325,12 +1345,14 @@ def _status_payload(
             for k, v in _rolling_configs(DEFAULT_ROLLING_MODEL_ID).items()
         }
         exp_prefixes_out = {}
+        horizon_out = 1
     cal = _calendar_bounds()
     active = _get_active()
     return {
         "today": datetime.now().date().isoformat(),
         "calendar": cal,
         "config_key": resolved_key,
+        "horizon": horizon_out,
         "model": model_id,
         "yaml": yaml_out,
         "config_path": str(config_path.relative_to(REPO_ROOT)),

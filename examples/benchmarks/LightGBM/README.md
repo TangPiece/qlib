@@ -13,6 +13,19 @@
 - 滚动重训：7 年训练 + 1 年验证，再预测约 2 年窗口；首窗自 **2008-01-01** 起。
 - 通过 [`rolling_7y1y.py`](rolling_7y1y.py) 运行；`end_time` 由每日更新脚本写成**当天日期**（见下文「每日更新」）；本地 `cn_data` 可能略滞后。
 
+`workflow_config_lightgbm_Alpha158_rolling_7y1y_1m.yaml`
+- 训练/验证切分与上面的 7y1y 相同，特征仍是完整 Alpha158。
+- 预测未来约 20 个交易日（顶层 `horizon: 20`，标签 `Ref($close, -21) / Ref($close, -1) - 1`）。
+- 不设置 `hold_thresh`，满 1 个交易日即可卖，每天仍可换 1 只。
+- 命令行可不传 `--horizon`（以 yaml 为准）。控制台左侧选 `7y1y_1m`。
+
+```bash
+.venv/bin/python examples/benchmarks/LightGBM/rolling_7y1y.py \
+  --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y1y_1m.yaml \
+  --exp_name=LightGBM_Alpha158_rolling_7y1y_1m_$(date +%Y%m%d) \
+  run
+```
+
 ---
 
 # 本地控制台（页面操作）

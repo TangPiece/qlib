@@ -50,12 +50,46 @@ def compute_step_2y(step_start: str = STEP_START, step_end: str = STEP_END) -> i
     return step
 
 
-def load_qlib_init(conf_path: Path) -> dict:
-    """从滚动 yaml 读取 qlib_init（Rolling 基类会忽略该段，需手动 auto_init）。"""
-    with conf_path.open("r") as f:
+def load_conf(conf_path: Path) -> dict:
+    """读取滚动 yaml；文件不存在或为空时返回空 dict。"""
+    path = Path(conf_path)
+    if not path.is_file():
+        return {}
+    with path.open("r") as f:
         yaml = YAML(typ="safe", pure=True)
         conf = yaml.load(f) or {}
-    return dict(conf.get("qlib_init") or {})
+    return dict(conf) if isinstance(conf, dict) else {}
+
+
+def load_qlib_init(conf_path: Path) -> dict:
+    """从滚动 yaml 读取 qlib_init（Rolling 基类会忽略该段，需手动 auto_init）。"""
+    return dict(load_conf(conf_path).get("qlib_init") or {})
+
+
+def explicit_horizon_from_argv() -> Optional[int]:
+    """命令行显式传入的 horizon；未传则返回 None，交给 yaml。"""
+    argv = sys.argv[1:]
+    for i, arg in enumerate(argv):
+        if arg.startswith("--horizon="):
+            return int(arg.split("=", 1)[1])
+        # fire 也接受 --horizon 20 / horizon 20
+        if arg in ("--horizon", "horizon") and i + 1 < len(argv) and not str(argv[i + 1]).startswith("-"):
+            return int(argv[i + 1])
+    return None
+
+
+def load_yaml_horizon(conf_path: Path) -> Optional[int]:
+    """读取 yaml 顶层 horizon（交易日）。没有该字段或非法时返回 None。"""
+    raw = load_conf(conf_path).get("horizon")
+    if raw is None:
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if value < 1:
+        return None
+    return value
 
 
 def resolve_conf_path_from_argv(default_conf: Path, env_key: str = "ROLLING_CONF") -> Path:
@@ -169,14 +203,25 @@ def make_rolling_cli(
             step: Optional[int] = None,
             **kwargs,
         ) -> None:
+            # 显式 --horizon 优先；否则用 yaml 顶层 horizon，没有则保持默认（隔日为 1）
+            cli_horizon = explicit_horizon_from_argv()
+            yaml_horizon = None if cli_horizon is not None else load_yaml_horizon(conf_path)
+            if cli_horizon is not None:
+                resolved_horizon = cli_horizon
+            elif yaml_horizon is not None:
+                resolved_horizon = yaml_horizon
+            else:
+                resolved_horizon = horizon
             super().__init__(
                 conf_path=conf_path,
                 exp_name=exp_name,
-                horizon=horizon,
+                horizon=resolved_horizon,
                 step=step,
                 override_label=override_label,
                 **kwargs,
             )
+            if yaml_horizon is not None:
+                self.logger.info(f"Using horizon={resolved_horizon} from yaml (CLI --horizon not set)")
 
     if set_omp_threads:
         # macOS 上 joblib fork 后多线程 OpenMP 易 SIGSEGV；训练前锁定单线程

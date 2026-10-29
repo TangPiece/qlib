@@ -38,6 +38,8 @@ DIRNAME = Path(__file__).absolute().resolve().parent
 DEFAULT_QLIB_DIR = Path("~/.qlib/qlib_data/cn_data").expanduser()
 DEFAULT_CONFIGS = [
     DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml",
+    # 20 日预测配置的结束日与隔日配置一起写成当天
+    DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y1y_1m.yaml",
     DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y1y_ind_weight.yaml",
 ]
 DOWNLOAD_URL = (
