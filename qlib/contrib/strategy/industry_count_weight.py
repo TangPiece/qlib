@@ -20,7 +20,7 @@ import pandas as pd
 
 from qlib.backtest.decision import Order, OrderDir, TradeDecisionWO
 from qlib.backtest.position import Position
-from qlib.contrib.strategy.signal_strategy import TopkDropoutStrategy
+from qlib.contrib.strategy.signal_strategy import TopkDropoutStrategy, limit_trade_direction
 from qlib.log import get_module_logger
 
 DIRNAME = Path(__file__).absolute().resolve()
@@ -146,7 +146,7 @@ class IndustryCountWeightStrategy(TopkDropoutStrategy):
         return {code: float(budget * w) for code, w in zip(buy, weights)}
 
     def generate_trade_decision(self, execute_result=None):
-        # Same selection logic as TopkDropoutStrategy; only buy cash split differs.
+        # 选股与 TopkDropout 共用；只改新买入的现金切分。
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
         pred_start_time, pred_end_time = self.trade_calendar.get_step_time(trade_step, shift=1)
@@ -156,87 +156,20 @@ class IndustryCountWeightStrategy(TopkDropoutStrategy):
         if pred_score is None:
             return TradeDecisionWO([], self)
 
-        if self.only_tradable:
-
-            def get_first_n(li, n, reverse=False):
-                cur_n = 0
-                res = []
-                for si in reversed(li) if reverse else li:
-                    if self.trade_exchange.is_stock_tradable(
-                        stock_id=si, start_time=trade_start_time, end_time=trade_end_time
-                    ):
-                        res.append(si)
-                        cur_n += 1
-                        if cur_n >= n:
-                            break
-                return res[::-1] if reverse else res
-
-            def get_last_n(li, n):
-                return get_first_n(li, n, reverse=True)
-
-            def filter_stock(li):
-                return [
-                    si
-                    for si in li
-                    if self.trade_exchange.is_stock_tradable(
-                        stock_id=si, start_time=trade_start_time, end_time=trade_end_time
-                    )
-                ]
-
-        else:
-
-            def get_first_n(li, n):
-                return list(li)[:n]
-
-            def get_last_n(li, n):
-                return list(li)[-n:]
-
-            def filter_stock(li):
-                return li
-
         current_temp: Position = copy.deepcopy(self.trade_position)
         sell_order_list = []
         buy_order_list = []
         cash = current_temp.get_cash()
         current_stock_list = current_temp.get_stock_list()
-        last = pred_score.reindex(current_stock_list).sort_values(ascending=False).index
-
-        if self.method_buy == "top":
-            today = get_first_n(
-                pred_score[~pred_score.index.isin(last)].sort_values(ascending=False).index,
-                self.n_drop + self.topk - len(last),
-            )
-        elif self.method_buy == "random":
-            topk_candi = get_first_n(pred_score.sort_values(ascending=False).index, self.topk)
-            candi = list(filter(lambda x: x not in last, topk_candi))
-            n = self.n_drop + self.topk - len(last)
-            try:
-                today = np.random.choice(candi, n, replace=False)
-            except ValueError:
-                today = candi
-        else:
-            raise NotImplementedError("This type of input is not supported")
-
-        comb = pred_score.reindex(last.union(pd.Index(today))).sort_values(ascending=False).index
-
-        if self.method_sell == "bottom":
-            sell = last[last.isin(get_last_n(comb, self.n_drop))]
-        elif self.method_sell == "random":
-            candi = filter_stock(last)
-            try:
-                sell = pd.Index(np.random.choice(candi, self.n_drop, replace=False) if len(last) else [])
-            except ValueError:
-                sell = candi
-        else:
-            raise NotImplementedError("This type of input is not supported")
-
-        buy = today[: len(sell) + self.topk - len(last)]
+        _today, sell, buy, _slot_last = self._select_buy_sell(
+            pred_score, current_stock_list, trade_start_time, trade_end_time
+        )
         for code in current_stock_list:
             if not self.trade_exchange.is_stock_tradable(
                 stock_id=code,
                 start_time=trade_start_time,
                 end_time=trade_end_time,
-                direction=None if self.forbid_all_trade_at_limit else OrderDir.SELL,
+                direction=limit_trade_direction(self.forbid_all_trade_at_limit, OrderDir.SELL),
             ):
                 continue
             if code in sell:
@@ -267,7 +200,7 @@ class IndustryCountWeightStrategy(TopkDropoutStrategy):
                 stock_id=code,
                 start_time=trade_start_time,
                 end_time=trade_end_time,
-                direction=None if self.forbid_all_trade_at_limit else OrderDir.BUY,
+                direction=limit_trade_direction(self.forbid_all_trade_at_limit, OrderDir.BUY),
             ):
                 continue
             value = buy_values.get(code, 0.0)

@@ -38,7 +38,9 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import qlib
+from qlib.backtest.account import WRITE_OFF_MISSING_BARS
 from qlib.constant import REG_CN
+from qlib.contrib.strategy.signal_strategy import plan_topk_dropout
 from qlib.data import D
 from qlib.workflow import R
 from qlib.workflow.online.utils import OnlineToolR
@@ -665,6 +667,76 @@ def _upsert_live_book_day(
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"wrote live_book {path} date={execute_date} n_hold={len(holdings)}")
 
+def _lookback_calendar(asof: pd.Timestamp, n_bars: int) -> List[pd.Timestamp]:
+    """信号日往前（含当日）最多 n_bars 个已落地交易日。"""
+    asof = pd.Timestamp(asof).normalize()
+    cal = D.calendar(end_time=asof, freq="day", future=False)
+    if cal is None or len(cal) == 0:
+        return []
+    days = [pd.Timestamp(d).normalize() for d in cal if pd.Timestamp(d).normalize() <= asof]
+    return days[-n_bars:]
+
+
+def _market_has_close(asof: pd.Timestamp) -> bool:
+    """基准当日是否有 $close，用来挡住行情未到的整批下账。"""
+    asof = pd.Timestamp(asof).normalize()
+    try:
+        df = D.features(["SH000300"], ["$close"], asof, asof, freq="day")
+    except Exception:  # noqa: BLE001
+        return False
+    if df is None or df.empty:
+        return False
+    return bool(df["$close"].notna().any())
+
+
+def live_write_offs(
+    holdings: Sequence[str],
+    asof: pd.Timestamp,
+    *,
+    missing_bars: int = WRITE_OFF_MISSING_BARS,
+) -> List[str]:
+    """与回测相同：连续 missing_bars 日都无 $close 行才下账。不因 pred 缺票下账。"""
+    codes = [str(c) for c in holdings]
+    if not codes:
+        return []
+    if not _market_has_close(asof):
+        return []
+    days = _lookback_calendar(asof, missing_bars)
+    if len(days) < missing_bars:
+        return []
+    try:
+        df = D.features(codes, ["$close"], days[0], days[-1], freq="day")
+    except Exception:  # noqa: BLE001
+        return []
+    present: Dict[str, set] = {c: set() for c in codes}
+    if df is not None and not df.empty:
+        close = df["$close"]
+        # 有行即算（含 NaN 停牌行），对齐回测 close is not None
+        for key, _val in close.items():
+            if isinstance(key, tuple) and len(key) >= 2:
+                inst, dt = key[0], key[1]
+            else:
+                continue
+            present.setdefault(str(inst), set()).add(pd.Timestamp(dt).normalize())
+    day_set = set(days)
+    return [c for c in codes if not (present.get(c) or set()) & day_set]
+
+
+def live_close_tradable_set(close_df) -> set:
+    """从当日 ``$close`` 抽出非空收盘的代码。无行或 NaN 视为停牌，不可交易。"""
+    if close_df is None or getattr(close_df, "empty", True):
+        return set()
+    if "$close" not in close_df.columns:
+        return set()
+    out = set()
+    for key, val in close_df["$close"].items():
+        if not isinstance(key, tuple) or len(key) < 2:
+            continue
+        if pd.notna(val):
+            out.add(str(key[0]))
+    return out
+
+
 def topk_dropout_actions(
     pred_score: pd.Series,
     current_holdings: Sequence[str],
@@ -673,28 +745,48 @@ def topk_dropout_actions(
     n_drop: int = DEFAULT_N_DROP,
     hold_thresh: int = DEFAULT_HOLD_THRESH,
     count_day: Optional[Dict[str, int]] = None,
-) -> Tuple[List[str], List[str], List[str]]:
-    """Mirror TopkDropoutStrategy (method_buy=top, method_sell=bottom) without exchange checks."""
+    write_offs: Optional[Sequence[str]] = None,
+    is_tradable=None,
+) -> Tuple[List[str], List[str], List[str], List[str]]:
+    """镜像回测 TopkDropout。write_offs 须由行情谓词给出，不是「不在 pred 里」。"""
     count_day = count_day or {}
-    score = pred_score.astype(float).dropna()
-    held = [c for c in current_holdings if c in score.index]
-    last = score.reindex(held).sort_values(ascending=False).index
-    n_buy_candi = n_drop + topk - len(last)
-    today = list(score[~score.index.isin(last)].sort_values(ascending=False).index)
-    if n_buy_candi > 0:
-        today = today[:n_buy_candi]
-    else:
-        today = []
-    comb = score.reindex(last.union(pd.Index(today))).sort_values(ascending=False).index
-    sell_candi = last[last.isin(list(comb)[-n_drop:])] if n_drop > 0 else pd.Index([])
-    sells: List[str] = []
-    for code in sell_candi:
-        if count_day.get(code, hold_thresh) < hold_thresh:
-            continue
-        sells.append(str(code))
-    buys = [str(c) for c in today[: len(sells) + topk - len(last)]]
-    holds = [str(c) for c in held if c not in sells]
-    return buys, sells, holds
+    off = [str(c) for c in (write_offs or [])]
+    off_set = set(off)
+    held = [str(c) for c in current_holdings if str(c) not in off_set]
+    score = pred_score.astype(float)
+    pred_index = set(score.dropna().index.astype(str))
+
+    def _default_tradable(code, direction=None):
+        del direction
+        return str(code) in pred_index
+
+    tradable = is_tradable or _default_tradable
+
+    def get_first_n(li, n):
+        return list(li)[: max(0, n)]
+
+    def get_last_n(li, n):
+        return [] if n <= 0 else list(li)[-n:]
+
+    def filter_stock(li):
+        return [c for c in li if tradable(c)]
+
+    _today, sell, buy, _slot = plan_topk_dropout(
+        score,
+        held,
+        topk=topk,
+        n_drop=n_drop,
+        method_buy="top",
+        method_sell="bottom",
+        get_first_n=get_first_n,
+        get_last_n=get_last_n,
+        filter_stock=filter_stock,
+        is_tradable=tradable,
+    )
+    sells = [str(c) for c in sell if count_day.get(str(c), hold_thresh) >= hold_thresh]
+    buys = [str(c) for c in buy]
+    holds = [c for c in held if c not in sells]
+    return buys, sells, holds, off
 
 
 def _item(code: str, score: Optional[float], name_map: Dict[str, str]) -> Dict[str, Any]:
@@ -937,13 +1029,31 @@ def run(
         out_dir=out_dir, safe=safe, exp_name=exp_name, asof=signal_ts
     )
 
-    buys, sells, holds = topk_dropout_actions(
+    write_offs = live_write_offs(holdings, signal_ts)
+    # 持仓 ∪ 有分数的票都查收盘：买入候选也要过停牌谓词
+    quote_codes = list(dict.fromkeys(list(holdings) + [str(c) for c in scores.dropna().index]))
+    close_today: set = set()
+    try:
+        if quote_codes:
+            close_df = D.features(quote_codes, ["$close"], signal_ts, signal_ts, freq="day")
+            close_today = live_close_tradable_set(close_df)
+    except Exception:  # noqa: BLE001
+        close_today = set()
+
+    def _is_tradable(code, direction=None):
+        del direction
+        # 对齐回测停牌：无行或 NaN $close 不可交易；仅有 pred 分数不够
+        return str(code) in close_today
+
+    buys, sells, holds, write_offs = topk_dropout_actions(
         scores,
         holdings,
         topk=topk,
         n_drop=n_drop,
         hold_thresh=hold_thresh,
         count_day=count_day,
+        write_offs=write_offs,
+        is_tradable=_is_tradable,
     )
 
     book_rolled = False
@@ -983,6 +1093,8 @@ def run(
         note += " （跳过了 update_online_pred，使用已有 pred.pkl。）"
     if reset_book:
         note += " （本轮已 --reset_book，从回测仓重开。）"
+    if write_offs:
+        note += f" 已下账连续 {WRITE_OFF_MISSING_BARS} 日无 $close 的持仓 {write_offs}，不再结转。"
 
     payload = {
         "exp_name": exp_name,
@@ -1007,6 +1119,7 @@ def run(
         "buys": [_item(c, score_map.get(c), name_map) for c in buys],
         "sells": [_item(c, score_map.get(c), name_map) for c in sells],
         "holds": [_item(c, score_map.get(c), name_map) for c in holds],
+        "write_offs": [_item(c, None, name_map) for c in write_offs],
         "note": note,
     }
 
@@ -1014,7 +1127,7 @@ def run(
     print(f"wrote {out_path}")
     print(
         f"book_tip={book_tip} signal_date={signal_date} execute_date={execute_date} "
-        f"buy={len(buys)} sell={len(sells)} hold={len(holds)} "
+        f"buy={len(buys)} sell={len(sells)} hold={len(holds)} write_off={len(write_offs)} "
         f"pred_updated={updated} holdings_source={holdings_source} book_rolled={book_rolled}"
     )
     return out_path

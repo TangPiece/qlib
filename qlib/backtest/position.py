@@ -130,6 +130,13 @@ class BasePosition:
         """
         raise NotImplementedError(f"Please implement the `get_stock_amount` method")
 
+    def write_off_stock(self, stock_id: str) -> float:
+        """按最后盯市价把持仓兑成现金并下账（无交易成本）。
+
+        用于已离开行情表、无法撮合的退市/摘牌股。返回兑出金额。
+        """
+        raise NotImplementedError(f"Please implement the `write_off_stock` method")
+
     def get_cash(self, include_settle: bool = False) -> float:
         """
         Parameters
@@ -384,6 +391,21 @@ class Position(BasePosition):
     def _del_stock(self, stock_id: str) -> None:
         del self.position[stock_id]
 
+    def write_off_stock(self, stock_id: str) -> float:
+        """按最后盯市价兑成现金并下账，无交易成本。价格缺失或非正则视为 0。"""
+        if stock_id not in self.position or not isinstance(self.position.get(stock_id), dict):
+            raise KeyError("{} not in current position".format(stock_id))
+        amount = float(self.position[stock_id]["amount"])
+        raw_price = self.position[stock_id].get("price")
+        price = 0.0 if raw_price is None else float(raw_price)
+        if np.isnan(price) or price <= 0:
+            self._del_stock(stock_id)
+            return 0.0
+        trade_val = amount * price
+        # 复用卖出路径以尊重 cash / cash_delay；cost=0 因为无法撮合
+        self._sell_stock(stock_id, trade_val, cost=0.0, trade_price=price)
+        return trade_val
+
     def check_stock(self, stock_id: str) -> bool:
         return stock_id in self.position
 
@@ -517,6 +539,9 @@ class InfPosition(BasePosition):
 
     def update_order(self, order: Order, trade_val: float, cost: float, trade_price: float) -> None:
         pass
+
+    def write_off_stock(self, stock_id: str) -> float:
+        return 0.0
 
     def update_stock_price(self, stock_id: str, price: float) -> None:
         pass

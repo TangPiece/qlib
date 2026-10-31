@@ -416,6 +416,11 @@ class NestedExecutor(BaseExecutor):
         # - more detailed information will be set into trade decision
         self._init_sub_trading(trade_decision)
 
+        # 只用外层日历下账，避免内层分钟缺 bar 被当成退市
+        from qlib.backtest.backtest import _write_off_unlisted
+
+        _write_off_unlisted(self)
+
         _inner_execute_result = None
         while not self.inner_executor.finished():
             trade_decision = self._update_trade_decision(trade_decision)

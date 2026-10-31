@@ -6,7 +6,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from typing import Dict, List, Text, Tuple, Union
+from typing import Callable, Dict, List, Optional, Sequence, Text, Tuple, Union
 from abc import ABC
 
 from qlib.data import D
@@ -20,6 +20,137 @@ from qlib.log import get_module_logger
 from qlib.utils import get_pre_trading_date, load_dataset
 from qlib.contrib.strategy.order_generator import OrderGenerator, OrderGenWOInteract
 from qlib.contrib.strategy.optimizer import EnhancedIndexingOptimizer
+
+
+def make_topk_dropout_selectors(
+    exchange,
+    trade_start_time,
+    trade_end_time,
+    *,
+    only_tradable: bool,
+):
+    """构造 TopkDropout 的截取/过滤闭包。only_tradable 只影响买入候选池。"""
+
+    def is_tradable(stock_id, direction=None) -> bool:
+        return bool(
+            exchange.is_stock_tradable(
+                stock_id=stock_id,
+                start_time=trade_start_time,
+                end_time=trade_end_time,
+                direction=direction,
+            )
+        )
+
+    if only_tradable:
+
+        def get_first_n(li, n, reverse=False):
+            cur_n = 0
+            res = []
+            for si in reversed(li) if reverse else li:
+                if is_tradable(si):
+                    res.append(si)
+                    cur_n += 1
+                    if cur_n >= n:
+                        break
+            return res[::-1] if reverse else res
+
+        def get_last_n(li, n):
+            return get_first_n(li, n, reverse=True)
+
+        def filter_stock(li):
+            return [si for si in li if is_tradable(si)]
+
+    else:
+
+        def get_first_n(li, n):
+            return list(li)[: max(0, n)]
+
+        def get_last_n(li, n):
+            if n <= 0:
+                return []
+            return list(li)[-n:]
+
+        def filter_stock(li):
+            return list(li)
+
+    return get_first_n, get_last_n, filter_stock, is_tradable
+
+
+def limit_trade_direction(forbid_all_trade_at_limit: bool, order_dir: int) -> Optional[int]:
+    """选股占坑与下单共用的 direction。
+
+    ``forbid_all_trade_at_limit=True`` 时涨跌停双向禁（``direction=None``），
+    避免涨停占了卖出坑、执行层又拒单导致多买少卖。
+    """
+    return None if forbid_all_trade_at_limit else order_dir
+
+
+def plan_topk_dropout(
+    pred_score: pd.Series,
+    current_stock_list: Sequence[str],
+    *,
+    topk: int,
+    n_drop: int,
+    method_buy: str,
+    method_sell: str,
+    get_first_n: Callable,
+    get_last_n: Callable,
+    filter_stock: Callable,
+    is_tradable: Callable,
+    sell_direction: Optional[int] = OrderDir.SELL,
+) -> Tuple[list, pd.Index, list, list]:
+    """按 TopkDropout 规则选出 today / sell / buy，以及占用 topk 名额的可交易持仓。
+
+    不可交易持仓（临停、涨跌停无法卖出等）不占 ``topk`` 名额，也不能独占卖出位，
+    否则超配 + 最差那只卖不掉时会锁死换手。
+
+    ``sell_direction`` 必须与下单循环的 ``is_stock_tradable(..., direction=)`` 一致。
+    """
+    last = pred_score.reindex(list(current_stock_list)).sort_values(ascending=False).index
+    # 只有当天能卖的持仓才占 topk 坑；direction 与下单共用
+    slot_last = [c for c in last if is_tradable(c, direction=sell_direction)]
+    n_new = max(0, n_drop + topk - len(slot_last))
+
+    if method_buy == "top":
+        today = get_first_n(
+            pred_score[~pred_score.index.isin(last)].sort_values(ascending=False).index,
+            n_new,
+        )
+    elif method_buy == "random":
+        topk_candi = get_first_n(pred_score.sort_values(ascending=False).index, topk)
+        candi = list(filter(lambda x: x not in last, topk_candi))
+        try:
+            today = np.random.choice(candi, n_new, replace=False)
+        except ValueError:
+            today = candi
+    else:
+        raise NotImplementedError(f"This type of input is not supported")
+
+    today = list(today)
+    comb = pred_score.reindex(last.union(pd.Index(today))).sort_values(ascending=False).index
+
+    if method_sell == "bottom":
+        # 从 comb 最差往上跳过不可卖，改卖下一只可交易持仓
+        sell_pool: List = []
+        last_set = set(last)
+        for code in reversed(list(comb)):
+            if code in last_set and is_tradable(code, direction=sell_direction):
+                sell_pool.append(code)
+                if len(sell_pool) >= n_drop:
+                    break
+        sell = last[last.isin(sell_pool)]
+    elif method_sell == "random":
+        candi = [c for c in filter_stock(last) if is_tradable(c, direction=sell_direction)]
+        try:
+            sell = pd.Index(np.random.choice(candi, n_drop, replace=False) if len(candi) else [])
+        except ValueError:
+            sell = pd.Index(candi)
+    else:
+        raise NotImplementedError(f"This type of input is not supported")
+
+    buy_n = max(0, len(sell) + topk - len(slot_last))
+    buy = today[:buy_n]
+    return today, sell, buy, slot_last
 
 
 class BaseSignalStrategy(BaseStrategy, ABC):
@@ -105,15 +236,8 @@ class TopkDropoutStrategy(BaseSignalStrategy):
             minimum holding days
             before sell stock , will check current.get_stock_count(order.stock_id) >= self.hold_thresh.
         only_tradable : bool
-            will the strategy only consider the tradable stock when buying and selling.
-
-            if only_tradable:
-
-                strategy will make decision with the tradable state of the stock info and avoid buy and sell them.
-
-            else:
-
-                strategy will make buy sell decision without checking the tradable state of the stock.
+            买入候选池是否只保留可交易票。占坑/选卖始终按 ``sell_direction``
+            检查可卖性（与下单循环一致），与本开关无关。
         forbid_all_trade_at_limit : bool
             if forbid all trades when limit_up or limit_down reached.
 
@@ -135,6 +259,29 @@ class TopkDropoutStrategy(BaseSignalStrategy):
         self.only_tradable = only_tradable
         self.forbid_all_trade_at_limit = forbid_all_trade_at_limit
 
+    def _select_buy_sell(self, pred_score, current_stock_list, trade_start_time, trade_end_time):
+        """选出 today / sell / buy。不可交易持仓不占 topk、不独占卖出位。"""
+        get_first_n, get_last_n, filter_stock, is_tradable = make_topk_dropout_selectors(
+            self.trade_exchange,
+            trade_start_time,
+            trade_end_time,
+            only_tradable=self.only_tradable,
+        )
+        return plan_topk_dropout(
+            pred_score,
+            current_stock_list,
+            topk=self.topk,
+            n_drop=self.n_drop,
+            method_buy=self.method_buy,
+            method_sell=self.method_sell,
+            get_first_n=get_first_n,
+            get_last_n=get_last_n,
+            filter_stock=filter_stock,
+            is_tradable=is_tradable,
+            # 与 generate_trade_decision 下单检查同一套涨跌停方向
+            sell_direction=limit_trade_direction(self.forbid_all_trade_at_limit, OrderDir.SELL),
+        )
+
     def generate_trade_decision(self, execute_result=None):
         # get the number of trading step finished, trade_step can be [0, 1, 2, ..., trade_len - 1]
         trade_step = self.trade_calendar.get_trade_step()
@@ -147,44 +294,6 @@ class TopkDropoutStrategy(BaseSignalStrategy):
             pred_score = pred_score.iloc[:, 0]
         if pred_score is None:
             return TradeDecisionWO([], self)
-        if self.only_tradable:
-            # If The strategy only consider tradable stock when make decision
-            # It needs following actions to filter stocks
-            def get_first_n(li, n, reverse=False):
-                cur_n = 0
-                res = []
-                for si in reversed(li) if reverse else li:
-                    if self.trade_exchange.is_stock_tradable(
-                        stock_id=si, start_time=trade_start_time, end_time=trade_end_time
-                    ):
-                        res.append(si)
-                        cur_n += 1
-                        if cur_n >= n:
-                            break
-                return res[::-1] if reverse else res
-
-            def get_last_n(li, n):
-                return get_first_n(li, n, reverse=True)
-
-            def filter_stock(li):
-                return [
-                    si
-                    for si in li
-                    if self.trade_exchange.is_stock_tradable(
-                        stock_id=si, start_time=trade_start_time, end_time=trade_end_time
-                    )
-                ]
-
-        else:
-            # Otherwise, the stock will make decision without the stock tradable info
-            def get_first_n(li, n):
-                return list(li)[:n]
-
-            def get_last_n(li, n):
-                return list(li)[-n:]
-
-            def filter_stock(li):
-                return li
 
         current_temp: Position = copy.deepcopy(self.trade_position)
         # generate order list for this adjust date
@@ -193,48 +302,15 @@ class TopkDropoutStrategy(BaseSignalStrategy):
         # load score
         cash = current_temp.get_cash()
         current_stock_list = current_temp.get_stock_list()
-        # last position (sorted by score)
-        last = pred_score.reindex(current_stock_list).sort_values(ascending=False).index
-        # The new stocks today want to buy **at most**
-        if self.method_buy == "top":
-            today = get_first_n(
-                pred_score[~pred_score.index.isin(last)].sort_values(ascending=False).index,
-                self.n_drop + self.topk - len(last),
-            )
-        elif self.method_buy == "random":
-            topk_candi = get_first_n(pred_score.sort_values(ascending=False).index, self.topk)
-            candi = list(filter(lambda x: x not in last, topk_candi))
-            n = self.n_drop + self.topk - len(last)
-            try:
-                today = np.random.choice(candi, n, replace=False)
-            except ValueError:
-                today = candi
-        else:
-            raise NotImplementedError(f"This type of input is not supported")
-        # combine(new stocks + last stocks),  we will drop stocks from this list
-        # In case of dropping higher score stock and buying lower score stock.
-        comb = pred_score.reindex(last.union(pd.Index(today))).sort_values(ascending=False).index
-
-        # Get the stock list we really want to sell (After filtering the case that we sell high and buy low)
-        if self.method_sell == "bottom":
-            sell = last[last.isin(get_last_n(comb, self.n_drop))]
-        elif self.method_sell == "random":
-            candi = filter_stock(last)
-            try:
-                sell = pd.Index(np.random.choice(candi, self.n_drop, replace=False) if len(last) else [])
-            except ValueError:  # No enough candidates
-                sell = candi
-        else:
-            raise NotImplementedError(f"This type of input is not supported")
-
-        # Get the stock list we really want to buy
-        buy = today[: len(sell) + self.topk - len(last)]
+        _today, sell, buy, _slot_last = self._select_buy_sell(
+            pred_score, current_stock_list, trade_start_time, trade_end_time
+        )
         for code in current_stock_list:
             if not self.trade_exchange.is_stock_tradable(
                 stock_id=code,
                 start_time=trade_start_time,
                 end_time=trade_end_time,
-                direction=None if self.forbid_all_trade_at_limit else OrderDir.SELL,
+                direction=limit_trade_direction(self.forbid_all_trade_at_limit, OrderDir.SELL),
             ):
                 continue
             if code in sell:
@@ -274,7 +350,7 @@ class TopkDropoutStrategy(BaseSignalStrategy):
                 stock_id=code,
                 start_time=trade_start_time,
                 end_time=trade_end_time,
-                direction=None if self.forbid_all_trade_at_limit else OrderDir.BUY,
+                direction=limit_trade_direction(self.forbid_all_trade_at_limit, OrderDir.BUY),
             ):
                 continue
             # buy order

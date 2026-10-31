@@ -17,6 +17,41 @@ if TYPE_CHECKING:
 from tqdm.auto import tqdm
 
 from ..utils.time import Freq
+from .account import WRITE_OFF_MISSING_BARS
+
+
+def lookback_windows(calendar, n: int = WRITE_OFF_MISSING_BARS):
+    """当前步往前（含当日）最多 n 根 bar 的 [start, end]。步数不够则缩短。"""
+    if calendar is None or n <= 0:
+        return []
+    step = calendar.get_trade_step()
+    windows = []
+    for shift in range(n):
+        if step - shift < 0:
+            break
+        try:
+            windows.append(calendar.get_step_time(step, shift=shift))
+        except (IndexError, KeyError):
+            break
+    windows.reverse()
+    return windows
+
+
+def _write_off_unlisted(executor: "BaseExecutor") -> None:
+    """在策略出单前，按外层日历窗口下账确认离开行情的持仓。"""
+    account = getattr(executor, "trade_account", None)
+    exchange = getattr(executor, "trade_exchange", None)
+    if account is None or exchange is None:
+        return
+    write_off = getattr(account, "write_off_unlisted", None)
+    if not callable(write_off):
+        return
+    start = end = None
+    calendar = getattr(executor, "trade_calendar", None)
+    windows = lookback_windows(calendar, WRITE_OFF_MISSING_BARS)
+    if calendar is not None:
+        start, end = calendar.get_step_time()
+    write_off(exchange, start, end, windows=windows)
 
 PORT_METRIC = Dict[str, Tuple[pd.DataFrame, dict]]
 INDICATOR_METRIC = Dict[str, Tuple[pd.DataFrame, Indicator]]
@@ -85,6 +120,8 @@ def collect_data_loop(
     with tqdm(total=trade_executor.trade_calendar.get_trade_len(), desc="backtest loop") as bar:
         _execute_result = None
         while not trade_executor.finished():
+            # 决策前先下账已离开行情表的持仓，避免退市股占坑锁死换手
+            _write_off_unlisted(trade_executor)
             _trade_decision: BaseTradeDecision = trade_strategy.generate_trade_decision(_execute_result)
             _execute_result = yield from trade_executor.collect_data(_trade_decision, level=0)
             trade_strategy.post_exe_step(_execute_result)

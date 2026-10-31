@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple, cast
 
 import pandas as pd
 
+from qlib.log import get_module_logger
 from qlib.utils import init_instance_by_config
 
 from .decision import BaseTradeDecision, Order
@@ -14,6 +15,12 @@ from .exchange import Exchange
 from .high_performance_ds import BaseOrderIndicator
 from .position import BasePosition
 from .report import Indicator, PortfolioMetrics
+
+# 连续这么多根 bar 都无 $close 行才下账，避免单日漏行/临停被当成退市。
+WRITE_OFF_MISSING_BARS = 5
+# 抽查这么多只判断「全市场当日是否都无行」，挡住日历超前于行情的整仓误杀。
+_WRITE_OFF_MARKET_SAMPLE = 32
+_logger = get_module_logger("Account")
 
 """
 rtn & earning in the Account
@@ -179,6 +186,79 @@ class Account:
 
     def get_cash(self) -> float:
         return self.current_position.get_cash()
+
+    def write_off_unlisted(
+        self,
+        trade_exchange: Exchange,
+        trade_start_time: Optional[pd.Timestamp] = None,
+        trade_end_time: Optional[pd.Timestamp] = None,
+        *,
+        windows: Optional[List[Tuple[pd.Timestamp, pd.Timestamp]]] = None,
+        missing_bars: int = WRITE_OFF_MISSING_BARS,
+    ) -> List[str]:
+        """把确认离开行情的持仓按最后盯市价下账。
+
+        - 从不在行情表：立即下账。
+        - 在行情表但最近 ``missing_bars`` 根窗口都无 ``$close`` 行：视为退市/数据消失，下账。
+        - 任一窗口仍有 ``$close`` 行（即使是 NaN 停牌）：不下账。
+        - 最新窗口抽样全市场都无行：视为日历超前/包未到，整批跳过。
+        返回被下账的代码列表。
+        """
+        if self.current_position.skip_update():
+            return []
+        quote = getattr(trade_exchange, "quote", None)
+        if quote is None or not hasattr(quote, "get_all_stock"):
+            return []
+        listed = set(quote.get_all_stock())
+        spans = list(windows) if windows else []
+        if not spans and trade_start_time is not None and trade_end_time is not None:
+            spans = [(trade_start_time, trade_end_time)]
+        if spans and self._market_quote_empty(quote, listed, spans[-1][0], spans[-1][1]):
+            _logger.warning(
+                "skip write_off_unlisted: no $close bars on %s (calendar ahead of quote?)",
+                spans[-1][0],
+            )
+            return []
+
+        dropped: List[str] = []
+        for code in list(self.current_position.get_stock_list()):
+            if code not in listed:
+                self.current_position.write_off_stock(code)
+                dropped.append(code)
+                continue
+            if not spans or len(spans) < missing_bars:
+                continue
+            if any(self._has_quote_bar(quote, code, listed, start, end) for start, end in spans):
+                continue
+            self.current_position.write_off_stock(code)
+            dropped.append(code)
+        if dropped:
+            _logger.info("write_off_unlisted %s asof=%s", dropped, spans[-1][0] if spans else None)
+        return dropped
+
+    @staticmethod
+    def _has_quote_bar(
+        quote,
+        stock_id: str,
+        listed: set,
+        trade_start_time: Optional[pd.Timestamp],
+        trade_end_time: Optional[pd.Timestamp],
+    ) -> bool:
+        """该窗口是否还有行情行。无起止时间时退回「是否在行情表」。"""
+        if stock_id not in listed:
+            return False
+        if trade_start_time is None or trade_end_time is None or not hasattr(quote, "get_data"):
+            return True
+        close = quote.get_data(stock_id, trade_start_time, trade_end_time, "$close")
+        return close is not None
+
+    @classmethod
+    def _market_quote_empty(cls, quote, listed: set, start: pd.Timestamp, end: pd.Timestamp) -> bool:
+        """抽样检查当日是否全市场都无 $close 行。"""
+        if not listed or start is None or end is None:
+            return False
+        sample = list(listed)[:_WRITE_OFF_MARKET_SAMPLE]
+        return not any(cls._has_quote_bar(quote, code, listed, start, end) for code in sample)
 
     def _update_state_from_order(self, order: Order, trade_val: float, cost: float, trade_price: float) -> None:
         if self.is_port_metr_enabled():
