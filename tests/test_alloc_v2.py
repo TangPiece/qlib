@@ -244,6 +244,27 @@ def test_run_update_with_injected_rows(tmp_path: Path) -> None:
     assert (tmp_path / "_markers" / "update.json").is_file()
 
 
+def test_labels_display_name_and_captions_cover_dashboard() -> None:
+    from qlib.contrib.data.alloc_v2.labels import (
+        CHART_CAPTIONS,
+        REQUIRED_DASHBOARD_CAPTION_IDS,
+        display_name,
+        print_caption,
+    )
+
+    assert display_name("801080") == "电子"
+    assert display_name("SPX") == "标普500"
+    assert "综合分" in display_name("IndustryAllocationScore")
+    assert display_name("strength") == "宽基强度"
+    assert "沪深300" in display_name("510300")
+    assert display_name("UNKNOWN_XYZ") == "UNKNOWN_XYZ"
+    for chart_id in REQUIRED_DASHBOARD_CAPTION_IDS:
+        assert chart_id in CHART_CAPTIONS
+        assert "【读图】" in CHART_CAPTIONS[chart_id]
+    # 冒烟：未知 id 也有输出
+    print_caption("not_exist_chart")
+
+
 def test_r2_upload_skips_markers_and_uses_prefix(tmp_path: Path, monkeypatch) -> None:
     from qlib.contrib.data.alloc_v2.r2_upload import (
         iter_upload_files,

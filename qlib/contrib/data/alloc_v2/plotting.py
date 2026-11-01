@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from .labels import ETF_NAMES, display_name, print_caption
+
 _FONT_READY = False
 
 
@@ -89,7 +91,7 @@ def plot_normalized(
         clean = series.dropna().sort_index()
         if clean.empty or float(clean.iloc[0]) == 0.0:
             continue
-        ax.plot(clean.index, clean / clean.iloc[0], label=label)
+        ax.plot(clean.index, clean / clean.iloc[0], label=display_name(label))
         plotted += 1
     if not plotted:
         _empty_msg(ax, title)
@@ -116,7 +118,7 @@ def plot_levels(
         clean = series.dropna().sort_index()
         if clean.empty:
             continue
-        ax.plot(clean.index, clean, label=label)
+        ax.plot(clean.index, clean, label=display_name(label))
         plotted += 1
     if not plotted:
         _empty_msg(ax, title)
@@ -136,19 +138,21 @@ def plot_bar(
     ylabel: str = "",
     figsize: tuple[float, float] = (10, 4),
     highlight_failed: Sequence[bool] | None = None,
+    relabel: bool = True,
 ) -> plt.Figure:
     fig, ax = plt.subplots(figsize=figsize)
     if not labels:
         _empty_msg(ax, title)
         fig.tight_layout()
         return fig
-    x = np.arange(len(labels))
+    shown = [display_name(str(x)) if relabel else str(x) for x in labels]
+    x = np.arange(len(shown))
     colors = None
-    if highlight_failed is not None and len(highlight_failed) == len(labels):
+    if highlight_failed is not None and len(highlight_failed) == len(shown):
         colors = ["#c44e52" if failed else "#4c72b0" for failed in highlight_failed]
     ax.bar(x, list(values), color=colors)
     ax.set_xticks(x)
-    ax.set_xticklabels(list(labels), rotation=30, ha="right", fontsize=8)
+    ax.set_xticklabels(shown, rotation=30, ha="right", fontsize=8)
     ax.set_title(title)
     if ylabel:
         ax.set_ylabel(ylabel)
@@ -188,7 +192,7 @@ def plot_heatmap_pivot(
         return fig
     part = factors[factors["factor_id"] == factor_id].copy()
     if part.empty:
-        _empty_msg(ax, title, f"无因子 {factor_id}")
+        _empty_msg(ax, title, f"无因子 {display_name(factor_id)}")
         fig.tight_layout()
         return fig
     part["event_date"] = pd.to_datetime(part["event_date"])
@@ -211,8 +215,7 @@ def plot_heatmap_pivot(
         return fig
     im = ax.imshow(pivot.to_numpy(dtype=float), aspect="auto", interpolation="nearest", cmap="RdBu_r")
     ax.set_yticks(range(len(pivot.index)))
-    ax.set_yticklabels(list(pivot.index), fontsize=8)
-    # 日期刻度稀疏显示
+    ax.set_yticklabels([display_name(str(i)) for i in pivot.index], fontsize=8)
     cols = list(pivot.columns)
     step = max(1, len(cols) // 8)
     ticks = list(range(0, len(cols), step))
@@ -233,29 +236,30 @@ def plot_etf_three_metrics(
 ) -> plt.Figure:
     """三类指标并列：份额、原始份额变化、估算配置。"""
     fig, axes = plt.subplots(3, 1, figsize=figsize, sharex=True)
+    name = ETF_NAMES.get(etf_code, etf_code)
     specs = (
-        ("RawShares", "份额（direct）", axes[0]),
-        ("Raw_Share_Change", "原始份额变化（direct）", axes[1]),
-        ("Estimated_Allocation", "估算配置 ΔShares×NAV（estimate）", axes[2]),
+        ("RawShares", "份额（直接）", axes[0]),
+        ("Raw_Share_Change", "原始份额变化（直接）", axes[1]),
+        ("Estimated_Allocation", "估算配置=份额变化×净值（估算）", axes[2]),
     )
     any_plot = False
     for factor_id, ylabel, ax in specs:
         series = series_from_factor(factors, factor_id=factor_id, entity_id=etf_code).dropna()
         if series.empty:
-            _empty_msg(ax, ylabel, f"{etf_code} 无 {factor_id}")
+            _empty_msg(ax, ylabel, f"{name} 无 {display_name(factor_id)}")
             continue
         ax.plot(series.index, series)
         ax.set_ylabel(ylabel, fontsize=8)
-        ax.axhline(0.0, color="gray", linewidth=0.6) if factor_id != "RawShares" else None
+        if factor_id != "RawShares":
+            ax.axhline(0.0, color="gray", linewidth=0.6)
         any_plot = True
-    fig.suptitle(title or f"ETF {etf_code}：三类指标（份额变化 ≠ 净流入）")
-    if not any_plot:
-        pass
+    fig.suptitle(title or f"{name}（{etf_code}）：三类指标（份额变化 ≠ 净流入）")
+    _ = any_plot
     fig.tight_layout()
     return fig
 
 
-def plot_s1_components(s1: pd.DataFrame | dict, *, title: str = "S1 市场组件") -> plt.Figure:
+def plot_s1_components(s1: pd.DataFrame | dict, *, title: str = "S1 市场层组件") -> plt.Figure:
     """S1 components 布尔条。"""
     fig, ax = plt.subplots(figsize=(6, 3))
     if isinstance(s1, pd.DataFrame):
@@ -275,11 +279,12 @@ def plot_s1_components(s1: pd.DataFrame | dict, *, title: str = "S1 市场组件
         except Exception:  # noqa: BLE001
             comps = {}
     if not comps:
-        _empty_msg(ax, title, f"S1 value={row.get('value')}")
+        _empty_msg(ax, title, f"S1 总信号={row.get('value')}")
         fig.tight_layout()
         return fig
-    labels = list(comps.keys())
-    values = [1.0 if bool(comps[k]) else 0.0 for k in labels]
+    keys = list(comps.keys())
+    labels = [display_name(k) for k in keys]
+    values = [1.0 if bool(comps[k]) else 0.0 for k in keys]
     ax.bar(labels, values, color=["#55a868" if v else "#c44e52" for v in values])
     ax.set_ylim(0, 1.2)
     ax.set_title(f"{title}（总信号={row.get('value')}）")
@@ -288,7 +293,7 @@ def plot_s1_components(s1: pd.DataFrame | dict, *, title: str = "S1 市场组件
     return fig
 
 
-def plot_s2_pass_bar(s2: pd.DataFrame, *, title: str = "S2 行业信号") -> plt.Figure:
+def plot_s2_pass_bar(s2: pd.DataFrame, *, title: str = "S2 行业是否进入观察（1=过）") -> plt.Figure:
     if s2 is None or s2.empty:
         fig, ax = plt.subplots(figsize=(8, 3))
         _empty_msg(ax, title)
@@ -302,19 +307,25 @@ def plot_s2_pass_bar(s2: pd.DataFrame, *, title: str = "S2 行业信号") -> plt
         title=title,
         ylabel="通过=1",
         figsize=(10, 3.5),
+        relabel=True,
     )
 
 
-def plot_backtest_bars(backtest: pd.DataFrame, *, metric: str = "rank_ic_mean_h20", title: str | None = None) -> plt.Figure:
-    """回测条形：失败因子标红。"""
+def plot_backtest_bars(
+    backtest: pd.DataFrame,
+    *,
+    metric: str = "rank_ic_mean_h20",
+    title: str | None = None,
+    ylabel: str | None = None,
+) -> plt.Figure:
+    """回测条形：失败因子标红；因子名显示中文。"""
     if backtest is None or backtest.empty:
         fig, ax = plt.subplots(figsize=(8, 3))
-        _empty_msg(ax, title or metric)
+        _empty_msg(ax, title or display_name(metric))
         fig.tight_layout()
         return fig
     frame = backtest.copy()
     if metric not in frame.columns:
-        # 退化：展示 status
         failed = (frame.get("status", pd.Series(dtype=str)) == "failed").tolist()
         values = [0.0 if f else 1.0 for f in failed]
         return plot_bar(
@@ -322,13 +333,33 @@ def plot_backtest_bars(backtest: pd.DataFrame, *, metric: str = "rank_ic_mean_h2
             values,
             title=title or "回测状态（1=有结果）",
             highlight_failed=failed,
+            relabel=True,
         )
     values = frame[metric].astype(float).fillna(0.0).tolist()
     failed = (frame.get("status", pd.Series(["ok"] * len(frame))) == "failed").tolist()
     return plot_bar(
         list(frame["factor_id"].astype(str)),
         values,
-        title=title or metric,
-        ylabel=metric,
+        title=title or display_name(metric),
+        ylabel=ylabel or "数值",
         highlight_failed=failed,
+        relabel=True,
     )
+
+
+# 供 notebook 直接 from plotting import print_caption
+__all__ = [
+    "configure_cjk_font",
+    "latest_cross_section",
+    "plot_backtest_bars",
+    "plot_bar",
+    "plot_etf_three_metrics",
+    "plot_heatmap_pivot",
+    "plot_levels",
+    "plot_normalized",
+    "plot_s1_components",
+    "plot_s2_pass_bar",
+    "print_caption",
+    "series_from_factor",
+    "series_from_standard",
+]
