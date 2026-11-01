@@ -1,3 +1,7 @@
+# Alpha158 推荐核心 19 因子滚动模板：7y train + 1y valid，~2y step
+# 与 workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml 窗口/策略/超参相同，
+# 仅用 FilterCol 保留短名单核心因子；不取反 reverse 列（树模型自学分方向）。
+# 真正滚动请显式传 --conf_path，勿改 rolling_7y1y.py 的 DEFAULT_CONF。
 qlib_init:
     provider_uri: "~/.qlib/qlib_data/cn_data"
     region: cn
@@ -5,10 +9,35 @@ market: &market csi300
 benchmark: &benchmark SH000300
 data_handler_config: &data_handler_config
     start_time: 2008-01-01
-    end_time: 2026-10-09
+    end_time: 2026-10-31
     fit_start_time: 2008-01-01
-    fit_end_time: 2015-12-31
+    fit_end_time: 2014-12-31
     instruments: *market
+    # PTYPE_A：learn = infer + learn processors，写在 infer 侧即可同时筛训练/推理列
+    infer_processors:
+        - class: FilterCol
+          kwargs:
+              fields_group: feature
+              col_list:
+                  - KLOW
+                  - LOW0
+                  - CORD5
+                  - MIN5
+                  - BETA5
+                  - CNTN5
+                  - RANK5
+                  - ROC5
+                  - IMXD5
+                  - QTLD5
+                  - IMAX5
+                  - MA5
+                  - RESI20
+                  - VSUMP5
+                  - IMIN5
+                  - SUMD5
+                  - QTLU5
+                  - VMA60
+                  - RSV5
 port_analysis_config: &port_analysis_config
     strategy:
         class: TopkDropoutStrategy
@@ -18,8 +47,8 @@ port_analysis_config: &port_analysis_config
             topk: 10
             n_drop: 1
     backtest:
-        start_time: 2018-01-01
-        end_time: 2026-10-09
+        start_time: 2016-01-01
+        end_time: 2026-10-31
         account: 100000
         benchmark: *benchmark
         exchange_kwargs:
@@ -51,10 +80,10 @@ task:
                 module_path: qlib.contrib.data.handler
                 kwargs: *data_handler_config
             segments:
-                # First rolling window template: 7y train + 2y valid; test span is full horizon
+                # First rolling window template: 7y train + 1y valid; test span is full horizon
                 train: [2008-01-01, 2014-12-31]
-                valid: [2015-01-01, 2016-12-31]
-                test: [2017-01-01, 2026-10-10]
+                valid: [2015-01-01, 2015-12-31]
+                test: [2016-01-01, 2026-10-31]
     record:
         - class: SignalRecord
           module_path: qlib.workflow.record_temp

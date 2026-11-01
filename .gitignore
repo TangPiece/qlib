@@ -5,6 +5,7 @@ __pycache__/
 *.pyd
 *.so
 *.ipynb
+!examples/flow_monitor/dashboard.ipynb
 .ipynb_checkpoints
 _build
 build/
@@ -65,5 +66,13 @@ node_modules/
 # 财务因子 staging / 日宽表
 /data/fundamental_staging/
 
+# 资金流向监测 staging
+# /data/flow_staging/
+
+# 资金配置研究 V2（四层数据，不进 git）
+/data/alloc_v2/
+
 # 评估结果
 /examples/benchmarks/LightGBM/eval_output/
+!examples/alloc_v2/*.ipynb
+

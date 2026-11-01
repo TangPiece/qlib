@@ -27,6 +27,20 @@
   run
 ```
 
+`workflow_config_lightgbm_Alpha158_rolling_7y1y_core19.yaml`
+- 训练/验证/回测窗口、策略、LightGBM 超参与上面的 7y1y 相同。
+- 特征用已有 `FilterCol` 只保留短名单推荐核心 19 列（见 [`eval_output/alpha158_predictive_shortlist.md`](eval_output/alpha158_predictive_shortlist.md)）；reverse 列不取反。
+- **独立配置**：不改 `rolling_7y1y.py` 默认路径，也不进控制台下拉 / 每日更新默认列表。必须显式 `--conf_path`，并用独立 `--exp_name`，避免覆盖全量 Alpha158 实验。
+- `end_time` 需刷新时，手动对齐基线 7y1y，或对该文件单独传 `--config`。
+
+```bash
+.venv/bin/python examples/benchmarks/LightGBM/rolling_7y1y.py \
+  --conf_path=examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158_rolling_7y1y_core19.yaml \
+  --exp_name=LightGBM_Alpha158_rolling_7y1y_core19_$(date +%Y%m%d) \
+  --horizon=1 \
+  run
+```
+
 ---
 
 # 本地控制台（页面操作）

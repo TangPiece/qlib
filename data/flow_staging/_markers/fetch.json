@@ -1,0 +1,625 @@
+{
+  "series": {
+    "account_new": {
+      "rows": 68,
+      "min_date": "2018-01-01",
+      "max_date": "2023-08-01",
+      "evidence_grade": "L3"
+    },
+    "cn_lpr_1y": {
+      "rows": 493,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-20",
+      "evidence_grade": "L3"
+    },
+    "etf_159915_amount": {
+      "rows": 2139,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_159915_px": {
+      "rows": 2139,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_159915_shares": {
+      "rows": 1,
+      "min_date": "2011-12-09",
+      "max_date": "2011-12-09",
+      "evidence_grade": "L1"
+    },
+    "etf_159928_amount": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_159928_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_159928_shares": {
+      "rows": 1,
+      "min_date": "2013-09-16",
+      "max_date": "2013-09-16",
+      "evidence_grade": "L1"
+    },
+    "etf_510050_amount": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_510050_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_510050_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_510300_amount": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_510300_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_510300_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_510500_amount": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_510500_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_510500_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_510880_amount": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_510880_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_510880_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_511260_amount": {
+      "rows": 2139,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_511260_px": {
+      "rows": 2139,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_511260_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_512100_amount": {
+      "rows": 2139,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_512100_px": {
+      "rows": 2139,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_512100_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_512480_amount": {
+      "rows": 1791,
+      "min_date": "2019-06-12",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_512480_px": {
+      "rows": 1791,
+      "min_date": "2019-06-12",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_512480_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_512800_amount": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_512800_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_512800_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_512880_amount": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_512880_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_512880_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_515080_amount": {
+      "rows": 1656,
+      "min_date": "2019-12-27",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_515080_px": {
+      "rows": 1656,
+      "min_date": "2019-12-27",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_515080_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_516160_amount": {
+      "rows": 1387,
+      "min_date": "2021-02-04",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_516160_px": {
+      "rows": 1387,
+      "min_date": "2021-02-04",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_516160_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_518880_amount": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_518880_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_518880_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "etf_588000_amount": {
+      "rows": 1444,
+      "min_date": "2020-11-16",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_588000_px": {
+      "rows": 1444,
+      "min_date": "2020-11-16",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "etf_588000_shares": {
+      "rows": 8,
+      "min_date": "2026-10-21",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "fund_scale_bond_snapshot": {
+      "rows": 1,
+      "min_date": "2026-11-01",
+      "max_date": "2026-11-01",
+      "evidence_grade": "L2"
+    },
+    "fund_scale_equity_snapshot": {
+      "rows": 1,
+      "min_date": "2026-11-01",
+      "max_date": "2026-11-01",
+      "evidence_grade": "L2"
+    },
+    "fund_scale_money_snapshot": {
+      "rows": 1,
+      "min_date": "2026-11-01",
+      "max_date": "2026-11-01",
+      "evidence_grade": "L2"
+    },
+    "fx_usdcny": {
+      "rows": 2141,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "gold_gld_change": {
+      "rows": 1450,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "gold_gld_tonnes": {
+      "rows": 1450,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "hsgt_north_hold_mcap": {
+      "rows": 2051,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L2"
+    },
+    "hsgt_north_net": {
+      "rows": 1536,
+      "min_date": "2018-01-02",
+      "max_date": "2024-08-16",
+      "evidence_grade": "L1"
+    },
+    "hsgt_south_net": {
+      "rows": 2025,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L1"
+    },
+    "ind_auto_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_auto_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_bank_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_bank_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_broker_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_broker_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_electronics_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_electronics_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_food_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_food_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_grid_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_grid_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_machinery_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_machinery_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_nmetal_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_nmetal_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_pharma_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_pharma_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_property_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_property_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_telecom_amount": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "ind_telecom_px": {
+      "rows": 2129,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "institute_hold_snapshot": {
+      "rows": 1,
+      "min_date": "2026-11-01",
+      "max_date": "2026-11-01",
+      "evidence_grade": "L2"
+    },
+    "margin_sh_balance": {
+      "rows": 2139,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-29",
+      "evidence_grade": "L3"
+    },
+    "margin_sz_balance": {
+      "rows": 1950,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-29",
+      "evidence_grade": "L3"
+    },
+    "px_csi300": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "px_djia": {
+      "rows": 2220,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "px_gold_sge": {
+      "rows": 2140,
+      "min_date": "2018-01-01",
+      "max_date": "2026-10-28",
+      "evidence_grade": "L3"
+    },
+    "px_hsi": {
+      "rows": 2172,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "px_n225": {
+      "rows": 1000,
+      "min_date": "2022-10-18",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "px_ndx": {
+      "rows": 2220,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "px_sensex": {
+      "rows": 1000,
+      "min_date": "2022-10-27",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "px_spx": {
+      "rows": 2220,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "px_sse": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "px_sx5e": {
+      "rows": 1000,
+      "min_date": "2022-12-07",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "style_chinext_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "style_csi1000_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "style_csi300_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "style_csi500_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "style_dividend_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "style_star50_px": {
+      "rows": 1653,
+      "min_date": "2020-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "style_sz50_px": {
+      "rows": 2140,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "yld_cn_10y": {
+      "rows": 2204,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "yld_cn_2y": {
+      "rows": 2204,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "yld_us_10y": {
+      "rows": 2208,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    },
+    "yld_us_2y": {
+      "rows": 2208,
+      "min_date": "2018-01-02",
+      "max_date": "2026-10-30",
+      "evidence_grade": "L3"
+    }
+  },
+  "adapter_counts": {
+    "global_macro": 32117,
+    "etf_cn": 59736,
+    "industry_cn": 61331,
+    "china_flow": 10266
+  },
+  "n_rows": 163450,
+  "n_series": 102,
+  "path": "/Users/900game/Desktop/ai/qlib/data/flow_staging/raw/long.parquet"
+}

@@ -1,0 +1,12 @@
+{
+  "n_rows": 163450,
+  "n_series": 102,
+  "n_change_rows": 102,
+  "n_flow_vs_price": 32,
+  "paths": {
+    "long": "/Users/900game/Desktop/ai/qlib/data/flow_staging/panels/long.parquet",
+    "changes": "/Users/900game/Desktop/ai/qlib/data/flow_staging/diagnostics/changes.parquet",
+    "flow_vs_price": "/Users/900game/Desktop/ai/qlib/data/flow_staging/diagnostics/flow_vs_price.parquet",
+    "allocation": "/Users/900game/Desktop/ai/qlib/data/flow_staging/diagnostics/allocation_evidence.parquet"
+  }
+}
