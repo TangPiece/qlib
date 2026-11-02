@@ -10,9 +10,13 @@ from datetime import date, timedelta
 
 from ..mappings import load_etf_master
 from ..schema import finite_number, first_col, in_range, parse_day, yyyymmdd
-from .base import lookup, row_of, safe_call, sample_weekdays
+from .base import lookup, row_of, safe_call
 
 _log = logging.getLogger(__name__)
+
+# 上交所份额接口按日查询：近端日频 + 更早周频，兼顾 window=20 与全量耗时
+_SSE_DAILY_LOOKBACK_DAYS = 180
+_SZSE_CHUNK_DAYS = 90
 
 
 def _sina_symbol(code: str) -> str:
@@ -23,6 +27,34 @@ def _listed_etf_codes() -> list[str]:
     master = load_etf_master()
     listed = master[master["exchange"].isin({"SH", "SZ"})]
     return [str(code) for code in listed["etf_code"]]
+
+
+def _sse_share_sample_days(start: date | None, end: date | None) -> list[date]:
+    """上交所份额采样日：最近约半年每个工作日，更早仅取周五。"""
+    last = end or date.today()
+    first = start or (last - timedelta(days=365))
+    if first > last:
+        first, last = last, first
+    recent_cut = last - timedelta(days=_SSE_DAILY_LOOKBACK_DAYS)
+    days: list[date] = []
+    cursor = last
+    while cursor >= first:
+        if cursor.weekday() < 5:
+            if cursor >= recent_cut or cursor.weekday() == 4:
+                days.append(cursor)
+        cursor -= timedelta(days=1)
+    return days
+
+
+def _month_chunks(start: date, end: date, *, chunk_days: int = _SZSE_CHUNK_DAYS) -> list[tuple[date, date]]:
+    """深交所区间接口按块拉取，避免单次跨度过大。"""
+    chunks: list[tuple[date, date]] = []
+    cursor = start
+    while cursor <= end:
+        chunk_end = min(end, cursor + timedelta(days=chunk_days - 1))
+        chunks.append((cursor, chunk_end))
+        cursor = chunk_end + timedelta(days=1)
+    return chunks
 
 
 class EtfAdapter:
@@ -122,38 +154,57 @@ class EtfAdapter:
         return rows
 
     def _fetch_sse_shares(self, start: date | None, end: date | None) -> list:
+        """上交所按日接口：近端日频、远端周频。
+
+        远端周采样会写入 quality_flag=sparse_sample；全样本流因子早期区间勿当完整日频。
+        """
         import akshare as ak
 
         spec = lookup("etf_shares")
-        days = sample_weekdays(start, end, limit=8)
+        days = _sse_share_sample_days(start, end)
         wanted = {code for code in _listed_etf_codes() if code.startswith("5")}
+        last = end or date.today()
+        recent_cut = last - timedelta(days=_SSE_DAILY_LOOKBACK_DAYS)
         rows = []
+        _log.info("etf_shares SSE sample days=%s (daily after %s)", len(days), recent_cut)
         for day in days:
+            # 近 180 日之外仅周五点 → sparse_sample，供因子/文档降权
+            qflag = "ok" if day >= recent_cut else "sparse_sample"
             frame = safe_call(f"fund_etf_scale_sse:{day}", ak.fund_etf_scale_sse, date=yyyymmdd(day))
-            rows.extend(_shares_from_scale(frame, wanted, spec, fallback_day=day))
+            rows.extend(_shares_from_scale(frame, wanted, spec, fallback_day=day, quality_flag=qflag))
         return rows
 
     def _fetch_szse_shares(self, start: date | None, end: date | None) -> list:
+        """深交所区间日频份额：按块拉取全区间，再补一张快照。"""
         import akshare as ak
 
         spec = lookup("etf_shares")
         wanted = {code for code in _listed_etf_codes() if not code.startswith("5")}
         rows = []
-        if start is not None and end is not None:
+        last = end or date.today()
+        first = start or (last - timedelta(days=365))
+        for chunk_start, chunk_end in _month_chunks(first, last):
             frame = safe_call(
-                "fund_scale_daily_szse",
+                f"fund_scale_daily_szse:{yyyymmdd(chunk_start)}_{yyyymmdd(chunk_end)}",
                 ak.fund_scale_daily_szse,
-                start_date=yyyymmdd(start),
-                end_date=yyyymmdd(end),
+                start_date=yyyymmdd(chunk_start),
+                end_date=yyyymmdd(chunk_end),
                 symbol="ETF",
             )
-            rows.extend(_shares_from_scale(frame, wanted, spec, fallback_day=end))
+            rows.extend(_shares_from_scale(frame, wanted, spec, fallback_day=chunk_end, quality_flag="ok"))
         snap = safe_call("fund_etf_scale_szse", ak.fund_etf_scale_szse)
-        rows.extend(_shares_from_scale(snap, wanted, spec, fallback_day=end or date.today()))
+        rows.extend(_shares_from_scale(snap, wanted, spec, fallback_day=last, quality_flag="ok"))
         return rows
 
 
-def _shares_from_scale(frame, wanted: set[str], spec, *, fallback_day: date) -> list:
+def _shares_from_scale(
+    frame,
+    wanted: set[str],
+    spec,
+    *,
+    fallback_day: date,
+    quality_flag: str = "ok",
+) -> list:
     if frame is None or getattr(frame, "empty", True):
         return []
     code_col = first_col(frame, ("基金代码", "代码", "SEC_CODE"))
@@ -182,6 +233,7 @@ def _shares_from_scale(frame, wanted: set[str], spec, *, fallback_day: date) -> 
                 available_at=day + timedelta(days=1),
                 unit="share",
                 evidence_class="direct",
+                quality_flag=quality_flag,
             )
         )
     return rows

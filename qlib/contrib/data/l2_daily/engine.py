@@ -93,7 +93,7 @@ def load_symbol_frames(
     code: str,
     ftypes: tuple[str, ...] | list[str],
 ) -> dict[str, pd.DataFrame | None]:
-    """按类型读明细；缺文件或空 CSV 为 None，避免把停牌误当成空表。"""
+    """按类型读明细；缺文件/空表/解码或解析失败为 None，避免单文件拖垮整标的。"""
     frames: dict[str, pd.DataFrame | None] = {}
     for ftype in ftypes:
         path = source_file_path(books_root, trade_date, code, ftype)
@@ -102,8 +102,9 @@ def load_symbol_frames(
             continue
         try:
             frames[ftype] = _read_path(path, ftype)
-        except pd.errors.EmptyDataError:
-            # 0 字节或无列表头：当缺源，不让一只坏行情打死成交。
+        except (pd.errors.EmptyDataError, UnicodeDecodeError, pd.errors.ParserError) as exc:
+            # 坏文件只置该 ftype 为 None；缺源组仍由 _calc_group_from_frames 返回 None。
+            _log.warning("读 CSV 失败 %s %s %s: %s", trade_date, code, ftype, exc)
             frames[ftype] = None
     return frames
 

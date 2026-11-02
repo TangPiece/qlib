@@ -56,8 +56,10 @@ def report_industry(root: Path | None = None) -> pd.DataFrame:
             "IndustryETFFlow20_pct120",
             "IndustryETFFlow20_pct250",
             "Industry_Turnover_Ratio",
+            "Industry_Turnover_Delta20",
             "Industry_Turnover_Rel20",
             "Industry_RelRet20",
+            "Industry_ResidualRet20",
             "Raw_Share_Change",
             "Estimated_Allocation",
             "ArbitrageRisk",
@@ -81,7 +83,7 @@ def report_institution(root: Path | None = None) -> pd.DataFrame:
 
 
 def report_swing(root: Path | None = None) -> dict[str, Any]:
-    """报告4：波段研究 S0–S4 + 个股确认清单。"""
+    """报告4：波段研究 S0–S4 + 个股确认清单 + 回测分窗诊断。"""
     return {
         "S1": read_research("signal_s1", root=root),
         "S2": read_research("signal_s2", root=root),
@@ -89,6 +91,8 @@ def report_swing(root: Path | None = None) -> dict[str, Any]:
         "S4": read_research("signal_s4", root=root),
         "invalidation": read_research("signal_invalidation", root=root),
         "backtest": read_research("backtest_factors", root=root),
+        "backtest_ic_by_year": read_research("backtest_ic_by_year", root=root),
+        "backtest_factor_corr": read_research("backtest_factor_corr", root=root),
         "catalog": pd.DataFrame(catalog_rows()),
     }
 

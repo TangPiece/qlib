@@ -201,12 +201,29 @@ def run_backtest(root: Path | None = None) -> dict[str, Any]:
 
     standard = read_standard(root=root)
     factors = read_factor("all", root=root)
-    results = run_factor_backtests(factors, standard)
-    path = write_research(results, name="backtest_factors", root=root)
+    bundle = run_factor_backtests(factors, standard)
+    summary_df = bundle["summary"]
+    path = write_research(summary_df, name="backtest_factors", root=root)
+    path_year = write_research(bundle.get("by_year", pd.DataFrame()), name="backtest_ic_by_year", root=root)
+    path_corr = write_research(bundle.get("corr", pd.DataFrame()), name="backtest_factor_corr", root=root)
+    # 份额序列长度：便于判断 IndustryETFFlow20 是否因历史过短失败
+    share_len = {}
+    if not factors.empty and "factor_id" in factors.columns:
+        raw = factors[factors["factor_id"] == "RawShares"]
+        if not raw.empty:
+            share_len = raw.groupby("entity_id").size().astype(int).to_dict()
     summary = {
-        "n_results": int(len(results)),
-        "n_failed": int((results["status"] == "failed").sum()) if not results.empty and "status" in results.columns else 0,
+        "n_results": int(len(summary_df)),
+        "n_failed": int((summary_df["status"] == "failed").sum())
+        if not summary_df.empty and "status" in summary_df.columns
+        else 0,
+        "n_missing": int((summary_df.get("result_kind", pd.Series(dtype=str)) == "missing").sum())
+        if not summary_df.empty
+        else 0,
         "path": str(path),
+        "path_ic_by_year": str(path_year),
+        "path_factor_corr": str(path_corr),
+        "etf_share_n_obs": share_len,
     }
     write_marker("backtest", summary, root=root)
     return summary

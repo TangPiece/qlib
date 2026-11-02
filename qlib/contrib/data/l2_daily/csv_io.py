@@ -58,13 +58,32 @@ def normalize(df: pd.DataFrame, ftype: str) -> pd.DataFrame:
     return frame
 
 
+# 同日可能混用 GBK/GB18030 与带 BOM 的 UTF-8（行情 vs 逐笔），按此顺序回退。
+_CSV_ENCODINGS = ("gb18030", "gbk", "utf-8-sig", "utf-8")
+
+
 def read_csv_bytes(csv_bytes: bytes, ftype: str) -> pd.DataFrame:
-    """按 gb18030 读入万得 CSV，再规范化。"""
-    frame = pd.read_csv(
-        BytesIO(csv_bytes),
-        encoding="gb18030",
-        dtype=str,
-        keep_default_na=False,
-        low_memory=False,
-    )
-    return normalize(frame, ftype)
+    """读入万得 CSV 并规范化；编码按 gb18030→gbk→utf-8-sig→utf-8 回退。"""
+    last_err: UnicodeDecodeError | None = None
+    for encoding in _CSV_ENCODINGS:
+        try:
+            frame = pd.read_csv(
+                BytesIO(csv_bytes),
+                encoding=encoding,
+                dtype=str,
+                keep_default_na=False,
+                low_memory=False,
+            )
+            return normalize(frame, ftype)
+        except UnicodeDecodeError as exc:
+            last_err = exc
+            continue
+    tried = ", ".join(_CSV_ENCODINGS)
+    sample = csv_bytes[:1] if csv_bytes else b"\x00"
+    raise UnicodeDecodeError(
+        "csv",
+        sample,
+        0,
+        1,
+        f"all encodings failed ({tried}): {last_err}",
+    ) from last_err

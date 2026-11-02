@@ -49,9 +49,11 @@ FACTOR_NAMES: dict[str, str] = {
     "IndustryETFFlow20_pct120": "行业ETF流120日分位",
     "IndustryETFFlow20_pct250": "行业ETF流250日分位",
     "Industry_Turnover_Ratio": "行业成交额占比",
+    "Industry_Turnover_Delta20": "行业成交占比变化20日",
     "Industry_Turnover_Rel20": "行业成交相对20日",
     "Industry_Turnover_Rel60": "行业成交相对60日",
     "Industry_RelRet20": "行业相对收益20日",
+    "Industry_ResidualRet20": "行业残差收益20日",
     "RawShares": "ETF份额",
     "Raw_Share_Change": "原始份额变化",
     "Estimated_Allocation": "估算配置",
@@ -63,6 +65,10 @@ FACTOR_NAMES: dict[str, str] = {
     "Close": "收盘价",
     "NAV": "净值",
     "Amount": "成交额",
+    "rank_ic_mean_h20": "全样本RankIC(20日)",
+    "rank_ic_mean_h20_last252": "近一年RankIC(20日)",
+    "long_short_net_h20": "全样本多空净收益(20日)",
+    "long_short_net_h20_last252": "近一年多空净收益(20日)",
 }
 
 S1_COMPONENT_NAMES: dict[str, str] = {
@@ -142,20 +148,35 @@ CHART_CAPTIONS: dict[str, str] = {
         "通过表示行业层条件满足，可进入观察，不等于建议买入。\n"
         "注意：须结合 S1；S1=0 时此处亮灯只作观察。"
     ),
+    "s3": (
+        "【读图】S3 当前为行业级确认骨架：S2=1 的行业一律 S3=1。\n"
+        "龙虎榜仅写入 notes 旁证，不否决信号（non_mandatory）。\n"
+        "注意：因此「三层共振」在个股层实际等价于 S1∧S2，不是独立选股确认。"
+    ),
     "s4": (
-        "【读图】S4 为市场+行业(+个股确认)同时成立。\n"
+        "【读图】S4 需 S1 过关，且 S2∩S3（S3 表为空时才降级为仅 S2）。\n"
         "entity 为 MARKET/NONE 且值为 0，表示共振未成立。\n"
-        "注意：这是研究信号，不是实盘下单指令。"
+        "注意：S3 骨架模式下通过名单≈S2；这是研究信号，不是实盘下单指令。"
     ),
     "backtest_ic": (
-        "【读图】因子与未来约20日收益的截面 RankIC 均值。\n"
-        "接近 0 表示这段样本几乎没有稳定预测力；红柱=该因子计算失败/缺失。\n"
-        "注意：失败≠很差的 IC，而是没有结果；不能把监测看板当成已验证 alpha。"
+        "【读图】因子与未来约20日收益的截面 RankIC 全样本均值。\n"
+        "接近 0=这段构造下平均几乎无稳定预测力；红柱=因子未建成(factor_missing)，不是测过了很差。\n"
+        "注意：行业 ETF 流在上交所远端为周采样(sparse_sample)，全样本早期勿当完整日频；综合分不应与成交占比 IC 锁死。"
     ),
     "backtest_ls": (
-        "【读图】高分组减低分组的多空收益均值（已扣粗成本）。\n"
-        "净值为负或接近 0，说明当前参数下难有稳定超额。\n"
-        "注意：失败结果也会留档；不要只看最优组合。"
+        "【读图】高分组减低分组的多空收益均值（成本按持有期摊销，全样本）。\n"
+        "净值为负或接近 0，说明当前参数下难有稳定超额；成交占比水平可作拥挤反向对照。\n"
+        "注意：失败/缺失会留档；不要只看最优组合，也不要全样本调权刷绿。"
+    ),
+    "backtest_ic_last252": (
+        "【读图】近约 252 个交易日的 RankIC（与多空共用同一日历截断）。\n"
+        "流因子近端为日频更可信；与全样本同向且接近 0→更像结构性无效。\n"
+        "注意：仍不是样本外调参许可。"
+    ),
+    "backtest_corr": (
+        "【读图】因子两两截面相关的时间均值。\n"
+        "综合分与成交占比若接近 1，说明评分再次退化，需检查组件是否纳入 Δ换手/残差/流。\n"
+        "注意：相关高≠预测力，只说明信息重叠。"
     ),
 }
 
@@ -172,9 +193,12 @@ REQUIRED_DASHBOARD_CAPTION_IDS: tuple[str, ...] = (
     "etf_arb",
     "s1",
     "s2",
+    "s3",
     "s4",
     "backtest_ic",
     "backtest_ls",
+    "backtest_ic_last252",
+    "backtest_corr",
 )
 
 

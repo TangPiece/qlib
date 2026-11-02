@@ -90,6 +90,14 @@ _SEED_ETFS: tuple[dict, ...] = (
     {"etf_code": "512800", "name": "银行ETF", "benchmark": "399986", "primary_industry": "801780", "theme": "bank", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
     {"etf_code": "512880", "name": "证券ETF", "benchmark": "399975", "primary_industry": "801790", "theme": "broker", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
     {"etf_code": "159928", "name": "消费ETF", "benchmark": "000932", "primary_industry": "801120", "theme": "consumer", "is_cross_border": False, "feeder_target": "", "exchange": "SZ"},
+    # 扩覆盖：有 primary_industry 的主题 ETF 才进 IndustryETFFlow20
+    {"etf_code": "512010", "name": "医药ETF", "benchmark": "000991", "primary_industry": "801150", "theme": "pharma", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
+    {"etf_code": "512660", "name": "军工ETF", "benchmark": "399967", "primary_industry": "801740", "theme": "defense", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
+    {"etf_code": "515220", "name": "煤炭ETF", "benchmark": "000819", "primary_industry": "801950", "theme": "coal", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
+    {"etf_code": "512200", "name": "房地产ETF", "benchmark": "931052", "primary_industry": "801180", "theme": "property", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
+    {"etf_code": "512980", "name": "传媒ETF", "benchmark": "399971", "primary_industry": "801760", "theme": "media", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
+    {"etf_code": "515050", "name": "5GETF", "benchmark": "931079", "primary_industry": "801770", "theme": "telecom", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
+    {"etf_code": "159819", "name": "人工智能ETF", "benchmark": "930713", "primary_industry": "801750", "theme": "ai", "is_cross_border": False, "feeder_target": "", "exchange": "SZ"},
     {"etf_code": "515080", "name": "中证红利ETF", "benchmark": "000922", "primary_industry": "", "theme": "dividend", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
     {"etf_code": "510880", "name": "红利ETF", "benchmark": "000015", "primary_industry": "", "theme": "dividend", "is_cross_border": False, "feeder_target": "", "exchange": "SH"},
     # 跨境 ETF：不与境内混算 IndustryETFFlow20
@@ -172,11 +180,24 @@ def load_feeder(root: Path | None = None) -> pd.DataFrame:
 
 
 def domestic_etf_codes(master: pd.DataFrame | None = None) -> list[str]:
-    """境内、非联接 ETF，才允许进入 IndustryETFFlow20。"""
+    """境内、非联接、且映射到申万一级的主题 ETF，才允许进入 IndustryETFFlow20。"""
     frame = master if master is not None else seed_etf_master()
     mask = (~frame["is_cross_border"].fillna(False)) & (frame["feeder_target"].fillna("") == "")
-    mask &= frame["theme"].isin({"semiconductor", "new_energy", "bank", "broker", "consumer", "dividend"})
+    industry = frame["primary_industry"].fillna("").astype(str)
+    mask &= industry.str.startswith("801")
     return [str(code) for code in frame.loc[mask, "etf_code"]]
+
+
+def etf_to_industry_map(master: pd.DataFrame | None = None) -> dict[str, str]:
+    """ETF 代码 → 申万一级行业代码（仅 primary_industry 以 801 开头）。"""
+    frame = master if master is not None else seed_etf_master()
+    out: dict[str, str] = {}
+    for _, row in frame.iterrows():
+        code = str(row.get("etf_code", ""))
+        industry = str(row.get("primary_industry", "") or "")
+        if code and industry.startswith("801"):
+            out[code] = industry
+    return out
 
 
 def broad_etf_codes(master: pd.DataFrame | None = None) -> list[str]:

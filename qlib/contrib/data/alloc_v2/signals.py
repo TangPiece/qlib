@@ -13,7 +13,7 @@ import pandas as pd
 from .mappings import broad_etf_codes, load_etf_master
 from .schema import SCHEMA_VERSION
 
-SIGNAL_VERSION = "signals@v2"
+SIGNAL_VERSION = "signals@v3"
 
 
 def _factor_panel(factors: pd.DataFrame, factor_id: str) -> pd.DataFrame:
@@ -92,28 +92,33 @@ def signal_s2_industry(factors: pd.DataFrame, *, asof: pd.Timestamp) -> pd.DataF
 
     简化可测规则：
     - C1: Industry_Turnover_Rel20 > 1
-    - C2: IndustryETFFlow20_pct120 > 0.6（若无 ETF 行业对齐，则用 Industry_RelRet20 > 0 代理并标 proxy）
-    - C3: Industry_RelRet20 > 0
+    - C2: IndustryETFFlow20_pct120 > 0.6（有行业对齐流时用 estimate；否则 RelRet 代理）
+    - C3: Industry_ResidualRet20 > 0（若无则 Industry_RelRet20 > 0）
     - C4: IndustryAllocationScore 截面前 30%
     - C5: 数据 quality_flag == ok
     """
     turn = _latest_by_entity(_factor_panel(factors, "Industry_Turnover_Rel20"), asof)
     flow_pct = _latest_by_entity(_factor_panel(factors, "IndustryETFFlow20_pct120"), asof)
+    resid = _latest_by_entity(_factor_panel(factors, "Industry_ResidualRet20"), asof)
     rel = _latest_by_entity(_factor_panel(factors, "Industry_RelRet20"), asof)
     score = _latest_by_entity(_factor_panel(factors, "IndustryAllocationScore"), asof)
 
-    entities = sorted(set(turn.index) | set(rel.index) | set(score.index) | set(flow_pct.index))
+    entities = sorted(set(turn.index) | set(rel.index) | set(resid.index) | set(score.index) | set(flow_pct.index))
     rows = []
     score_cut = float(score.quantile(0.7)) if len(score) else np.nan
     for entity in entities:
         c1 = bool(turn.get(entity, np.nan) > 1.0) if entity in turn.index else False
+        # 流因子可用则不再依赖收益代理，减少「涨了就算流入」循环论证
         if entity in flow_pct.index and pd.notna(flow_pct.get(entity)):
             c2 = bool(flow_pct.get(entity) > 0.6)
             c2_kind = "estimate"
         else:
             c2 = bool(rel.get(entity, np.nan) > 0) if entity in rel.index else False
             c2_kind = "proxy"
-        c3 = bool(rel.get(entity, np.nan) > 0) if entity in rel.index else False
+        if entity in resid.index and pd.notna(resid.get(entity)):
+            c3 = bool(resid.get(entity) > 0)
+        else:
+            c3 = bool(rel.get(entity, np.nan) > 0) if entity in rel.index else False
         c4 = bool(score.get(entity, np.nan) >= score_cut) if entity in score.index and pd.notna(score_cut) else False
         c5 = True  # 进入因子表的默认 ok；质量不通过上游已剔除
         extras = sum([c3, c4, c5])
@@ -141,30 +146,41 @@ def signal_s3_stock(
     *,
     asof: pd.Timestamp,
 ) -> pd.DataFrame:
-    """S3：属于 S2 行业 + 相对强度/活跃度 + 至少一项交易验证（龙虎榜非强制）。"""
+    """S3：行业级确认骨架（当前无个股映射）。
+
+    语义（显式）：
+    - 对每个 S2=1 行业输出一行 S3=1（骨架放行），notes 标明是否有龙虎榜旁证；
+    - 龙虎榜**不否决** S3（non_mandatory）；将来若改为强制，须同步改 S4 交集逻辑。
+    - 因此当前「三层共振」在个股层等价于 S1∧S2，文档须与此一致。
+    """
     if s2.empty:
         return pd.DataFrame()
     watch = set(s2.loc[s2["value"] > 0, "entity_id"])
     if not watch:
-        return pd.DataFrame(columns=["asof", "entity_id", "signal_id", "value", "statement_kind", "available_at", "quality_flag", "notes", "version"])
+        return pd.DataFrame(
+            columns=["asof", "entity_id", "signal_id", "value", "statement_kind", "available_at", "quality_flag", "notes", "version"]
+        )
 
     lhb = _latest_by_entity(_factor_panel(factors, "LHB_Institution_Ratio_d5"), asof)
-    # 个股层：若标准层有龙虎榜股票，则要求在观察行业；无映射时仅输出行业级确认骨架
+    lhb_available = not lhb.empty
     rows = []
     for entity in sorted(watch):
         trade_confirm = bool(entity in lhb.index and pd.notna(lhb.get(entity)) and float(lhb.get(entity)) > 0.2)
-        # 龙虎榜非强制：无 LHB 也可过，但 notes 标明缺交易验证
-        passed = True
+        # 骨架模式：S2 观察名单一律 S3=1；LHB 仅写入 notes
         rows.append(
             {
                 "asof": asof.date().isoformat(),
                 "entity_id": entity,
                 "signal_id": "S3",
-                "value": 1.0 if passed else 0.0,
+                "value": 1.0,
                 "statement_kind": "signal",
                 "available_at": asof.date().isoformat(),
                 "quality_flag": "ok",
-                "notes": "trade_confirm=lhb" if trade_confirm else "trade_confirm=none(non_mandatory)",
+                "notes": (
+                    "skeleton_pass;trade_confirm=lhb"
+                    if trade_confirm
+                    else f"skeleton_pass;trade_confirm=none(non_mandatory);lhb_data={'yes' if lhb_available else 'no'}"
+                ),
                 "version": SIGNAL_VERSION,
             }
         )
@@ -173,7 +189,13 @@ def signal_s3_stock(
 
 
 def signal_s4(s1: dict[str, Any], s2: pd.DataFrame, s3: pd.DataFrame, *, asof: pd.Timestamp) -> pd.DataFrame:
-    """S4：三层同时成立。"""
+    """S4：三层同时成立。
+
+    规则：
+    - S1 必须过；
+    - 若 S3 表为空（未跑/无观察名单）→ 仅用 S2（骨架降级）；
+    - 若 S3 表非空 → 必须 S2∩S3；S3 全为 0 时不得回退到仅 S2。
+    """
     if not s1.get("value"):
         return pd.DataFrame(
             [
@@ -191,8 +213,13 @@ def signal_s4(s1: dict[str, Any], s2: pd.DataFrame, s3: pd.DataFrame, *, asof: p
             ]
         )
     s2_ok = set(s2.loc[s2["value"] > 0, "entity_id"]) if not s2.empty else set()
-    s3_ok = set(s3.loc[s3["value"] > 0, "entity_id"]) if not s3.empty else set()
-    both = sorted(s2_ok & s3_ok) if s3_ok else sorted(s2_ok)
+    if s3 is None or s3.empty:
+        both = sorted(s2_ok)
+        mode = "S1&S2(no_S3_table)"
+    else:
+        s3_ok = set(s3.loc[s3["value"] > 0, "entity_id"])
+        both = sorted(s2_ok & s3_ok)
+        mode = "S1&S2&S3"
     rows = []
     for entity in both:
         rows.append(
@@ -204,7 +231,7 @@ def signal_s4(s1: dict[str, Any], s2: pd.DataFrame, s3: pd.DataFrame, *, asof: p
                 "statement_kind": "signal",
                 "available_at": asof.date().isoformat(),
                 "quality_flag": "ok",
-                "notes": "S1&S2&S3",
+                "notes": mode,
                 "version": SIGNAL_VERSION,
             }
         )
@@ -218,7 +245,7 @@ def signal_s4(s1: dict[str, Any], s2: pd.DataFrame, s3: pd.DataFrame, *, asof: p
                 "statement_kind": "signal",
                 "available_at": asof.date().isoformat(),
                 "quality_flag": "ok",
-                "notes": "no intersection",
+                "notes": "no intersection" if (s3 is not None and not s3.empty) else "S2 empty",
                 "version": SIGNAL_VERSION,
             }
         )
