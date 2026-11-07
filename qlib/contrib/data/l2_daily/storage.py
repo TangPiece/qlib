@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from .catalog import FACTOR_VERSION, factor_ids, wide_columns
-from .r2_env import load_r2_env
+from .r2_env import load_r2_env, r2_direct_enabled
 from .util import canonical_symbol
 
 _log = logging.getLogger(__name__)
@@ -649,19 +649,25 @@ def _bucket() -> str:
 
 
 def _r2_client():
+    """懒创建 boto3 客户端。默认 proxies={}，不走 HTTP_PROXY。"""
     global _client
     if _client is not None:
         return _client
+    load_r2_env()
     import boto3
     from botocore.config import Config
 
+    # 空 dict 让 botocore 不读环境代理；LEVEL2_L2_DAILY_NO_PROXY=0 时保留默认。
+    cfg_kw: dict[str, object] = {"signature_version": "s3v4"}
+    if r2_direct_enabled():
+        cfg_kw["proxies"] = {}
     _client = boto3.client(
         "s3",
         endpoint_url=os.getenv("R2_ENDPOINT_URL", "").strip(),
         aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID", "").strip(),
         aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY", "").strip(),
         region_name=os.getenv("R2_REGION", "auto").strip() or "auto",
-        config=Config(signature_version="s3v4"),
+        config=Config(**cfg_kw),
     )
     return _client
 

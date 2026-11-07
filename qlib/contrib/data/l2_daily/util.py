@@ -35,10 +35,26 @@ def is_equity(code: str) -> bool:
 
 
 def as_time(series: pd.Series) -> pd.Series:
-    """补齐到 9 位。上午小时经常丢前导 0。"""
+    """归一成 9 位 HHMMSSmmm。
+
+    深市行情多为 8–9 位（已含毫秒），左补零即可。
+    沪市部分日只给 HHMMSS（≤6 位）；整数读入后再 zfill(9) 会变成 000091500，
+    连续竞价字符串窗 093000000 会把全日滤光。
+    规则：≤6 位，或已是 000HHMMSS 左填充形态 → 按 HHMMSS 右补毫秒 000。
+    """
     text = series.astype(str).str.replace("\x00", "", regex=False).str.strip()
     text = text.str.replace(r"\.0$", "", regex=True)
-    return text.str.zfill(9)
+    # 只留数字，避免 '91500.0' / 杂字符干扰长度判断
+    digits = text.str.replace(r"\D", "", regex=True)
+    short = digits.str.len().le(6)
+    # 读入后已是 9 位、但实为 HHMMSS 左补三零（如 000091500）
+    left_padded = digits.str.match(r"^000\d{6}$", na=False)
+    out = digits.str.zfill(9)
+    fix = short | left_padded
+    # 短戳先补到 6 位再接毫秒；左填充形态取末 6 位
+    hhmmss = digits.where(~left_padded, digits.str[-6:]).where(~short, digits.str.zfill(6))
+    out.loc[fix] = hhmmss.loc[fix] + "000"
+    return out
 
 
 def flag(series: pd.Series) -> pd.Series:

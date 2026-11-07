@@ -85,6 +85,29 @@ def test_canonical_symbol_normalizes_suffix() -> None:
     assert canonical_symbol("600000.SH") == "600000.SH"
 
 
+def test_as_time_short_hhmmss_right_pads_ms() -> None:
+    """沪市 HHMMSS（≤6 位或 000HHMMSS）应右补毫秒，不能停在 000091500。"""
+    from qlib.contrib.data.l2_daily.util import CONTINUOUS_QUOTE_START, as_time
+
+    clock = as_time(
+        pd.Series([91500, "84518", "093000", "000093015", 93000000, "091500000", "000091500"])
+    )
+    assert clock.tolist() == [
+        "091500000",
+        "084518000",
+        "093000000",
+        "093015000",
+        "093000000",
+        "091500000",
+        "091500000",
+    ]
+    # 连续竞价起点附近的短戳 / 左填充戳必须能进窗
+    assert clock.iloc[2] >= CONTINUOUS_QUOTE_START
+    assert clock.iloc[3] >= CONTINUOUS_QUOTE_START
+    assert clock.iloc[4] >= CONTINUOUS_QUOTE_START
+
+
+
 def test_canonicalize_panel_collapses_case_duplicates() -> None:
     """旧 .sh 空行和 .SH 实值折成一行，非空优先。"""
     from qlib.contrib.data.l2_daily.storage import canonicalize_panel
@@ -386,6 +409,7 @@ def test_load_r2_env_fills_empty_keys_only(tmp_path: Path, monkeypatch) -> None:
 
     from qlib.contrib.data.l2_daily import r2_env
 
+    r2_env.reset_r2_network_for_tests()
     env = tmp_path / ".env"
     env.write_text(
         "R2_ENDPOINT_URL=https://example.r2.cloudflarestorage.com\n"
@@ -403,6 +427,32 @@ def test_load_r2_env_fills_empty_keys_only(tmp_path: Path, monkeypatch) -> None:
     assert os.environ["R2_ENDPOINT_URL"].startswith("https://example")
     assert os.environ["R2_ACCESS_KEY_ID"] == "keep-me"
     assert os.environ["R2_BUCKET"] == "level2"
+
+
+def test_r2_client_bypasses_env_proxy(tmp_path: Path, monkeypatch) -> None:
+    """默认直连：HTTPS_PROXY 指向死代理时，R2 client 也不走它。"""
+    import os
+
+    from qlib.contrib.data.l2_daily import r2_env, storage
+
+    r2_env.reset_r2_network_for_tests()
+    storage._client = None
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:7890")
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:7890")
+    monkeypatch.delenv("LEVEL2_L2_DAILY_NO_PROXY", raising=False)
+    monkeypatch.setenv("R2_ENV_FILE", str(tmp_path / "missing.env"))
+    monkeypatch.setenv("R2_ENDPOINT_URL", "https://example.r2.cloudflarestorage.com")
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "id")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret")
+    monkeypatch.setenv("R2_BUCKET", "level2")
+
+    r2_env.load_r2_env()
+    assert "HTTPS_PROXY" not in os.environ
+    assert "HTTP_PROXY" not in os.environ
+    client = storage._r2_client()
+    assert client.meta.config.proxies == {}
+    storage._client = None
+    r2_env.reset_r2_network_for_tests()
 
 
 def test_upload_day_to_r2_none_when_unconfigured(tmp_path: Path, monkeypatch) -> None:

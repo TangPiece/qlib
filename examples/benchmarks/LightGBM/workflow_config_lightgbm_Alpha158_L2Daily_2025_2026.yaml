@@ -1,0 +1,92 @@
+# Alpha158 + L2 百因子联合训练（258 列）；窗口对齐本机 L2 连续段 2025-01~2026-09
+# 训 2025Q1–Q3 / 验 2025Q4 / 测+回测 2026 至 L2 末日；超参与处理器同基线 yaml
+qlib_init:
+    provider_uri: "~/.qlib/qlib_data/cn_data"
+    region: cn
+market: &market csi300
+benchmark: &benchmark SH000300
+data_handler_config: &data_handler_config
+    start_time: 2025-01-02
+    end_time: 2026-09-30
+    fit_start_time: 2025-01-02
+    fit_end_time: 2025-09-30
+    instruments: *market
+    # 无 L2 成交的停牌日整行丢掉，避免 Fillna 把空 L2 填成中位数污染联合模型
+    infer_processors:
+        - class: DropnaCols
+          kwargs:
+              col_list: ["l2_trade_count"]
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: feature
+              method: robust
+        - class: Fillna
+          kwargs:
+              fields_group: feature
+    learn_processors:
+        - class: DropnaLabel
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: label
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>
+            # 实测集中持仓回撤更高，联合模型保留更稳健的 50 股组合
+            topk: 50
+            n_drop: 5
+    backtest:
+        start_time: 2026-01-05
+        end_time: 2026-09-30
+        account: 100000000
+        benchmark: *benchmark
+        exchange_kwargs:
+            limit_threshold: 0.095
+            deal_price: close
+            open_cost: 0.0005
+            close_cost: 0.0015
+            min_cost: 5
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs:
+            loss: mse
+            colsample_bytree: 0.8879
+            learning_rate: 0.05
+            subsample: 0.8789
+            lambda_l1: 205.6999
+            lambda_l2: 580.9768
+            max_depth: 6
+            num_leaves: 64
+            num_threads: 20
+            early_stopping_rounds: 50
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: Alpha158L2Daily
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                train: [2025-01-02, 2025-09-30]
+                valid: [2025-10-01, 2025-12-31]
+                test: [2026-01-05, 2026-09-30]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            model: <MODEL>
+            dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            ana_long_short: False
+            ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            config: *port_analysis_config
