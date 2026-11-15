@@ -26,6 +26,8 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import socket
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -49,10 +51,12 @@ DOWNLOAD_URL = (
 )
 RELEASE_MARKER_NAME = ".investment_data_release"
 _DATE_TAG_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-# 大文件下载易中断：默认重试次数与分块大小
-DOWNLOAD_RETRIES = 8
+# 大文件下载易中断/半挂死：优先 curl 续传；urllib 兜底并带读超时
+DOWNLOAD_RETRIES = 16
 DOWNLOAD_CHUNK_SIZE = 1 << 20  # 1 MiB
-DOWNLOAD_RETRY_SLEEP_SEC = 3.0
+DOWNLOAD_RETRY_SLEEP_SEC = 2.0
+DOWNLOAD_READ_TIMEOUT_SEC = 30  # 单次读超过该秒数视为卡死，触发续传
+DOWNLOAD_CONNECT_TIMEOUT_SEC = 30
 
 
 def log(msg: str) -> None:
@@ -70,7 +74,7 @@ def _probe_remote_size(url: str) -> Optional[int]:
     """HEAD 探测 Content-Length；失败则返回 None。"""
     req = urllib.request.Request(url, method="HEAD")
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=DOWNLOAD_CONNECT_TIMEOUT_SEC) as resp:
             length = resp.headers.get("Content-Length")
             if length and length.isdigit():
                 return int(length)
@@ -79,49 +83,105 @@ def _probe_remote_size(url: str) -> Optional[int]:
     return None
 
 
-def _print_progress(downloaded: int, total_size: int, last_pct: List[int]) -> None:
-    """按整数百分比刷新进度条，避免刷屏。"""
-    if total_size <= 0:
-        mb = downloaded / (1024 * 1024)
-        sys.stdout.write(f"\r  downloaded {mb:.1f} MB")
-        sys.stdout.flush()
+def _print_progress(
+    downloaded: int,
+    total_size: int,
+    state: List[float],
+    *,
+    force: bool = False,
+) -> None:
+    """刷新进度：至少每 1MB 或每 2 秒一次，并显示瞬时速度，避免「卡在 xx%」。
+
+    state = [last_printed_bytes, last_print_time, last_bytes_for_speed, last_speed_time]
+    """
+    now = time.monotonic()
+    last_printed, last_t, speed_bytes, speed_t = state
+    if (
+        not force
+        and downloaded < total_size
+        and (downloaded - last_printed) < DOWNLOAD_CHUNK_SIZE
+        and (now - last_t) < 2.0
+    ):
         return
-    pct = int(min(downloaded, total_size) * 100 / total_size)
-    if pct == last_pct[0] and downloaded < total_size:
-        return
-    last_pct[0] = pct
+
+    # 近窗口速度（B/s）
+    dt = max(now - speed_t, 1e-6)
+    speed = (downloaded - speed_bytes) / dt
+    state[0] = float(downloaded)
+    state[1] = now
+    state[2] = float(downloaded)
+    state[3] = now
+
     mb = downloaded / (1024 * 1024)
-    total_mb = total_size / (1024 * 1024)
-    sys.stdout.write(f"\r  {pct:3d}%  ({mb:.1f}/{total_mb:.1f} MB)")
+    speed_mb = speed / (1024 * 1024)
+    if total_size > 0:
+        pct = min(downloaded, total_size) * 100 / total_size
+        total_mb = total_size / (1024 * 1024)
+        sys.stdout.write(f"\r  {pct:5.1f}%  ({mb:.1f}/{total_mb:.1f} MB)  {speed_mb:.2f} MB/s")
+    else:
+        sys.stdout.write(f"\r  downloaded {mb:.1f} MB  {speed_mb:.2f} MB/s")
     sys.stdout.flush()
-    if downloaded >= total_size:
+    if total_size > 0 and downloaded >= total_size:
         sys.stdout.write("\n")
 
 
-def download_archive(
+def _curl_available() -> bool:
+    return shutil.which("curl") is not None
+
+
+def _download_with_curl(url: str, dest: Path, remote_size: Optional[int]) -> None:
+    """用 curl 断点续传（对 GitHub CDN / 不稳定链路更稳）。"""
+    # -C - 续传；--retry 处理瞬时失败；-L 跟随 redirect；--fail 把 HTTP 错误当失败
+    cmd = [
+        "curl",
+        "-L",
+        "--fail",
+        "--retry",
+        "8",
+        "--retry-delay",
+        "2",
+        "--retry-all-errors",
+        "--connect-timeout",
+        str(DOWNLOAD_CONNECT_TIMEOUT_SEC),
+        "--speed-time",
+        "30",  # 连续 30s 速度过低则中止，便于外层重跑续传
+        "--speed-limit",
+        "1024",  # <1 KiB/s 视为卡死
+        "-C",
+        "-",
+        "-o",
+        str(dest),
+        url,
+    ]
+    log(f"Using curl resume download -> {dest}")
+    # 让 curl 自己画进度条到 stderr
+    proc = subprocess.run(cmd, check=False)
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl exited with code {proc.returncode}")
+    final_size = dest.stat().st_size if dest.exists() else 0
+    if remote_size is not None and final_size < remote_size:
+        raise urllib.error.ContentTooShortError(
+            f"retrieval incomplete: got only {final_size} out of {remote_size} bytes",
+            None,
+        )
+    log(f"Download complete: {final_size / (1024 * 1024):.1f} MB")
+
+
+def _download_with_urllib(
     url: str,
     dest: Path,
+    remote_size: Optional[int],
     *,
-    retries: int = DOWNLOAD_RETRIES,
+    retries: int,
 ) -> None:
-    """下载大文件，支持 Range 断点续传与自动重试。
-
-    GitHub release 约 500MB+，``urlretrieve`` 中途断连会抛 ContentTooShortError；
-    本函数在同一 dest 上续传，并在多次重试后仍校验最终大小。
-    """
-    log(f"Downloading: {url}")
-    log(f"        to: {dest}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-
-    remote_size = _probe_remote_size(url)
-    last_pct = [-1]
+    """urllib 兜底：Range 续传 + 读超时，避免半挂死卡在某个百分比。"""
+    progress_state = [0.0, time.monotonic(), 0.0, time.monotonic()]
     attempt = 0
 
     while attempt < retries:
         attempt += 1
         existing = dest.stat().st_size if dest.exists() else 0
 
-        # 本地已完整则直接复用
         if remote_size is not None and existing == remote_size:
             log(f"Cache hit: {dest} already {existing / (1024 * 1024):.1f} MB")
             return
@@ -141,17 +201,21 @@ def download_archive(
 
         req = urllib.request.Request(url, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                # 不支持 Range 时服务器会返回 200 全量，需改回覆盖写
+            with urllib.request.urlopen(req, timeout=DOWNLOAD_CONNECT_TIMEOUT_SEC) as resp:
+                # 连接成功后单独收紧读超时，半挂死时尽快抛错续传
+                try:
+                    resp.fp.raw._sock.settimeout(DOWNLOAD_READ_TIMEOUT_SEC)  # type: ignore[attr-defined]
+                except Exception:  # noqa: BLE001
+                    socket.setdefaulttimeout(DOWNLOAD_READ_TIMEOUT_SEC)
+
                 status = getattr(resp, "status", None) or resp.getcode()
                 if existing > 0 and status == 200:
                     log("Server ignored Range; restarting from scratch")
                     dest.unlink(missing_ok=True)
                     existing = 0
                     mode = "wb"
-                    last_pct[0] = -1
+                    progress_state[0] = 0.0
 
-                # 从响应头更新期望总大小
                 total_size = remote_size
                 if status == 206:
                     content_range = resp.headers.get("Content-Range", "")
@@ -166,6 +230,8 @@ def download_archive(
                         remote_size = total_size
 
                 downloaded = existing
+                progress_state[2] = float(downloaded)
+                progress_state[3] = time.monotonic()
                 with open(dest, mode) as out:
                     while True:
                         chunk = resp.read(DOWNLOAD_CHUNK_SIZE)
@@ -173,7 +239,7 @@ def download_archive(
                             break
                         out.write(chunk)
                         downloaded += len(chunk)
-                        _print_progress(downloaded, total_size or 0, last_pct)
+                        _print_progress(downloaded, total_size or 0, progress_state)
 
             final_size = dest.stat().st_size
             if remote_size is not None and final_size < remote_size:
@@ -181,25 +247,64 @@ def download_archive(
                     f"retrieval incomplete: got only {final_size} out of {remote_size} bytes",
                     None,
                 )
-            if last_pct[0] < 100 and remote_size:
-                _print_progress(final_size, remote_size, last_pct)
-            elif last_pct[0] >= 0 and not (remote_size and final_size >= remote_size):
+            _print_progress(final_size, remote_size or final_size, progress_state, force=True)
+            if not (remote_size and final_size >= remote_size):
                 sys.stdout.write("\n")
-            size_mb = final_size / (1024 * 1024)
-            log(f"Download complete: {size_mb:.1f} MB")
+            log(f"Download complete: {final_size / (1024 * 1024):.1f} MB")
             return
 
-        except (urllib.error.URLError, urllib.error.ContentTooShortError, TimeoutError, OSError) as exc:
+        except (
+            urllib.error.URLError,
+            urllib.error.ContentTooShortError,
+            TimeoutError,
+            socket.timeout,
+            OSError,
+        ) as exc:
             sys.stdout.write("\n")
             partial = dest.stat().st_size if dest.exists() else 0
             log(f"Download interrupted ({exc}); kept {partial / (1024 * 1024):.1f} MB partial")
             if attempt >= retries:
                 raise
-            sleep_s = DOWNLOAD_RETRY_SLEEP_SEC * attempt
+            sleep_s = DOWNLOAD_RETRY_SLEEP_SEC * min(attempt, 5)
             log(f"Retrying in {sleep_s:.0f}s ...")
             time.sleep(sleep_s)
 
     raise RuntimeError(f"Failed to download after {retries} attempts: {url}")
+
+
+def download_archive(
+    url: str,
+    dest: Path,
+    *,
+    retries: int = DOWNLOAD_RETRIES,
+) -> None:
+    """下载大文件，优先 curl 断点续传，失败再回退 urllib。
+
+    GitHub release 约 500MB+，链路抖动时易半挂死「进度停在某 %」；
+    curl 的 ``--speed-time`` / ``-C -`` 对续传更稳。
+    """
+    log(f"Downloading: {url}")
+    log(f"        to: {dest}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    remote_size = _probe_remote_size(url)
+    existing = dest.stat().st_size if dest.exists() else 0
+    if remote_size is not None and existing == remote_size:
+        log(f"Cache hit: {dest} already {existing / (1024 * 1024):.1f} MB")
+        return
+    if remote_size is not None and existing > remote_size:
+        log(f"Local file larger than remote ({existing} > {remote_size}); truncating")
+        dest.unlink(missing_ok=True)
+
+    if _curl_available():
+        try:
+            _download_with_curl(url, dest, remote_size)
+            return
+        except Exception as exc:  # noqa: BLE001
+            partial = dest.stat().st_size if dest.exists() else 0
+            log(f"curl download failed ({exc}); falling back to urllib (kept {partial / (1024 * 1024):.1f} MB)")
+
+    _download_with_urllib(url, dest, remote_size, retries=retries)
 
 
 def archive_strip_components(members: Iterable[tarfile.TarInfo]) -> int:

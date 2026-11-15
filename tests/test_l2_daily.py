@@ -252,6 +252,97 @@ def test_missing_trade_source_is_skipped_not_failed(tmp_path: Path) -> None:
     assert status_rows[0]["status"] == "skipped"
 
 
+def test_onesided_limit_down_book_is_skipped(tmp_path: Path) -> None:
+    """全日跌停（买一=0）book 记 skipped，不抬失败率。"""
+    from qlib.contrib.data.l2_daily.catalog import GROUP_BOOK, factor_ids_for_group
+    from qlib.contrib.data.l2_daily.engine import _append_symbol_result, calc_group_for_symbol
+    from qlib.contrib.data.l2_daily.groups.book import ONESIDED_LOCK_KEY, snapshot_onesided_lock
+    from qlib.contrib.data.l2_daily.csv_io import read_csv_bytes
+
+    day = "20200203"
+    code_dir = tmp_path / day / "000004.SZ"
+    _write_gb18030(
+        code_dir / "行情.csv",
+        "时间,申买价1,申卖价1,申买量1,申卖量1\n"
+        "093100000,0,205400,0,100\n"
+        "100000000,0,205400,0,100\n"
+        "140000000,0,205400,0,100\n",
+    )
+    snap = read_csv_bytes((code_dir / "行情.csv").read_bytes(), "行情")
+    assert snapshot_onesided_lock(snap)
+    result = calc_group_for_symbol(tmp_path, day, "000004.SZ", GROUP_BOOK)
+    assert result is not None
+    assert result.get(ONESIDED_LOCK_KEY) is True
+
+    rows: list[dict] = []
+    status_rows: list[dict] = []
+    ok, fail = _append_symbol_result(
+        trade_date=day,
+        code="000004.SZ",
+        factor_group=GROUP_BOOK,
+        result=result,
+        columns=factor_ids_for_group(GROUP_BOOK),
+        rows=rows,
+        status_rows=status_rows,
+        books_root=tmp_path,
+    )
+    assert (ok, fail) == (0, 0)
+    assert rows == []
+    assert status_rows[0]["status"] == "skipped"
+
+
+def test_check_day_excludes_onesided_book_from_null_rate(tmp_path: Path) -> None:
+    """涨跌停锁死标的不进 book 空值率；应算标的足够时 QA 通过。"""
+    from qlib.contrib.data.l2_daily.catalog import factor_ids_for_group, wide_columns
+    from qlib.contrib.data.l2_daily.engine import calc_group_for_symbol
+    from qlib.contrib.data.l2_daily.qa import BOOK_NULL_MAX, check_day, group_null_rates
+
+    day = "20200203"
+    book_cols = factor_ids_for_group("book")
+    # 两行都填满非 book 列，避免 trade 空值率误杀；仅锁死行 book 全 NaN
+    ok_row = {col: 1.0 for col in wide_columns()}
+    ok_row.update({"trade_date": day, "symbol": "000001.SZ"})
+    locked_row = {col: 1.0 for col in wide_columns()}
+    locked_row.update({"trade_date": day, "symbol": "000004.SZ"})
+    for col in book_cols:
+        ok_row[col] = 0.1
+        locked_row[col] = float("nan")
+    wide = pd.DataFrame([ok_row, locked_row])
+
+    raw_rates = group_null_rates(wide)
+    assert raw_rates["book"] >= BOOK_NULL_MAX
+    excl_rates = group_null_rates(wide, book_exclude_symbols={"000004.SZ"})
+    assert excl_rates["book"] < BOOK_NULL_MAX
+
+    # 只建宽表内标的目录，避免 SAMPLE_CODES 抽到未入表的 600000.SH
+    for code in ("000001.SZ", "000004.SZ"):
+        _write_gb18030(
+            tmp_path / day / code / "逐笔成交.csv",
+            "时间,成交价格,成交数量,成交代码,BS标志,叫买序号,叫卖序号\n"
+            "093000001,100000,100,0,B,1,2\n",
+        )
+    live = calc_group_for_symbol(tmp_path, day, "000001.SZ", "trade")
+    assert live is not None
+    wide.loc[wide["symbol"] == "000001.SZ", "l2_trade_count"] = live["l2_trade_count"]
+    wide.loc[wide["symbol"] == "000001.SZ", "l2_vwap"] = live["l2_vwap"]
+    live_locked = calc_group_for_symbol(tmp_path, day, "000004.SZ", "trade")
+    assert live_locked is not None
+    wide.loc[wide["symbol"] == "000004.SZ", "l2_trade_count"] = live_locked["l2_trade_count"]
+    wide.loc[wide["symbol"] == "000004.SZ", "l2_vwap"] = live_locked["l2_vwap"]
+
+    report = check_day(
+        day=day,
+        wide=wide,
+        raw_root=tmp_path,
+        old_wide=None,
+        qa_dir=tmp_path / "qa",
+        book_exclude_symbols={"000004.SZ"},
+    )
+    assert report["ok"], report["errors"]
+    assert report["book_exclude_n"] == 1
+    assert report["group_null_rates"]["book"] < BOOK_NULL_MAX
+
+
 def test_drop_rows_without_trade_source(tmp_path: Path) -> None:
     """宽表丢掉缺逐笔成交的股票；缺源率按目录统计。"""
     from qlib.contrib.data.l2_daily.qa import (

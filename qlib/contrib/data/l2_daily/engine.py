@@ -18,6 +18,7 @@ from .catalog import (
 )
 from .csv_io import read_csv_bytes
 from .groups import (
+    ONESIDED_LOCK_KEY,
     calc_book_factors,
     calc_microstructure_factors,
     calc_order_factors,
@@ -267,6 +268,21 @@ def _append_symbol_result(
     宽表/账本 symbol 用规范化代码，读文件仍用传入的目录真名。
     """
     symbol = canonical_symbol(code)
+    # 涨跌停单边盘口：book 全 NaN 但属正常市况，与缺源一样记 skipped
+    if (
+        result is not None
+        and factor_group == GROUP_BOOK
+        and bool(result.get(ONESIDED_LOCK_KEY))
+    ):
+        status_rows.append(
+            {
+                "symbol": symbol,
+                "factor_group": factor_group,
+                "status": "skipped",
+                "source_version": "",
+            }
+        )
+        return 0, 0
     if result is None or _group_all_nan(result, columns):
         if (
             result is None

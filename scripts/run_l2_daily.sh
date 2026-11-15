@@ -103,9 +103,50 @@ is_running() {
   [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
 }
 
+# 列出某 pid 的直接子进程（ProcessPool worker 等）
+list_children() {
+  local pid="$1"
+  pgrep -P "$pid" 2>/dev/null || true
+}
+
+# 向进程组发信号；start_new_session=True 时 pid 即 pgid
+# 组杀失败时回退到单 pid，避免误伤无关进程
+kill_tree() {
+  local sig="$1"
+  local pid="$2"
+  kill "-${sig}" -- "-${pid}" 2>/dev/null || kill "-${sig}" -- "$pid" 2>/dev/null || true
+}
+
+# 兜底：清扫仍活着的 l2_daily 主进程及其子进程（历史孤儿）
+sweep_l2_daily_orphans() {
+  local pids child
+  # 匹配 python -m qlib.contrib.data.l2_daily；排除本 shell 自身
+  pids="$(pgrep -f 'python.*-m[[:space:]]+qlib\.contrib\.data\.l2_daily' 2>/dev/null || true)"
+  [[ -n "$pids" ]] || return 0
+  echo "清扫残留 l2_daily 进程: ${pids}"
+  for pid in $pids; do
+    [[ "$pid" == "$$" ]] && continue
+    is_running "$pid" || continue
+    for child in $(list_children "$pid"); do
+      kill -TERM -- "$child" 2>/dev/null || true
+    done
+    kill_tree TERM "$pid"
+  done
+  sleep 1
+  pids="$(pgrep -f 'python.*-m[[:space:]]+qlib\.contrib\.data\.l2_daily' 2>/dev/null || true)"
+  for pid in $pids; do
+    [[ "$pid" == "$$" ]] && continue
+    is_running "$pid" || continue
+    for child in $(list_children "$pid"); do
+      kill -KILL -- "$child" 2>/dev/null || true
+    done
+    kill_tree KILL "$pid"
+  done
+}
+
 cmd_status() {
   local key="$1"
-  local pf pid
+  local pf pid children child_count
   pf="$(pid_path "$key")"
   echo "key:     ${key}"
   echo "log:     $(log_path "$key")"
@@ -115,9 +156,23 @@ cmd_status() {
   if pid="$(read_pid "$key" 2>/dev/null)" && is_running "$pid"; then
     echo "status:  running (pid=${pid})"
     ps -p "$pid" -o pid=,etime=,pcpu=,command= 2>/dev/null || true
+    # 显示 ProcessPool 等子进程，便于核对是否多于 --workers
+    children="$(list_children "$pid")"
+    if [[ -n "$children" ]]; then
+      child_count="$(echo "$children" | wc -w | tr -d '[:space:]')"
+      echo "children:${child_count}"
+      ps -p "$(echo "$children" | tr ' ' ',')" -o pid=,ppid=,etime=,pcpu=,rss=,command= 2>/dev/null || true
+    else
+      echo "children:0"
+    fi
     return 0
   fi
   echo "status:  not running"
+  # pidfile 失效时仍提示是否有孤儿 worker
+  if pgrep -f 'python.*-m[[:space:]]+qlib\.contrib\.data\.l2_daily' >/dev/null 2>&1; then
+    echo "orphan:  仍有 l2_daily 相关进程（可用 stop 清扫）"
+    pgrep -fl 'python.*-m[[:space:]]+qlib\.contrib\.data\.l2_daily' 2>/dev/null || true
+  fi
   return 1
 }
 
@@ -132,22 +187,43 @@ cmd_tail() {
 
 cmd_stop() {
   local key="$1"
-  local pid
-  pid="$(read_pid "$key" 2>/dev/null)" || die "无 pid 文件: $(pid_path "$key")"
+  local pid child
+  pid="$(read_pid "$key" 2>/dev/null)" || {
+    # 无 pidfile 时仍尝试清扫历史孤儿 worker
+    echo "无 pid 文件: $(pid_path "$key")，尝试清扫残留 ..."
+    sweep_l2_daily_orphans
+    echo "已停止"
+    return 0
+  }
   if ! is_running "$pid"; then
-    echo "进程已不在运行 (pid=${pid})"
+    echo "进程已不在运行 (pid=${pid})，清扫残留 worker ..."
+    sweep_l2_daily_orphans
+    echo "已停止"
     return 0
   fi
-  echo "发送 SIGTERM 到 pid=${pid} ..."
-  kill -TERM "$pid"
+  # start_new_session=True：对进程组发 SIGTERM，一次收掉主进程 + workers
+  echo "发送 SIGTERM 到进程组 pgid=${pid} ..."
+  kill_tree TERM "$pid"
   for _ in $(seq 1 30); do
     if ! is_running "$pid"; then
+      # 主进程已退，再清可能落单的子进程 / 历史孤儿
+      for child in $(list_children "$pid"); do
+        kill -TERM -- "$child" 2>/dev/null || true
+      done
+      sweep_l2_daily_orphans
       echo "已停止"
       return 0
     fi
     sleep 1
   done
-  die "进程未在 30s 内退出，可手动 kill -9 ${pid}"
+  echo "30s 未退出，对进程组发送 SIGKILL ..."
+  kill_tree KILL "$pid"
+  sleep 1
+  sweep_l2_daily_orphans
+  if is_running "$pid"; then
+    die "进程组仍未退出，可手动 kill -9 -${pid}"
+  fi
+  echo "已强制停止"
 }
 
 cmd_start() {

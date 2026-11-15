@@ -1040,6 +1040,49 @@
       rebuildLiveIndustries(day);
     }
 
+    /** 与 server.py `_day_market` 单批上限一致，超出需前端拆批 */
+    const DAY_MARKET_CHUNK = 800;
+
+    /**
+     * 分批请求 /api/day_market，避免 topk=50 多日账本一次超 800 key 被拒。
+     * @returns {Promise<{quotes: Object, error: string|null}>}
+     */
+    async function fetchDayMarketQuotes(keys) {
+      const quotes = {};
+      if (!keys.length) return { quotes, error: null };
+      for (let i = 0; i < keys.length; i += DAY_MARKET_CHUNK) {
+        const chunk = keys.slice(i, i + DAY_MARKET_CHUNK);
+        const res = await fetch("/api/day_market", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys: chunk }),
+        });
+        if (!res.ok) {
+          let detail = "HTTP " + res.status;
+          try {
+            const body = await res.json();
+            if (body && body.error) detail = body.error;
+          } catch (_) { /* 非 JSON 响应时用 HTTP 状态 */ }
+          return { quotes, error: detail };
+        }
+        const body = await res.json();
+        (body.quotes || []).forEach((q) => {
+          if (q && q.instrument && q.date) quotes[quoteKey(q.instrument, q.date)] = q;
+        });
+      }
+      return { quotes, error: null };
+    }
+
+    /** 账本行情失败时写到预测区状态栏，避免权重静默变成「—」 */
+    function showLiveBookQuoteError(msg) {
+      const section = document.getElementById("liveSignalSection");
+      if (section) section.hidden = false;
+      const st = document.getElementById("livePredictStatus");
+      if (!st) return;
+      st.hidden = false;
+      st.textContent = msg;
+    }
+
     /** 按日期从早到晚给账本日补行情，后一天才能用到前一天滚完的现金和数量 */
     async function fillLiveBookDays() {
       const liveDays = (data.days || []).filter((d) => d && d.source === "live_book")
@@ -1070,18 +1113,20 @@
       });
       let quotes = {};
       try {
-        const res = await fetch("/api/day_market", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keys: keys }),
-        });
-        if (res.ok) {
-          const body = await res.json();
-          (body.quotes || []).forEach((q) => {
-            if (q && q.instrument && q.date) quotes[quoteKey(q.instrument, q.date)] = q;
-          });
+        const result = await fetchDayMarketQuotes(keys);
+        quotes = result.quotes;
+        if (result.error) {
+          showLiveBookQuoteError(
+            "账本行情补全失败（权重/价格可能为 —）: " + result.error +
+            " · keys=" + keys.length + " · batches=" + Math.ceil(keys.length / DAY_MARKET_CHUNK)
+          );
         }
-      } catch (_) { /* 报价失败时价格保持「—」 */ }
+      } catch (err) {
+        showLiveBookQuoteError(
+          "账本行情补全失败（权重/价格可能为 —）: " +
+          (err && err.message ? err.message : err)
+        );
+      }
       liveDays.forEach((day) => applyLiveDayMarks(day, quotes));
     }
 

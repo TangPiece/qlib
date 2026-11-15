@@ -21,6 +21,8 @@ BOOK_NULL_MAX = 0.20
 GROUP_FAIL_NULL = 0.95
 # 缺逐笔成交超过该比例视为坏档，而不是普通停牌。
 TRADE_SOURCE_MISS_MAX = 0.25
+# 涨跌停锁死等排除后，应算 book 的标的占比过低仍判坏档。
+BOOK_ELIGIBLE_MIN = 0.20
 SAMPLE_CODES = ("600000.SH", "000001.SZ")
 COMPARE_FIELDS = ("l2_trade_count", "l2_vwap")
 
@@ -46,15 +48,37 @@ def drop_rows_without_trade_source(wide: pd.DataFrame, raw_root: Path, day: str)
     return wide.loc[keep].reset_index(drop=True)
 
 
-def group_null_rates(wide: pd.DataFrame) -> dict[str, float]:
-    """每组单元格空值率。"""
+def _symbol_exclude_mask(wide: pd.DataFrame, exclude: set[str] | None) -> pd.Series:
+    """宽表行是否落在排除集合（规范化 symbol）。"""
+    if not exclude or "symbol" not in wide.columns:
+        return pd.Series(False, index=wide.index)
+    normalized = {canonical_symbol(item) for item in exclude}
+    return wide["symbol"].map(lambda value: canonical_symbol(value) if pd.notna(value) else value).isin(
+        normalized
+    )
+
+
+def group_null_rates(
+    wide: pd.DataFrame,
+    *,
+    book_exclude_symbols: set[str] | None = None,
+) -> dict[str, float]:
+    """每组单元格空值率。
+
+    book 可排除涨跌停锁死/缺行情 skipped 标的，只统计应算出盘口因子的行。
+    """
     out: dict[str, float] = {}
+    book_skip = _symbol_exclude_mask(wide, book_exclude_symbols)
     for group in ALL_GROUPS:
         cols = [c for c in factor_ids_for_group(group) if c in wide.columns]
         if not cols:
             out[group] = 1.0
             continue
-        out[group] = float(wide[cols].isna().to_numpy().mean())
+        frame = wide.loc[~book_skip] if group == "book" and book_exclude_symbols else wide
+        if frame.empty:
+            out[group] = 1.0
+            continue
+        out[group] = float(frame[cols].isna().to_numpy().mean())
     return out
 
 
@@ -133,15 +157,26 @@ def check_day(
     raw_root: Path,
     old_wide: pd.DataFrame | None,
     qa_dir: Path | None = None,
+    book_exclude_symbols: set[str] | None = None,
 ) -> dict[str, Any]:
-    """检查一日宽表。返回 {ok, errors, ...}。"""
+    """检查一日宽表。返回 {ok, errors, ...}。
+
+    book_exclude_symbols：涨跌停锁死等 book skipped 标的，不进 book 空值率分母。
+    """
     errors: list[str] = []
-    rates = group_null_rates(wide)
+    rates = group_null_rates(wide, book_exclude_symbols=book_exclude_symbols)
+    book_skip = _symbol_exclude_mask(wide, book_exclude_symbols)
+    book_eligible_n = int((~book_skip).sum()) if book_exclude_symbols else int(len(wide))
+    book_eligible_ratio = book_eligible_n / max(1, len(wide))
     if rates.get("trade", 1.0) >= GROUP_FAIL_NULL:
         errors.append(f"trade 空值率 {rates['trade']:.3f} ≥ {GROUP_FAIL_NULL}")
     elif rates.get("trade", 1.0) >= TRADE_NULL_MAX:
         errors.append(f"trade 空值率 {rates['trade']:.3f} ≥ {TRADE_NULL_MAX}")
-    if rates.get("book", 1.0) >= BOOK_NULL_MAX:
+    if book_eligible_ratio < BOOK_ELIGIBLE_MIN:
+        errors.append(
+            f"book 应算标的占比 {book_eligible_ratio:.3f} < {BOOK_ELIGIBLE_MIN}"
+        )
+    elif rates.get("book", 1.0) >= BOOK_NULL_MAX:
         errors.append(f"book 空值率 {rates['book']:.3f} ≥ {BOOK_NULL_MAX}")
 
     indexed = _index_by_canonical(wide) if "symbol" in wide.columns else wide
@@ -198,6 +233,8 @@ def check_day(
         "date": day,
         "n_symbols": int(len(wide)),
         "group_null_rates": rates,
+        "book_eligible_ratio": book_eligible_ratio,
+        "book_exclude_n": int(book_skip.sum()) if book_exclude_symbols else 0,
         "samples": samples,
         "errors": errors,
         "trade_source_miss_rate": trade_source_miss_rate(raw_root, day, list_codes(raw_root, day)),

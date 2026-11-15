@@ -6,8 +6,9 @@ import time
 from pathlib import Path
 
 from . import prepare, publish, qa, status, storage
-from .catalog import ALL_GROUPS, FACTOR_VERSION, factor_ids_for_group
+from .catalog import ALL_GROUPS, FACTOR_VERSION, GROUP_BOOK, factor_ids_for_group
 from .engine import calc_group_day, calc_groups_day, list_codes
+from .util import canonical_symbol
 
 _log = logging.getLogger(__name__)
 # 单日失败 kind 对应的中文，批次结束按类打印。
@@ -195,6 +196,31 @@ def _group_compute_status(ok: int, fail: int) -> str:
     return "failed"
 
 
+def _book_skipped_symbols(
+    output_root: Path,
+    trade_date: str,
+    *,
+    factor_version: int = FACTOR_VERSION,
+) -> set[str]:
+    """从当日 status 读取 book 组 skipped 标的（含涨跌停锁死 / 缺行情）。"""
+    path = storage.status_path(output_root, trade_date, factor_version=factor_version)
+    if not path.is_file():
+        return set()
+    try:
+        import pandas as pd
+
+        frame = pd.read_parquet(path)
+    except Exception:
+        _log.warning("读取 status 失败 %s", path, exc_info=True)
+        return set()
+    if frame.empty or "factor_group" not in frame.columns or "status" not in frame.columns:
+        return set()
+    hit = frame[(frame["factor_group"] == GROUP_BOOK) & (frame["status"] == "skipped")]
+    if hit.empty or "symbol" not in hit.columns:
+        return set()
+    return {canonical_symbol(str(item)) for item in hit["symbol"].tolist()}
+
+
 def _write_group_result(
     *,
     trade_date: str,
@@ -337,6 +363,8 @@ def run_one_day(
             continue
         pending.append(factor_group)
 
+    # book skipped（缺行情 / 涨跌停单边）不进 book 空值率分母
+    book_exclude_symbols: set[str] = set()
     if pending:
         by_group = calc_groups_day(
             books_root,
@@ -351,6 +379,10 @@ def run_one_day(
             source_version = versions[factor_group]
             for item in status_rows:
                 item["source_version"] = source_version
+            if factor_group == GROUP_BOOK:
+                for item in status_rows:
+                    if item.get("status") == "skipped":
+                        book_exclude_symbols.add(canonical_symbol(str(item.get("symbol") or "")))
             state = _group_compute_status(ok, fail)
             result = {
                 "status": state,
@@ -386,6 +418,11 @@ def run_one_day(
                 kind="compute",
             )
 
+    if not book_exclude_symbols and GROUP_BOOK in selected:
+        book_exclude_symbols = _book_skipped_symbols(
+            output_root, trade_date, factor_version=factor_version
+        )
+
     # 停牌占位不进宽表，也不计入空值率；缺源过多则视为坏档。
     miss_rate = qa.trade_source_miss_rate(books_root, trade_date, codes)
     if miss_rate >= qa.TRADE_SOURCE_MISS_MAX:
@@ -410,7 +447,13 @@ def run_one_day(
             error="empty wide",
         )
 
-    report = qa.check_day(day=trade_date, wide=merged, raw_root=books_root, old_wide=existing)
+    report = qa.check_day(
+        day=trade_date,
+        wide=merged,
+        raw_root=books_root,
+        old_wide=existing,
+        book_exclude_symbols=book_exclude_symbols or None,
+    )
     if not report.get("ok"):
         return _record_qa_failure(
             trade_date=trade_date,

@@ -11,7 +11,7 @@ from . import prepare, storage
 from .pipeline import run, run_batch
 from .r2_env import load_r2_env
 
-DEFAULT_WORKERS = 8
+DEFAULT_WORKERS = 10
 
 
 def _default_workers() -> int:

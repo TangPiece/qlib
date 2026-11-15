@@ -1,6 +1,8 @@
 """盘口与 OBI（因子 43–64）。"""
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
 from ..util import CONTINUOUS_QUOTE_END, CONTINUOUS_QUOTE_START, PRICE_SCALE, as_time
@@ -10,6 +12,8 @@ from .._prep import _numeric
 from ..catalog import factor_ids_for_group
 
 _KEYS = factor_ids_for_group("book")
+# 内部标记：连续竞价有行情但无双边有效价（涨跌停锁死），供 engine 记 skipped。
+ONESIDED_LOCK_KEY = "_onesided_lock"
 
 
 def _level_sum(frame: pd.DataFrame, prefix: str, levels: int) -> pd.Series:
@@ -26,8 +30,28 @@ def _level_sum(frame: pd.DataFrame, prefix: str, levels: int) -> pd.Series:
     return total
 
 
-def calc_book_factors(snapshot: pd.DataFrame) -> dict[str, float]:
-    out = empty_nan(_KEYS)
+def _continuous_quote_frame(snapshot: pd.DataFrame) -> pd.DataFrame:
+    """筛连续竞价时段行情；缺列或空表返回空 DataFrame。"""
+    if snapshot is None or len(snapshot) == 0 or "时间" not in snapshot.columns:
+        return pd.DataFrame()
+    clock = as_time(snapshot["时间"])
+    return snapshot.loc[(clock >= CONTINUOUS_QUOTE_START) & (clock < CONTINUOUS_QUOTE_END)]
+
+
+def snapshot_onesided_lock(snapshot: pd.DataFrame) -> bool:
+    """连续竞价有行情，但全程无买卖双边有效价（涨/跌停锁死）。"""
+    if "申买价1" not in getattr(snapshot, "columns", ()) or "申卖价1" not in snapshot.columns:
+        return False
+    frame = _continuous_quote_frame(snapshot)
+    if len(frame) == 0:
+        return False
+    bid = pd.to_numeric(frame["申买价1"], errors="coerce")
+    ask = pd.to_numeric(frame["申卖价1"], errors="coerce")
+    return not bool(((bid > 0) & (ask > 0)).any())
+
+
+def calc_book_factors(snapshot: pd.DataFrame) -> dict[str, Any]:
+    out: dict[str, Any] = empty_nan(_KEYS)
     if snapshot is None or len(snapshot) == 0 or "时间" not in snapshot.columns:
         return out
     if "申买价1" not in snapshot.columns or "申卖价1" not in snapshot.columns:
@@ -35,9 +59,7 @@ def calc_book_factors(snapshot: pd.DataFrame) -> dict[str, float]:
     if "申买量1" not in snapshot.columns or "申卖量1" not in snapshot.columns:
         return out
 
-    frame = snapshot.copy()
-    clock = as_time(frame["时间"])
-    frame = frame.loc[(clock >= CONTINUOUS_QUOTE_START) & (clock < CONTINUOUS_QUOTE_END)]
+    frame = _continuous_quote_frame(snapshot)
     if len(frame) == 0:
         return out
 
@@ -45,6 +67,10 @@ def calc_book_factors(snapshot: pd.DataFrame) -> dict[str, float]:
     ask = pd.to_numeric(frame["申卖价1"], errors="coerce") / PRICE_SCALE
     mid = (bid + ask) / 2.0
     valid = (bid > 0) & (ask > 0) & (mid > 0)
+    # 有连续竞价快照但无双边：涨跌停锁死，因子全 NaN 并打标供 engine skipped
+    if not bool(valid.any()):
+        out[ONESIDED_LOCK_KEY] = True
+        return out
     spread = (ask - bid).where(valid)
     rel = ((ask - bid) / mid).where(valid)
 

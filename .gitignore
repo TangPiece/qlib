@@ -66,6 +66,9 @@ node_modules/
 # 财务因子 staging / 日宽表
 /data/fundamental_staging/
 
+/data/A股上市公司财务数据/
+/data/中国电力年鉴/
+
 # 资金流向监测 staging
 # /data/flow_staging/
 
