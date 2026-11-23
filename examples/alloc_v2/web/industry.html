@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>行业配置 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="industry">
+  <main class="page">
+    <h2>行业配置</h2>
+    <p class="lede">综合分是相对强度合成，不是流入金额。点柱看单行业因子。</p>
+    <div class="grid two">
+      <section class="card">
+        <h3>配置综合分最新截面</h3>
+        <div class="chart-box tall" id="indBar"></div>
+        <div class="caption" id="capScore"></div>
+      </section>
+      <section class="card">
+        <h3>成交额占比</h3>
+        <div class="chart-box tall" id="indTurn"></div>
+        <div class="caption" id="capTurn"></div>
+      </section>
+    </div>
+    <section class="card">
+      <h3>近 60 日综合分热力</h3>
+      <div class="heat" id="indHeat"></div>
+      <div class="caption" id="capHeat"></div>
+    </section>
+    <section class="card">
+      <h3 id="indFocusTitle">行业详情</h3>
+      <div class="chart-box" id="indFocus"></div>
+    </section>
+    <section class="card">
+      <h3>全部行业综合分序列</h3>
+      <table id="indList"></table>
+    </section>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

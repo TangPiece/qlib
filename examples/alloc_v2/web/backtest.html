@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>回测 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="backtest">
+  <main class="page">
+    <h2>因子回测</h2>
+    <p class="lede">红柱 = 未建成（factor_missing）。IC≈0 是测过了但无稳定预测力。</p>
+    <section class="card">
+      <h3>全样本 RankIC（约 20 日）</h3>
+      <div class="chart-box" id="btIc"></div>
+      <div class="caption" id="capIc"></div>
+    </section>
+    <div class="grid two">
+      <section class="card">
+        <h3>近一年 RankIC</h3>
+        <div class="chart-box" id="btIc252"></div>
+        <div class="caption" id="capIc252"></div>
+      </section>
+      <section class="card">
+        <h3>多空净收益</h3>
+        <div class="chart-box" id="btLs"></div>
+        <div class="caption" id="capLs"></div>
+      </section>
+    </div>
+    <section class="card">
+      <h3>分年 IC</h3>
+      <div style="max-height: 280px; overflow: auto;"><table id="btYear"></table></div>
+    </section>
+    <section class="card">
+      <h3>因子相关</h3>
+      <div style="max-height: 280px; overflow: auto;"><table id="btCorr"></table></div>
+    </section>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+:root {
+  --bg: #f4f2ee;
+  --card: #fff;
+  --ink: #1c2430;
+  --muted: #667085;
+  --line: #e4dfd6;
+  --side: #1b2430;
+  --side-ink: #d7dde6;
+  --accent: #2563eb;
+  --ok: #157a4b;
+  --warn: #b45309;
+  --bad: #b42318;
+  --proxy: #52606d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 210px 1fr; min-height: 100vh; }
+.side { background: var(--side); color: var(--side-ink); padding: 18px 12px; position: sticky; top: 0; height: 100vh; overflow: auto; }
+.side h1 { font-size: 14px; margin: 0 0 4px; color: #fff; font-weight: 650; }
+.side .hint { color: #8b95a3; font-size: 12px; margin: 0 0 16px; }
+.side nav a { display: block; color: var(--side-ink); padding: 7px 10px; border-radius: 6px; margin-bottom: 2px; }
+.side nav a:hover { background: #2a3544; text-decoration: none; }
+.side nav a.active { background: #2f6fed; color: #fff; }
+.main { padding: 0; }
+.top { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 12px 22px; border-bottom: 1px solid var(--line); background: #fff; position: sticky; top: 0; z-index: 5; }
+.kpis { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; }
+.kpis b { display: block; font-size: 16px; }
+.kpis span { color: var(--muted); }
+.windows { display: flex; gap: 6px; }
+.evidence { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.windows button, .btn {
+  border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 10px; cursor: pointer;
+}
+.windows button.on, .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.page { padding: 20px 22px 48px; }
+.page h2 { margin: 0 0 8px; font-size: 20px; }
+.lede { color: var(--muted); margin: 0 0 16px; max-width: 70ch; }
+.grid { display: grid; gap: 14px; }
+.grid.two { grid-template-columns: 1fr 1fr; }
+.grid.three { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.card h3 { margin: 0 0 8px; font-size: 14px; }
+.caption { white-space: pre-wrap; color: var(--muted); font-size: 12px; margin-top: 8px; }
+.empty { color: var(--muted); padding: 28px 8px; text-align: center; }
+.tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: #eef2f6; color: var(--proxy); margin-right: 4px; }
+.tag.estimate { background: #fff4e5; color: var(--warn); }
+.tag.fact { background: #e7f6ee; color: var(--ok); }
+.tag.signal { background: #e8eefc; color: var(--accent); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: #f7f5f1; }
+tr.hi { background: #e8eefc; }
+.search { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 10px; }
+.chart-box { position: relative; height: 260px; }
+.chart-box.tall { height: 320px; }
+.heat { overflow: auto; }
+.heat table { font-size: 11px; }
+.heat td.cell { text-align: center; min-width: 28px; }
+.pager { display: flex; gap: 8px; align-items: center; margin-top: 10px; color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.kpi-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+a.kpi-card { display: block; color: inherit; text-decoration: none; }
+a.kpi-card:hover { border-color: var(--accent); text-decoration: none; }
+.heat tr[data-id] { cursor: pointer; }
+.kpi-card .v { font-size: 22px; font-weight: 650; }
+.tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+@media (max-width: 980px) {
+  .layout { grid-template-columns: 1fr; }
+  .side { height: auto; position: relative; }
+  .grid.two, .grid.three, .cards { grid-template-columns: 1fr; }
+}

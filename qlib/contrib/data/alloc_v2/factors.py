@@ -21,8 +21,21 @@ from .mappings import domestic_etf_codes, etf_to_industry_map, load_etf_master
 from .registry import dataset_by_id
 from .schema import SCHEMA_VERSION
 
-FORMULA_VERSION = "alloc_factors@v3"
+FORMULA_VERSION = "alloc_factors@v4"
 _log = logging.getLogger(__name__)
+
+# V2.2-Free 环境代理：单实体时间序列，不作行业截面 IC 评测
+_V22_PRICE_SPECS: tuple[tuple[str, str, str, str], ...] = (
+    # dataset, field, factor_prefix, entity_hint（空=全列）
+    ("vix_cboe", "close", "VIX", ""),
+    ("dxy", "close", "DXY", ""),
+    ("oil_brent", "close", "Brent", ""),
+    ("oil_wti", "close", "WTI", ""),
+    ("silver_sge", "close", "Silver", ""),
+    ("crypto_btc", "close", "BTC", ""),
+    ("gold_sge", "close", "GoldSGE", ""),
+    ("us_real_rate", "yield", "USReal10Y", ""),
+)
 
 
 def _asof_filter(frame: pd.DataFrame, asof: pd.Timestamp | None) -> pd.DataFrame:
@@ -389,6 +402,140 @@ def build_all_factors(standard: pd.DataFrame, *, asof: pd.Timestamp | None = Non
     if not turn_nb.empty:
         rows.extend(_long_factor_rows(turn_nb, factor_id="HSGT_Turnover", evidence_class="proxy", unit="cny", window=1, layer="B"))
 
+    # V2.2-Free：全球风险/商品价格代理因子（proxy，非资金流）
+    rows.extend(_build_v22_env_factors(work))
+
     out = pd.DataFrame(rows)
     assert_no_north_net_in_core(out)
+    return out
+
+
+def _build_v22_env_factors(work: pd.DataFrame) -> list[dict[str, Any]]:
+    """为已入库的全球环境序列写 Return20 / Change20 / 分位 / 价差。"""
+    rows: list[dict[str, Any]] = []
+    panels: dict[str, pd.DataFrame] = {}
+    for dataset, field, prefix, _hint in _V22_PRICE_SPECS:
+        panel = _pivot(work, dataset, field)
+        if panel.empty:
+            continue
+        panels[prefix] = panel
+        ret20 = panel.pct_change(20, fill_method=None)
+        rows.extend(
+            _long_factor_rows(ret20, factor_id=f"{prefix}_Return20", evidence_class="proxy", unit="ret", window=20, layer="B")
+        )
+        chg20 = panel.diff(20)
+        rows.extend(
+            _long_factor_rows(chg20, factor_id=f"{prefix}_Change20", evidence_class="proxy", unit="level", window=20, layer="B")
+        )
+        for entity in panel.columns:
+            pct = rolling_percentile(panel[entity], 60)
+            rows.extend(
+                _long_factor_rows(
+                    pct.to_frame(name=entity),
+                    factor_id=f"{prefix}_Percentile60",
+                    evidence_class="proxy",
+                    unit="pctile",
+                    window=60,
+                    layer="B",
+                )
+            )
+        # BTC 波动率：20 日收益标准差
+        if prefix == "BTC":
+            vol20 = panel.pct_change(fill_method=None).rolling(20, min_periods=10).std()
+            rows.extend(
+                _long_factor_rows(
+                    vol20, factor_id="BTC_Volatility20", evidence_class="proxy", unit="vol", window=20, layer="B"
+                )
+            )
+
+    # Brent − WTI 价差（同日历对齐）
+    if "Brent" in panels and "WTI" in panels:
+        b = panels["Brent"]
+        w = panels["WTI"]
+        if not b.empty and not w.empty:
+            b_col = b.columns[0]
+            w_col = w.columns[0]
+            aligned = pd.concat([b[b_col], w[w_col]], axis=1, join="inner")
+            aligned.columns = ["BRENT", "WTI"]
+            spread = (aligned["BRENT"] - aligned["WTI"]).to_frame(name="BRENT_WTI")
+            rows.extend(
+                _long_factor_rows(
+                    spread, factor_id="Brent_WTI_Spread", evidence_class="proxy", unit="usd/bbl", window=1, layer="B"
+                )
+            )
+
+    # 金银比：上海金(元/克) vs 上海银(元/千克) → 统一到元/克
+    gold = _pivot(work, "gold_sge", "close")
+    silver = _pivot(work, "silver_sge", "close")
+    if not gold.empty and not silver.empty:
+        g = gold[gold.columns[0]]
+        s = silver[silver.columns[0]] / 1000.0  # 元/千克 → 元/克
+        ratio = (g.reindex(g.index.union(s.index)).ffill(limit=5) / s.reindex(g.index.union(s.index)).ffill(limit=5)).dropna()
+        if not ratio.empty:
+            rows.extend(
+                _long_factor_rows(
+                    ratio.to_frame(name="GOLD_SILVER"),
+                    factor_id="Gold_Silver_Ratio",
+                    evidence_class="proxy",
+                    unit="ratio",
+                    window=1,
+                    layer="B",
+                )
+            )
+
+    # M1−M2 同比增速差（月频，不日前填成日频）
+    m1 = _pivot(work, "cn_macro", "m1_yoy")
+    m2 = _pivot(work, "cn_macro", "m2_yoy")
+    if not m1.empty and not m2.empty and "M1" in m1.columns and "M2" in m2.columns:
+        spread = (m1["M1"] - m2["M2"]).to_frame(name="M1_M2")
+        rows.extend(
+            _long_factor_rows(
+                spread, factor_id="M1_M2_Spread", evidence_class="proxy", unit="pct", window=1, layer="B"
+            )
+        )
+
+    # 股债收益差：盈利收益率(100/PE) − CN10Y；缺任一侧则跳过，不填 0
+    rows.extend(_build_equity_bond_yield_gap(work))
+    return rows
+
+
+def _build_equity_bond_yield_gap(work: pd.DataFrame) -> list[dict[str, Any]]:
+    """CSI300 滚动 PE → EarningsYield；与 CN10Y 按日对齐得 EquityBondYieldGap。"""
+    pe = _pivot(work, "idx_pe_csindex", "pe_ttm")
+    if pe.empty or "CSI300" not in pe.columns:
+        return []
+    pe_s = pe["CSI300"].astype(float)
+    pe_s = pe_s[(pe_s > 0) & pe_s.notna()]
+    if pe_s.empty:
+        return []
+    ey = (100.0 / pe_s).to_frame(name="CSI300")
+    out = _long_factor_rows(
+        ey,
+        factor_id="EarningsYield",
+        evidence_class="proxy",
+        unit="pct",
+        window=1,
+        layer="B",
+        available_at_lag_days=1,
+    )
+    bond = _pivot(work, "yield_cn_us", "yield")
+    if bond.empty or "CN10Y" not in bond.columns:
+        return out
+    aligned = pd.concat([ey["CSI300"], bond["CN10Y"]], axis=1, join="inner")
+    aligned.columns = ["ey", "cn10y"]
+    aligned = aligned.dropna()
+    if aligned.empty:
+        return out
+    gap = (aligned["ey"] - aligned["cn10y"]).to_frame(name="CSI300_CN10Y")
+    out.extend(
+        _long_factor_rows(
+            gap,
+            factor_id="EquityBondYieldGap",
+            evidence_class="proxy",
+            unit="pct",
+            window=1,
+            layer="B",
+            available_at_lag_days=1,
+        )
+    )
     return out

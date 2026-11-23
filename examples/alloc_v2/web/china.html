@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>中国宏观 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="china">
+  <main class="page">
+    <h2>中国宏观与流动性</h2>
+    <p class="lede">月频点稀疏是正常的，不伪装日频。社融为增量不是存量；回测按 available_at。</p>
+    <div class="grid two">
+      <section class="card">
+        <h3>M1/M2 同比与 PMI</h3>
+        <div class="chart-box" id="cMacro"></div>
+        <div class="caption" id="capMacro"></div>
+      </section>
+      <section class="card">
+        <h3>社融增量</h3>
+        <div class="chart-box" id="cSocfin"></div>
+      </section>
+    </div>
+    <section class="card">
+      <h3>LPR 与 M1-M2 增速差</h3>
+      <div class="chart-box" id="cLpr"></div>
+    </section>
+    <section class="card">
+      <h3>本层全部序列</h3>
+      <table id="chinaList"></table>
+    </section>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

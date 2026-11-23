@@ -158,13 +158,16 @@ def seed_cross_border() -> pd.DataFrame:
 
 
 def write_empty_maps(root: Path | None = None) -> dict[str, str]:
-    """写出映射表（有种子, 无则空结构）。"""
+    """写出映射表（有种子, 无则空结构）及 V2.2 指标目录。"""
+    from .catalog import write_indicator_catalog
+
     paths = {
         "etf_master": write_map(seed_etf_master(), name="etf_master", root=root),
         "etf_industry_weight": write_map(seed_industry_weight(), name="etf_industry_weight", root=root),
         "feeder_etf": write_map(seed_feeder(), name="feeder_etf", root=root),
         "entity_map": write_map(seed_entity_map(), name="entity_map", root=root),
         "cross_border_status": write_map(seed_cross_border(), name="cross_border_status", root=root),
+        "v22_indicator_catalog": write_indicator_catalog(root=root),
     }
     return {key: str(path) for key, path in paths.items()}
 

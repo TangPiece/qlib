@@ -69,13 +69,28 @@ def main(argv: list[str] | None = None) -> int:
     p_upload.add_argument("--root", default="", help="数据根，默认 data/alloc_v2")
     p_upload.add_argument("--dry-run", action="store_true", help="只列将上传的键，不 put")
 
+    p_serve = sub.add_parser("serve", help="本地多页研究站（只读 parquet）")
+    p_serve.add_argument("--root", default="", help="数据根，默认 data/alloc_v2")
+    p_serve.add_argument("--host", default="127.0.0.1", help="绑定地址，默认 127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8766, help="端口，默认 8766")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "catalog":
+        from .catalog import write_indicator_catalog
+
+        catalog_path = write_indicator_catalog()
         rows = catalog_rows(include_disabled=args.include_disabled)
         if args.json:
-            return _dump({"series_set": SERIES_SET, "count": len(rows), "datasets": rows})
-        print(f"{SERIES_SET} count={len(rows)}")
+            return _dump(
+                {
+                    "series_set": SERIES_SET,
+                    "count": len(rows),
+                    "catalog_csv": str(catalog_path),
+                    "datasets": rows,
+                }
+            )
+        print(f"{SERIES_SET} count={len(rows)} catalog={catalog_path}")
         for row in rows:
             flag = "on " if row["enabled"] else "off"
             print(
@@ -116,6 +131,12 @@ def main(argv: list[str] | None = None) -> int:
         if not summary.get("dry_run") and not summary.get("configured"):
             return 2
         return code
+    if args.cmd == "serve":
+        from .serve import serve_lab
+
+        # 前台阻塞；数据只读，不改因子
+        serve_lab(root=root, host=str(args.host), port=int(args.port))
+        return 0
     return 1
 
 

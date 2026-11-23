@@ -21,7 +21,8 @@ _PROXY_KEYS = (
 )
 
 _DEFAULT_NO_PROXY = "1"
-_DEFAULT_TIMEOUT = 15.0
+# (connect, read)：死站尽快失败，避免 update 卡在 connect
+_DEFAULT_TIMEOUT: float | tuple[float, float] = (5.0, 15.0)
 
 _prepared = False
 _cleared: dict[str, str] = {}
@@ -57,7 +58,7 @@ def disable_env_proxy() -> dict[str, str]:
     return saved
 
 
-def patch_requests_timeout(timeout: float = _DEFAULT_TIMEOUT) -> None:
+def patch_requests_timeout(timeout: float | tuple[float, float] = _DEFAULT_TIMEOUT) -> None:
     global _requests_patched, _orig_request
     if _requests_patched:
         return
@@ -75,7 +76,18 @@ def patch_requests_timeout(timeout: float = _DEFAULT_TIMEOUT) -> None:
 
     requests.sessions.Session.request = _request  # type: ignore[method-assign]
     _requests_patched = True
-    _log.info("requests 默认 timeout=%ss", timeout)
+    _log.info("requests 默认 timeout=%s", timeout)
+
+
+def resolve_http_timeout() -> float | tuple[float, float]:
+    """读取 ALLOC_V2_HTTP_TIMEOUT；支持 \"15\" 或 \"5,20\"。"""
+    timeout_raw = os.getenv("ALLOC_V2_HTTP_TIMEOUT", os.getenv("FLOW_MONITOR_HTTP_TIMEOUT", "")).strip()
+    if not timeout_raw:
+        return _DEFAULT_TIMEOUT
+    if "," in timeout_raw:
+        left, right = timeout_raw.split(",", 1)
+        return (float(left.strip()), float(right.strip()))
+    return float(timeout_raw)
 
 
 def prepare_network() -> None:
@@ -87,9 +99,7 @@ def prepare_network() -> None:
     raw = os.getenv("ALLOC_V2_NO_PROXY", os.getenv("FLOW_MONITOR_NO_PROXY", _DEFAULT_NO_PROXY))
     if _truthy(raw) and env_has_proxy():
         disable_env_proxy()
-    timeout_raw = os.getenv("ALLOC_V2_HTTP_TIMEOUT", os.getenv("FLOW_MONITOR_HTTP_TIMEOUT", "")).strip()
-    timeout = float(timeout_raw) if timeout_raw else _DEFAULT_TIMEOUT
-    patch_requests_timeout(timeout)
+    patch_requests_timeout(resolve_http_timeout())
 
 
 def reset_network_state_for_tests() -> None:

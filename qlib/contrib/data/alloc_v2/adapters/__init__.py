@@ -14,9 +14,11 @@ from .etf import EtfAdapter
 from .global_macro import GlobalMacroAdapter
 from .industry import IndustryAdapter
 from .institution import InstitutionAdapter
+from .v22_free import V22FreeAdapter
 
 ADAPTERS = (
     GlobalMacroAdapter,
+    V22FreeAdapter,
     EtfAdapter,
     IndustryAdapter,
     ChinaAdapter,

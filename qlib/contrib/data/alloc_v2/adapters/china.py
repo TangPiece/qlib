@@ -5,10 +5,35 @@
 
 from __future__ import annotations
 
-from datetime import date
+import re
+from calendar import monthrange
+from datetime import date, timedelta
 
 from ..schema import finite_number, first_col, in_range, parse_day
 from .base import lookup, row_of, safe_call
+
+
+def parse_cn_month(value) -> date | None:
+    """解析「2026年09月份」或「201501」为该月最后一天；失败再退回 parse_day。"""
+    if value is None:
+        return None
+    text = str(value).strip()
+    match = re.search(r"(\d{4})\s*年\s*(\d{1,2})\s*月", text)
+    if match:
+        year, month = int(match.group(1)), int(match.group(2))
+        if 1 <= month <= 12:
+            return date(year, month, monthrange(year, month)[1])
+    match = re.fullmatch(r"(\d{4})(\d{2})", text)
+    if match:
+        year, month = int(match.group(1)), int(match.group(2))
+        if 1 <= month <= 12:
+            return date(year, month, monthrange(year, month)[1])
+    return parse_day(value)
+
+
+def _macro_available_at(event_day: date, *, lag_days: int = 15) -> date:
+    """月频宏观：保守按观察月末 + lag 才可进入回测（非精确发布时间）。"""
+    return event_day + timedelta(days=lag_days)
 
 
 class ChinaAdapter:
@@ -93,6 +118,7 @@ class ChinaAdapter:
         return rows
 
     def _fetch_macro(self, start: date | None, end: date | None) -> list:
+        """货币供给 / 社融增量 / PMI / LPR。月频用月末 event_date + 保守 available_at。"""
         import akshare as ak
 
         spec = lookup("cn_macro")
@@ -100,14 +126,80 @@ class ChinaAdapter:
         money = safe_call("macro_china_money_supply", ak.macro_china_money_supply)
         if not money.empty:
             date_col = first_col(money, ("月份", "日期"))
-            value_col = first_col(money, ("货币和准货币(M2)-数量", "M2", "货币和准货币"))
+            field_map = (
+                ("M2", "m2", ("货币和准货币(M2)-数量", "M2", "货币和准货币"), "cny"),
+                ("M2", "m2_yoy", ("货币和准货币(M2)-同比",), "pct"),
+                ("M1", "m1", ("货币(M1)-数量", "M1"), "cny"),
+                ("M1", "m1_yoy", ("货币(M1)-同比",), "pct"),
+            )
+            if date_col is not None:
+                for entity, field, candidates, unit in field_map:
+                    value_col = first_col(money, candidates)
+                    if value_col is None:
+                        continue
+                    for raw_day, raw_value in zip(money[date_col], money[value_col]):
+                        day = parse_cn_month(raw_day)
+                        value = finite_number(raw_value)
+                        if value is None or not in_range(day, start, end):
+                            continue
+                        rows.append(
+                            row_of(
+                                spec,
+                                entity,
+                                day,
+                                field,
+                                value,
+                                unit=unit,
+                                available_at=_macro_available_at(day),
+                            )
+                        )
+
+        # 社融规模增量（非存量）——字段与实体名显式标明 NEW
+        socfin = safe_call("macro_china_shrzgm", ak.macro_china_shrzgm)
+        if not socfin.empty:
+            date_col = first_col(socfin, ("月份", "日期"))
+            value_col = first_col(socfin, ("社会融资规模增量", "社融增量"))
             if date_col is not None and value_col is not None:
-                for raw_day, raw_value in zip(money[date_col], money[value_col]):
-                    day = parse_day(raw_day)
+                for raw_day, raw_value in zip(socfin[date_col], socfin[value_col]):
+                    day = parse_cn_month(raw_day)
                     value = finite_number(raw_value)
                     if value is None or not in_range(day, start, end):
                         continue
-                    rows.append(row_of(spec, "M2", day, "m2", value, unit="cny", available_at=day))
+                    rows.append(
+                        row_of(
+                            spec,
+                            "SOCFIN_NEW",
+                            day,
+                            "amount",
+                            value,
+                            unit="cny_yi",
+                            available_at=_macro_available_at(day),
+                        )
+                    )
+
+        pmi = safe_call("macro_china_pmi", ak.macro_china_pmi)
+        if not pmi.empty:
+            date_col = first_col(pmi, ("月份", "日期"))
+            manu_col = first_col(pmi, ("制造业-指数", "制造业"))
+            if date_col is not None and manu_col is not None:
+                for raw_day, raw_value in zip(pmi[date_col], pmi[manu_col]):
+                    day = parse_cn_month(raw_day)
+                    value = finite_number(raw_value)
+                    if value is None or not in_range(day, start, end):
+                        continue
+                    # PMI 通常月初公布上月值，lag 取 3 日保守估计
+                    rows.append(
+                        row_of(
+                            spec,
+                            "PMI_MANU",
+                            day,
+                            "pmi",
+                            value,
+                            unit="index",
+                            available_at=_macro_available_at(day, lag_days=3),
+                        )
+                    )
+
         lpr = safe_call("macro_china_lpr", ak.macro_china_lpr)
         if not lpr.empty:
             date_col = first_col(lpr, ("TRADE_DATE", "日期"))

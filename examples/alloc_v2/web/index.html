@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>总览 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="index">
+  <main class="page">
+    <h2>总览</h2>
+    <p class="lede">先看环境是否配合，再下钻专题。份额变化 ≠ 净流入；商品涨 ≠ 行业利好。全量数据在「数据目录」。</p>
+    <div class="cards" id="overviewCards"></div>
+    <div class="grid two">
+      <section class="card">
+        <h3>股指与上海金（归一化，代理）</h3>
+        <div class="chart-box" id="ovChart"></div>
+        <div class="caption" id="ovCap"></div>
+      </section>
+      <section class="card">
+        <h3>行业配置综合分 Top</h3>
+        <div class="chart-box" id="ovBars"></div>
+        <p class="lede">S1 组件：<span id="ovS1">—</span></p>
+      </section>
+    </div>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

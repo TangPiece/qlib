@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>数据目录 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="catalog">
+  <main class="page">
+    <h2>数据目录</h2>
+    <p class="lede">standard / factor / research 全量索引。点行加载曲线和最近 50 行，不会一次塞进整表。</p>
+    <div class="tabs">
+      <button class="btn primary" data-layer="standard">standard</button>
+      <button class="btn" data-layer="factor">factor</button>
+      <button class="btn" data-layer="research">research</button>
+    </div>
+    <input class="search" id="catSearch" placeholder="搜索 dataset / entity / field" />
+    <section class="card">
+      <div style="max-height: 320px; overflow: auto;"><table id="catTable"></table></div>
+      <div class="pager">
+        <button class="btn" id="btnPrev">上一页</button>
+        <span id="catPager"></span>
+        <button class="btn" id="btnNext">下一页</button>
+      </div>
+    </section>
+    <section class="card">
+      <h3 id="catTitle">序列</h3>
+      <div class="chart-box tall" id="catChart"></div>
+      <div style="max-height: 240px; overflow: auto;"><table id="catRows"></table></div>
+    </section>
+    <section class="card">
+      <h3>Registry（含 disabled / needs_license）</h3>
+      <div style="max-height: 280px; overflow: auto;"><table id="regTable"></table></div>
+    </section>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

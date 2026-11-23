@@ -19,7 +19,9 @@ ENTITY_NAMES: dict[str, str] = {
     "SX5E": "欧洲斯托克50",
     "SENSEX": "印度SENSEX",
     "SGE_GOLD": "上海金",
+    "SGE_SILVER": "上海银",
     "GLD": "SPDR黄金ETF",
+    "SLV": "白银ETF持仓",
     "USDCNY": "美元兑人民币",
     "US2Y": "美债2年收益率",
     "US10Y": "美债10年收益率",
@@ -28,7 +30,21 @@ ENTITY_NAMES: dict[str, str] = {
     "NORTH": "北向",
     "SOUTH": "南向",
     "M2": "中国M2",
+    "M1": "中国M1",
     "LPR1Y": "LPR一年",
+    "SOCFIN_NEW": "社融增量",
+    "PMI_MANU": "制造业PMI",
+    "VIX": "VIX波动率",
+    "DXY": "美元指数",
+    "BRENT": "Brent原油",
+    "WTI": "WTI原油",
+    "BTCUSDT": "比特币",
+    "US_REAL10Y": "美债10年实际利率",
+    "FED_WALCL": "美联储资产负债表",
+    "BRENT_WTI": "Brent-WTI价差",
+    "GOLD_SILVER": "金银比",
+    "M1_M2": "M1-M2增速差",
+    "CSI300_CN10Y": "沪深300相对中债10Y",
     "SH": "上海",
     "SZ": "深圳",
     "MARKET": "全市场",
@@ -65,6 +81,23 @@ FACTOR_NAMES: dict[str, str] = {
     "Close": "收盘价",
     "NAV": "净值",
     "Amount": "成交额",
+    "VIX_Return20": "VIX收益20日",
+    "VIX_Change20": "VIX变化20日",
+    "VIX_Percentile60": "VIX60日分位",
+    "DXY_Return20": "美元指数收益20日",
+    "DXY_Change20": "美元指数变化20日",
+    "Brent_Return20": "Brent收益20日",
+    "WTI_Return20": "WTI收益20日",
+    "Brent_WTI_Spread": "Brent-WTI价差",
+    "Silver_Return20": "白银收益20日",
+    "GoldSGE_Return20": "上海金收益20日",
+    "Gold_Silver_Ratio": "金银比",
+    "BTC_Return20": "BTC收益20日",
+    "BTC_Volatility20": "BTC波动20日",
+    "USReal10Y_Change20": "美实际利率变化20日",
+    "M1_M2_Spread": "M1-M2增速差",
+    "EarningsYield": "盈利收益率(CSI300)",
+    "EquityBondYieldGap": "股债收益差",
     "rank_ic_mean_h20": "全样本RankIC(20日)",
     "rank_ic_mean_h20_last252": "近一年RankIC(20日)",
     "long_short_net_h20": "全样本多空净收益(20日)",
@@ -97,6 +130,26 @@ CHART_CAPTIONS: dict[str, str] = {
         "【读图】中美国债收益率水平（未归一化）。\n"
         "收益率上行通常对应利率收紧/定价更贵；可用来解释风险资产环境。\n"
         "注意：收益率变动不是债券基金申购量。"
+    ),
+    "equity_bond_gap": (
+        "【读图】股债收益差 = 100/CSI300滚动PE − CN10Y（日频代理）。\n"
+        "同图另有盈利收益率与中债10Y 水平线；差=二者之差。差扩大≈股相对债更「便宜」。\n"
+        "注意：这是定价代理，不是资金从债流向股，也不进 S1–S4 核心门闩。"
+    ),
+    "v22_risk_proxy": (
+        "【读图】V2.2-Free 全球风险代理：VIX、美元指数、美实际利率（归一化）。\n"
+        "VIX 抬升 / DXY 走强 / 实际利率上行 → 风险偏好偏紧的环境旁证。\n"
+        "注意：价格与利率代理，不是资金净流入，也不直接映射 A 股行业。"
+    ),
+    "v22_commodity_proxy": (
+        "【读图】V2.2-Free 商品/加密价格代理：Brent、WTI、上海银、BTC（归一化）。\n"
+        "只比较相对强弱；商品上涨 ≠ 相关股票利好，BTC ≠ 行业映射。\n"
+        "注意：无库存/CFTC/ETF申赎；Brent-WTI 价差见因子表，不作交易指令。"
+    ),
+    "v22_cn_macro": (
+        "【读图】中国月频宏观：M1/M2 同比、社融增量、制造业 PMI。\n"
+        "点稀疏是正常的（月频），禁止当成日频曲线解读。\n"
+        "注意：社融为增量不是存量；available_at 含保守滞后天数，回测须按 PIT。"
     ),
     "north_core": (
         "【读图】北向成交额与持股市值的相对变化（起点=1）。\n"
@@ -183,6 +236,10 @@ CHART_CAPTIONS: dict[str, str] = {
 REQUIRED_DASHBOARD_CAPTION_IDS: tuple[str, ...] = (
     "global_index",
     "yield_cn_us",
+    "equity_bond_gap",
+    "v22_risk_proxy",
+    "v22_commodity_proxy",
+    "v22_cn_macro",
     "north_core",
     "north_net_ref",
     "industry_score_bar",

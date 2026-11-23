@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>S1–S4 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="signals">
+  <main class="page">
+    <h2>波段研究信号</h2>
+    <p class="lede">研究门槛，不是买卖指令。S1 未过时下层只观察。</p>
+    <p>S1 总信号：<b id="s1Val">—</b></p>
+    <div class="cards" id="s1Lights"></div>
+    <div class="caption" id="capS1"></div>
+    <section class="card">
+      <h3>S2 行业观察名单</h3>
+      <div style="max-height: 320px; overflow: auto;"><table id="s2Table"></table></div>
+      <div class="caption" id="capS2"></div>
+    </section>
+    <section class="card">
+      <h3>S4 共振</h3>
+      <div style="max-height: 280px; overflow: auto;"><table id="s4Table"></table></div>
+      <div class="caption" id="capS4"></div>
+    </section>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

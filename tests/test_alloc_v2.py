@@ -62,8 +62,42 @@ def test_catalog_disables_epfr_and_marks_north_net_reference() -> None:
     assert lookup["ici_mmf"].enabled is False
     assert lookup["hsgt_net"].role == "reference_only"
     assert "hsgt_net" not in {d.dataset for d in core_datasets()}
+    assert lookup["idx_pe_csindex"].enabled is True
+    assert lookup["idx_pe_csindex"].adapter == "global_macro"
+    assert lookup["idx_pe_csindex"].unit == "pe"
     text = str(catalog_rows())
     assert "EPFR" in text or "epfr" in text.lower()
+
+
+def test_v22_free_registry_and_commercial_disabled() -> None:
+    """V2.2-Free：免费源启用；商业/无授权源不得进 core。"""
+    lookup = dataset_by_id()
+    for key in ("vix_cboe", "dxy", "oil_brent", "silver_sge", "crypto_btc", "us_real_rate", "fed_balance"):
+        assert lookup[key].enabled is True, key
+        assert lookup[key].adapter == "v22_free"
+    assert lookup["oil_wti"].role == "reference_only"
+    commercial = (
+        "cftc_cot",
+        "lme_metals",
+        "comex_inventory",
+        "ice_brent_depth",
+        "baltic_freight",
+        "smm_spot",
+        "mysteel_steel",
+        "wind_macro",
+        "commodity_cn_specialty",
+        "crypto_btc_flow",
+    )
+    core_ids = {d.dataset for d in core_datasets()}
+    for key in commercial:
+        assert lookup[key].enabled is False, key
+        assert key not in core_ids
+    from qlib.contrib.data.alloc_v2.catalog import indicator_catalog_frame
+
+    frame = indicator_catalog_frame()
+    assert "license" in frame.columns
+    assert set(frame.loc[frame["dataset"] == "lme_metals", "license"]) == {"needs_license"}
+    assert set(frame.loc[frame["dataset"] == "vix_cboe", "license"]) == {"free"}
 
 
 def test_price_adjusted_flow_subtracts_mark_to_market() -> None:
@@ -407,6 +441,8 @@ def test_labels_display_name_and_captions_cover_dashboard() -> None:
     )
 
     assert display_name("801080") == "电子"
+    assert display_name("EquityBondYieldGap") == "股债收益差"
+    assert "资金从债流向股" in CHART_CAPTIONS["equity_bond_gap"] or "不是资金" in CHART_CAPTIONS["equity_bond_gap"]
     assert display_name("SPX") == "标普500"
     assert "综合分" in display_name("IndustryAllocationScore")
     assert display_name("strength") == "宽基强度"
@@ -466,3 +502,293 @@ def test_r2_upload_skips_markers_and_uses_prefix(tmp_path: Path, monkeypatch) ->
     assert {k for k, _ in put} == set(out["keys"])
     assert (tmp_path / "_markers" / "r2_upload.json").is_file()
     reset_r2_client_for_tests()
+
+
+def test_parse_cn_month_and_macro_pit() -> None:
+    from qlib.contrib.data.alloc_v2.adapters.china import parse_cn_month
+
+    assert parse_cn_month("2026年09月份") == date(2026, 9, 30)
+    assert parse_cn_month("201501") == date(2015, 1, 31)
+    assert parse_cn_month("2024-02-15") == date(2024, 2, 15)
+
+
+def test_v22_env_factors_from_injected_rows(tmp_path: Path) -> None:
+    """注入 VIX/Brent/WTI/银/BTC 后应产出 proxy 因子；PIT available_at 不早于 event。"""
+    days = pd.bdate_range("2024-01-02", periods=40)
+    rows: list[StandardRow] = []
+    vix = _spec("vix_cboe")
+    brent = _spec("oil_brent")
+    wti = _spec("oil_wti")
+    silver = _spec("silver_sge")
+    gold = _spec("gold_sge")
+    btc = _spec("crypto_btc")
+    dxy = _spec("dxy")
+    real = _spec("us_real_rate")
+    macro = _spec("cn_macro")
+    for i, ts in enumerate(days):
+        day = ts.date()
+        avail = day + timedelta(days=1)
+        rows.append(row_of(vix, "VIX", day, "close", 15.0 + i * 0.1, available_at=avail, unit="index"))
+        rows.append(row_of(brent, "BRENT", day, "close", 80.0 + i * 0.2, unit="usd/bbl"))
+        rows.append(row_of(wti, "WTI", day, "close", 75.0 + i * 0.15, unit="usd/bbl"))
+        rows.append(row_of(silver, "SGE_SILVER", day, "close", 5000.0 + i, unit="cny/kg"))
+        rows.append(row_of(gold, "SGE_GOLD", day, "close", 450.0 + i * 0.1, unit="cny/g"))
+        rows.append(row_of(btc, "BTCUSDT", day, "close", 40000.0 + i * 100, unit="usdt"))
+        rows.append(row_of(dxy, "DXY", day, "close", 100.0 + i * 0.01, unit="index"))
+        rows.append(row_of(real, "US_REAL10Y", day, "yield", 2.0 + i * 0.01, available_at=avail, unit="pct"))
+    # 月频 M1/M2 同比：仅两期
+    rows.append(row_of(macro, "M1", date(2024, 1, 31), "m1_yoy", 5.0, available_at=date(2024, 2, 15), unit="pct"))
+    rows.append(row_of(macro, "M2", date(2024, 1, 31), "m2_yoy", 8.0, available_at=date(2024, 2, 15), unit="pct"))
+    rows.append(row_of(macro, "M1", date(2024, 2, 29), "m1_yoy", 6.0, available_at=date(2024, 3, 15), unit="pct"))
+    rows.append(row_of(macro, "M2", date(2024, 2, 29), "m2_yoy", 7.5, available_at=date(2024, 3, 15), unit="pct"))
+
+    info = run_pipeline(root=tmp_path, rows=rows)
+    assert info["fetch"]["n_rows"] > 0
+    factors = build_all_factors(read_standard(root=tmp_path))
+    ids = set(factors["factor_id"].astype(str))
+    for need in (
+        "VIX_Return20",
+        "VIX_Percentile60",
+        "Brent_Return20",
+        "Brent_WTI_Spread",
+        "Gold_Silver_Ratio",
+        "BTC_Volatility20",
+        "DXY_Return20",
+        "M1_M2_Spread",
+    ):
+        assert need in ids, need
+    vix_fac = factors[factors["factor_id"] == "VIX_Return20"].copy()
+    vix_fac["event_date"] = pd.to_datetime(vix_fac["event_date"])
+    vix_fac["available_at"] = pd.to_datetime(vix_fac["available_at"])
+    # 因子层默认 event_date；环境代理未强制 T+1，但不得早于 event
+    assert (vix_fac["available_at"] >= vix_fac["event_date"]).all()
+
+
+def test_equity_bond_yield_gap_from_injected_rows(tmp_path: Path) -> None:
+    """注入 pe_ttm + CN10Y 后产出 EarningsYield / EquityBondYieldGap；无 PE 不填假 0 差。"""
+    pe_spec = _spec("idx_pe_csindex")
+    yld_spec = _spec("yield_cn_us")
+    assert pe_spec.unit == "pe"
+    assert pe_spec.publish_lag == "T+1"
+
+    days = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    pe_vals = [10.0, 12.5, 20.0]
+    cn10y_vals = [2.5, 2.6, 2.4]
+    rows: list[StandardRow] = []
+    for day, pe, yld in zip(days, pe_vals, cn10y_vals):
+        rows.append(
+            row_of(pe_spec, "CSI300", day, "pe_ttm", pe, available_at=day + timedelta(days=1), unit="pe")
+        )
+        rows.append(row_of(yld_spec, "CN10Y", day, "yield", yld, unit="pct"))
+
+    run_pipeline(root=tmp_path, rows=rows)
+    factors = build_all_factors(read_standard(root=tmp_path))
+    ey = factors[factors["factor_id"] == "EarningsYield"].copy()
+    gap = factors[factors["factor_id"] == "EquityBondYieldGap"].copy()
+    assert len(ey) == 3
+    assert len(gap) == 3
+    ey["event_date"] = pd.to_datetime(ey["event_date"]).dt.date
+    gap["event_date"] = pd.to_datetime(gap["event_date"]).dt.date
+    ey_by = ey.set_index("event_date")["value"]
+    gap_by = gap.set_index("event_date")["value"]
+    for day, pe, yld in zip(days, pe_vals, cn10y_vals):
+        expect_ey = 100.0 / pe
+        assert ey_by[day] == pytest.approx(expect_ey)
+        assert gap_by[day] == pytest.approx(expect_ey - yld)
+    assert set(gap["entity_id"].astype(str)) == {"CSI300_CN10Y"}
+    assert (pd.to_datetime(gap["available_at"]).dt.date > pd.to_datetime(gap["event_date"]).dt.date).all()
+
+    # 仅有 CN10Y、无 PE：不得产出假 0 差（直接测因子层，跳过空因子信号管线）
+    only_bond = rows_to_frame(
+        [row_of(yld_spec, "CN10Y", date(2024, 2, 1), "yield", 2.5, unit="pct")]
+    )
+    fac2 = build_all_factors(only_bond)
+    if not fac2.empty:
+        ids2 = set(fac2["factor_id"].astype(str))
+        assert "EquityBondYieldGap" not in ids2
+        assert "EarningsYield" not in ids2
+
+
+def test_write_v22_indicator_catalog(tmp_path: Path) -> None:
+    from qlib.contrib.data.alloc_v2.catalog import write_indicator_catalog
+    from qlib.contrib.data.alloc_v2.mappings import write_empty_maps
+
+    path = write_indicator_catalog(root=tmp_path)
+    assert path.is_file()
+    frame = pd.read_csv(path)
+    assert "vix_cboe" in set(frame["dataset"])
+    assert "needs_license" in set(frame["license"])
+    paths = write_empty_maps(root=tmp_path)
+    assert "v22_indicator_catalog" in paths
+
+
+def test_jin10_etf_holdings_early_stop(monkeypatch) -> None:
+    """有界拉取：越过 start 后停止，且失败页不抛穿。"""
+    import requests
+
+    from qlib.contrib.data.alloc_v2.adapters import jin10_etf
+    from qlib.contrib.data.alloc_v2.network import reset_network_state_for_tests
+
+    reset_network_state_for_tests()
+    calls = {"n": 0}
+
+    class _Resp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {
+                    "data": {
+                        "values": [
+                            ["2024-10-10", 100.0, 1.0, 1.0],
+                            ["2024-10-01", 99.0, -1.0, 1.0],
+                        ]
+                    }
+                }
+            if calls["n"] == 2:
+                return {
+                    "data": {
+                        "values": [
+                            ["2024-09-20", 98.0, 0.0, 1.0],
+                            ["2024-09-01", 97.0, 0.0, 1.0],
+                        ]
+                    }
+                }
+            return {"data": {"values": []}}
+
+    monkeypatch.setattr(requests, "get", lambda *_a, **_k: _Resp())
+    frame = jin10_etf.fetch_jin10_etf_holdings(
+        attr_id="1",
+        commodity="黄金",
+        start=date(2024, 10, 1),
+        end=date(2024, 10, 15),
+        max_pages=20,
+    )
+    assert not frame.empty
+    assert frame["日期"].min() >= date(2024, 10, 1)
+    # 第二页已越过 start，应早停，不会无限翻页
+    assert calls["n"] <= 3
+    reset_network_state_for_tests()
+
+
+def test_lab_http_index_series_rows_and_catalog_page(tmp_path: Path) -> None:
+    """研究站：注入 parquet 后打 meta/index/series/rows；空序列不 500；catalog.html=200。"""
+    import json
+    import threading
+    import time
+    from http.server import ThreadingHTTPServer
+    from urllib.request import urlopen
+
+    from qlib.contrib.data.alloc_v2.serve import WEB_DIR, LabStore, make_handler
+    from qlib.contrib.data.alloc_v2.store import rows_to_frame, write_factor, write_research, write_standard
+
+    days = [date(2024, 1, 2) + timedelta(days=i) for i in range(8)]
+    written = {
+        "idx_global": ("CSI300", "close", 3000.0),
+        "vix_cboe": ("VIX", "close", 15.0),
+        "cn_macro": ("M2", "m2_yoy", 8.0),
+        "hsgt_turnover": ("NORTH", "amount", 1e8),
+        "etf_bar": ("510300", "close", 4.0),
+    }
+    rows: list[StandardRow] = []
+    for dataset, (entity, field, base) in written.items():
+        spec = _spec(dataset)
+        for i, day in enumerate(days):
+            rows.append(row_of(spec, entity, day, field, base + i))
+    write_standard(rows_to_frame(rows), root=tmp_path)
+    write_factor(
+        pd.DataFrame(
+            {
+                "factor_id": ["IndustryAllocationScore"] * 3,
+                "entity_id": ["801080"] * 3,
+                "event_date": days[:3],
+                "value": [0.1, 0.2, 0.3],
+            }
+        ),
+        name="all",
+        root=tmp_path,
+    )
+    write_research(
+        pd.DataFrame(
+            {
+                "asof": [days[-1]],
+                "entity_id": ["MARKET"],
+                "signal_id": ["S1"],
+                "value": [0.0],
+                "components": ["{}"],
+            }
+        ),
+        name="signal_s1",
+        root=tmp_path,
+    )
+
+    store = LabStore(tmp_path)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(store, WEB_DIR))
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+
+    def get_json(path: str) -> dict:
+        with urlopen(base + path, timeout=10) as resp:
+            assert resp.status == 200
+            return json.loads(resp.read().decode("utf-8"))
+
+    def get_status(path: str) -> int:
+        with urlopen(base + path, timeout=10) as resp:
+            return int(resp.status)
+
+    try:
+        for _ in range(30):
+            try:
+                get_json("/api/meta")
+                break
+            except OSError:
+                time.sleep(0.05)
+
+        meta = get_json("/api/meta")
+        assert meta["last_event_date"] == "2024-01-09"
+        assert meta["n_standard"] == len(rows)
+
+        # 默认分页也要能看到本次写入的全部 dataset
+        indexed = get_json("/api/index?layer=standard")
+        present = {row["dataset"] for row in indexed["rows"]}
+        assert set(written) <= present
+        assert indexed["total"] == len(written)
+
+        page0 = get_json("/api/index?layer=standard&limit=2&offset=0")
+        page1 = get_json("/api/index?layer=standard&limit=2&offset=2")
+        assert page0["total"] == len(written)
+        assert len(page0["rows"]) == 2
+        assert len(page1["rows"]) == 2
+        keys0 = {(r["dataset"], r["entity_id"], r["field"]) for r in page0["rows"]}
+        keys1 = {(r["dataset"], r["entity_id"], r["field"]) for r in page1["rows"]}
+        assert keys0.isdisjoint(keys1)
+
+        series = get_json("/api/series?dataset=idx_global&entity=CSI300&field=close&last_n=400")
+        assert series["note"] == ""
+        assert len(series["points"]) == 8
+        assert series["points"][-1]["v"] == pytest.approx(3007.0)
+
+        empty = get_json("/api/series?dataset=vix_cboe&entity=MISSING&field=close")
+        assert empty["points"] == []
+        assert empty["note"] == "无数据"
+        missing_factor = get_json("/api/series?factor_id=NoSuchFactor&entity=801080")
+        assert missing_factor["points"] == []
+        assert missing_factor["note"] == "无数据"
+
+        rows_p0 = get_json("/api/rows?dataset=idx_global&entity=CSI300&field=close&offset=0&limit=3")
+        rows_p1 = get_json("/api/rows?dataset=idx_global&entity=CSI300&field=close&offset=3&limit=3")
+        assert rows_p0["total"] == 8
+        assert len(rows_p0["rows"]) == 3
+        assert len(rows_p1["rows"]) == 3
+        assert str(rows_p0["rows"][0]["event_date"])[:10] == "2024-01-09"
+
+        assert get_status("/catalog.html") == 200
+        assert get_status("/") == 200
+        assert get_status("/global.html") == 200
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>全球资产 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="global">
+  <main class="page">
+    <h2>全球资产</h2>
+    <p class="lede">股指、利率、股债收益差、汇率、黄金。全是价格/利率/估值代理，不是资金净流入。</p>
+    <div class="grid">
+      <section class="card">
+        <h3>主要股指与上海金（归一化） <span class="tag">proxy</span></h3>
+        <div class="chart-box tall" id="gIndex"></div>
+        <div class="caption" id="capIndex"></div>
+      </section>
+      <section class="card">
+        <h3>中美国债收益率 <span class="tag">proxy</span></h3>
+        <div class="chart-box" id="gYield"></div>
+        <div class="caption" id="capYield"></div>
+      </section>
+      <section class="card">
+        <h3>股债收益差与水平（CSI300） <span class="tag">proxy</span></h3>
+        <div class="chart-box" id="gEquityBondGap"></div>
+        <div class="caption" id="capEquityBondGap"></div>
+      </section>
+      <section class="card">
+        <h3>美元兑人民币与 GLD 持仓吨位</h3>
+        <div class="chart-box" id="gFxGold"></div>
+      </section>
+      <section class="card">
+        <h3>本层全部序列</h3>
+        <table id="globalList"></table>
+      </section>
+    </div>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -23,6 +23,7 @@ usage() {
   run_alloc_v2.sh maps|fetch|standard|factor|signal|backtest|all [选项]
   run_alloc_v2.sh update [--overlap-days N] [--end YYYY-MM-DD]
   run_alloc_v2.sh upload [--dry-run] [--root DIR]
+  run_alloc_v2.sh serve [--host HOST] [--port PORT] [--root DIR]
 
   all     maps → fetch → factor → signal → backtest（首次全量）
           份额变化 ≠ 净流入；北向净买额不作核心因子。
@@ -32,6 +33,8 @@ usage() {
           需 .env 中 R2_ENDPOINT_URL / R2_ACCESS_KEY_ID /
           R2_SECRET_ACCESS_KEY / R2_BUCKET；前缀 ALLOC_V2_R2_PREFIX
           默认 research/alloc_v2。
+  serve   本地多页研究站（只读 parquet，不打外网）
+          默认 http://127.0.0.1:8766 ；总览下钻专题，全量走数据目录。
 
 选项:
   --start YYYY-MM-DD
@@ -41,6 +44,8 @@ usage() {
   --json
   --include-disabled
   --dry-run
+  --host HOST
+  --port PORT
 
 示例:
   ./scripts/run_alloc_v2.sh catalog
@@ -49,6 +54,8 @@ usage() {
   ./scripts/run_alloc_v2.sh update --overlap-days 7
   ./scripts/run_alloc_v2.sh upload --dry-run
   ./scripts/run_alloc_v2.sh upload
+  ./scripts/run_alloc_v2.sh serve
+  ./scripts/run_alloc_v2.sh serve --port 8766
 USAGE
 }
 

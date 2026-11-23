@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>北向 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="northbound">
+  <main class="page">
+    <h2>北向通道</h2>
+    <p class="lede">成交额与持股市值是核心观察；净买额仅对照，不进 S1–S4。</p>
+    <section class="card">
+      <h3>北向成交额与持股市值（归一化）</h3>
+      <div class="chart-box tall" id="nCore"></div>
+      <div class="caption" id="capNorth"></div>
+    </section>
+    <div class="grid two">
+      <section class="card">
+        <h3>北向净买额（仅对照） <span class="tag estimate">reference_only</span></h3>
+        <div class="chart-box" id="nNet"></div>
+        <div class="caption" id="capNet"></div>
+      </section>
+      <section class="card">
+        <h3>南向成交与持股（可选）</h3>
+        <div class="chart-box" id="nSouth"></div>
+      </section>
+    </div>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>商品与风险 · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="commodity">
+  <main class="page">
+    <h2>商品与风险代理</h2>
+    <p class="lede">VIX / DXY / 实际利率 / 原油 / 白银 / BTC。上涨 ≠ 相关 A 股利好；无库存与 CFTC。</p>
+    <div class="grid">
+      <section class="card">
+        <h3>风险环境（归一化） <span class="tag">proxy</span></h3>
+        <div class="chart-box" id="cRisk"></div>
+        <div class="caption" id="capRisk"></div>
+      </section>
+      <section class="card">
+        <h3>商品与 BTC（归一化） <span class="tag">proxy</span></h3>
+        <div class="chart-box" id="cCmdty"></div>
+        <div class="caption" id="capCmdty"></div>
+      </section>
+      <section class="card">
+        <h3>价差因子</h3>
+        <div class="chart-box" id="cSpread"></div>
+      </section>
+      <section class="card">
+        <h3>本层全部序列</h3>
+        <table id="cmdtyList"></table>
+      </section>
+    </div>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

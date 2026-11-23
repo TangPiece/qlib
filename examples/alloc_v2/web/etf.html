@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ETF · alloc_v2</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="etf">
+  <main class="page">
+    <h2>ETF</h2>
+    <p class="lede">点代码查看份额 / 份额变化 / 估算配置。估算配置 = 份额变化 × 净值，不是现金转账。</p>
+    <div class="grid two">
+      <section class="card">
+        <h3>主表</h3>
+        <input class="search" id="etfSearch" placeholder="搜索代码 / 名称 / 主题" />
+        <div style="max-height: 420px; overflow: auto;"><table id="etfTable"></table></div>
+      </section>
+      <section class="card">
+        <h3 id="etfTitle">三类指标</h3>
+        <div class="chart-box" id="etfShares"></div>
+        <div class="chart-box" id="etfChg"></div>
+        <div class="chart-box" id="etfEst"></div>
+        <div class="caption" id="capEtf"></div>
+      </section>
+    </div>
+  </main>
+  <script src="/static/nav.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

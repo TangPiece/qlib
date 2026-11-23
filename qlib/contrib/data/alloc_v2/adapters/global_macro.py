@@ -1,12 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""B 层全球与中国跨资产：指数、收益率、汇率、黄金。价格一律 proxy。"""
+"""B 层全球与中国跨资产：指数、收益率、汇率、黄金、指数 PE。价格/估值一律 proxy。"""
 
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from typing import Callable
 
 import pandas as pd
@@ -43,6 +43,7 @@ class GlobalMacroAdapter:
     def fetch(self, *, start: date | None = None, end: date | None = None) -> list:
         rows = []
         rows.extend(self._fetch_indexes(start, end))
+        rows.extend(self._fetch_csi_pe(start, end))
         rows.extend(self._fetch_yields(start, end))
         rows.extend(self._fetch_usdcny(start, end))
         rows.extend(self._fetch_sge_gold(start, end))
@@ -64,6 +65,46 @@ class GlobalMacroAdapter:
             fn = fetchers[kind]
             frame = safe_call(f"{kind}:{symbol}", fn, symbol=symbol)
             rows.extend(close_rows(frame, spec, entity_id, start, end))
+        return rows
+
+    def _fetch_csi_pe(self, start: date | None, end: date | None) -> list:
+        """中证沪深300日频滚动市盈率；失败降级空表。available_at=T+1。"""
+        import akshare as ak
+
+        spec = lookup("idx_pe_csindex")
+        start_text = yyyymmdd(start) or "20150101"
+        end_text = yyyymmdd(end) or date.today().strftime("%Y%m%d")
+        frame = safe_call(
+            "stock_zh_index_hist_csindex:000300",
+            ak.stock_zh_index_hist_csindex,
+            symbol="000300",
+            start_date=start_text,
+            end_date=end_text,
+        )
+        if frame.empty:
+            return []
+        date_col = first_col(frame, ("日期", "date"))
+        pe_col = first_col(frame, ("滚动市盈率",))
+        if date_col is None or pe_col is None:
+            return []
+        rows = []
+        for raw_day, raw_value in zip(frame[date_col], frame[pe_col]):
+            day = parse_day(raw_day)
+            value = finite_number(raw_value)
+            # PE 必须为正，否则无法换算盈利收益率
+            if value is None or value <= 0 or not in_range(day, start, end):
+                continue
+            rows.append(
+                row_of(
+                    spec,
+                    "CSI300",
+                    day,
+                    "pe_ttm",
+                    value,
+                    available_at=day + timedelta(days=1),
+                    unit="pe",
+                )
+            )
         return rows
 
     def _fetch_yields(self, start: date | None, end: date | None) -> list:
@@ -131,11 +172,19 @@ class GlobalMacroAdapter:
         return rows
 
     def _fetch_gld(self, start: date | None, end: date | None) -> list:
-        import akshare as ak
+        """金十黄金 ETF 持仓：有界分页，update 短窗口早停，不再全历史拖死。"""
+        from .jin10_etf import fetch_jin10_etf_holdings
 
-        _log.info("拉取 SPDR 黄金 ETF 持仓（可能需数十秒）…")
+        _log.info("拉取 SPDR 黄金 ETF 持仓（有界分页，start=%s）…", start)
         spec = lookup("gold_gld")
-        frame = safe_call("macro_cons_gold", ak.macro_cons_gold)
+        frame = safe_call(
+            "macro_cons_gold",
+            fetch_jin10_etf_holdings,
+            attr_id="1",
+            commodity="黄金",
+            start=start,
+            end=end,
+        )
         if frame.empty:
             return []
         date_col = first_col(frame, ("日期",))
