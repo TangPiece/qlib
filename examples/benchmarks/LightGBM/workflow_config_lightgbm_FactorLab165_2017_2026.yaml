@@ -1,0 +1,94 @@
+# TRAIN 冻结的 165 个因子（2017-01-03 至 2022-12-30 选定方向，表达式已按方向对齐）
+# 窗口、超参、TopkDropout 与 Alpha158_2017_2026 相同：训 2017–2023 / 验 2024 / 测+回测 2025–2026-11-11
+# 因子名单没有用到 2023 之后的样本；模型在 2023 训练、2024 早停，只有 2025–2026 是模型没看过的区间
+# 这不是 2023–2026 因子层盲测。从 examples 目录执行 qrun。
+qlib_init:
+    provider_uri: "~/.qlib/qlib_data/cn_data"
+    region: cn
+market: &market csi300
+benchmark: &benchmark SH000300
+data_handler_config: &data_handler_config
+    start_time: 2017-01-03
+    end_time: 2026-11-11
+    fit_start_time: 2017-01-03
+    fit_end_time: 2023-12-29
+    instruments: *market
+    feature_list_path: "feature_sets/factor_lab_freeze_165.json"
+    # 165 含 L2。缺 L2 的日子若直接 Fillna 会被填成 0，先丢掉 l2_obi5_mean 为空的行
+    infer_processors:
+        - class: DropnaCols
+          kwargs:
+              col_list: ["l2_obi5_mean"]
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: feature
+              method: robust
+        - class: Fillna
+          kwargs:
+              fields_group: feature
+    learn_processors:
+        - class: DropnaLabel
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: label
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>
+            topk: 10
+            n_drop: 1
+    backtest:
+        start_time: 2025-01-02
+        end_time: 2026-11-11
+        account: 100000
+        benchmark: *benchmark
+        exchange_kwargs:
+            limit_threshold: 0.095
+            deal_price: close
+            open_cost: 0.0005
+            close_cost: 0.0015
+            min_cost: 5
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs:
+            loss: mse
+            colsample_bytree: 0.8879
+            learning_rate: 0.2
+            subsample: 0.8789
+            lambda_l1: 20.5700
+            lambda_l2: 58.0977
+            max_depth: 8
+            num_leaves: 210
+            num_threads: 20
+            early_stopping_rounds: 50
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: FactorLabAB
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                train: [2017-01-03, 2023-12-29]
+                valid: [2024-01-02, 2024-12-31]
+                test: [2025-01-02, 2026-11-11]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            model: <MODEL>
+            dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            ana_long_short: False
+            ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            config: *port_analysis_config

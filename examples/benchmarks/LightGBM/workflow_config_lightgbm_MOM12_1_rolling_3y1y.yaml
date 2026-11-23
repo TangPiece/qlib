@@ -1,21 +1,21 @@
-# Alpha158 + L2 百因子联合训练（258 列）；窗口对齐本机 L2 连续段 2024-01~2026-09
-# 训 2024-01~2025-09 / 验 2025Q4 / 测+回测 2026 至 L2 末日；超参与处理器同基线 yaml
+# 单因子 MOM12-1 滚动：3y train + 1y valid，约 1y step（顶层 step）
+# 窗口对齐 Alpha158_rolling_3y1y，便于与 Alpha158 / L2 对照
+# 首窗训 2017–2019 / 验 2020 / 测段模板 2021–2026-11-11；由 rolling_7y1y.py 滑动
+# handler 用 MOM12_1（Alpha158 子类），以便 rolling 注入 label 覆盖 horizon
+step: 243
 qlib_init:
     provider_uri: "~/.qlib/qlib_data/cn_data"
     region: cn
 market: &market csi300
 benchmark: &benchmark SH000300
 data_handler_config: &data_handler_config
-    start_time: 2024-01-02
-    end_time: 2026-09-30
-    fit_start_time: 2024-01-02
-    fit_end_time: 2025-09-30
+    start_time: 2017-01-03
+    end_time: 2026-11-11
+    fit_start_time: 2017-01-03
+    fit_end_time: 2019-12-31
     instruments: *market
-    # 无 L2 成交的停牌日整行丢掉，避免 Fillna 把空 L2 填成中位数污染联合模型
+    # 与 Alpha158 3y1y 同套截面处理
     infer_processors:
-        - class: DropnaCols
-          kwargs:
-              col_list: ["l2_trade_count"]
         - class: CSZScoreNorm
           kwargs:
               fields_group: feature
@@ -34,12 +34,12 @@ port_analysis_config: &port_analysis_config
         module_path: qlib.contrib.strategy
         kwargs:
             signal: <PRED>
-            # 实测集中持仓回撤更高，联合模型保留更稳健的 50 股组合
+            # 与 Alpha158 3y1y 一致，便于对照
             topk: 10
             n_drop: 1
     backtest:
-        start_time: 2026-01-05
-        end_time: 2026-09-30
+        start_time: 2021-01-01
+        end_time: 2026-11-11
         account: 100000
         benchmark: *benchmark
         exchange_kwargs:
@@ -68,13 +68,14 @@ task:
         module_path: qlib.data.dataset
         kwargs:
             handler:
-                class: Alpha158L2Daily
+                class: MOM12_1
                 module_path: qlib.contrib.data.handler
                 kwargs: *data_handler_config
             segments:
-                train: [2024-01-02, 2025-09-30]
-                valid: [2025-10-01, 2025-12-31]
-                test: [2026-01-05, 2026-09-30]
+                # 首窗模板：3y train + 1y valid；test 为全区间，RollingGen 按 step 裁切滑动
+                train: [2017-01-03, 2019-12-31]
+                valid: [2020-01-01, 2020-12-31]
+                test: [2021-01-01, 2026-11-11]
     record:
         - class: SignalRecord
           module_path: qlib.workflow.record_temp

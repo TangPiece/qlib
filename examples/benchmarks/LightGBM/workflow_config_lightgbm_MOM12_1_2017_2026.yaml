@@ -1,0 +1,90 @@
+# 单因子 MOM12-1（1 列）；窗口/超参/策略对齐 Alpha158_2017_2026，便于对照
+# 特征：Ref($close,21)/Ref($close,252)-1；训 2017–2023 / 验 2024 / 测+回测 2025–2026-11-11
+# handler 用 MOM12_1（Alpha158 子类），与滚动配置一致、支持 label 注入
+qlib_init:
+    provider_uri: "~/.qlib/qlib_data/cn_data"
+    region: cn
+market: &market csi300
+benchmark: &benchmark SH000300
+data_handler_config: &data_handler_config
+    start_time: 2017-01-03
+    end_time: 2026-11-11
+    fit_start_time: 2017-01-03
+    fit_end_time: 2023-12-29
+    instruments: *market
+    # 与 Alpha158_2017_2026 同套截面处理
+    infer_processors:
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: feature
+              method: robust
+        - class: Fillna
+          kwargs:
+              fields_group: feature
+    learn_processors:
+        - class: DropnaLabel
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: label
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>
+            # 与 Alpha158_2017_2026 一致，便于对照
+            topk: 10
+            n_drop: 1
+    backtest:
+        start_time: 2025-01-02
+        end_time: 2026-11-11
+        account: 100000
+        benchmark: *benchmark
+        exchange_kwargs:
+            limit_threshold: 0.095
+            deal_price: close
+            open_cost: 0.0005
+            close_cost: 0.0015
+            min_cost: 5
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs:
+            loss: mse
+            colsample_bytree: 0.8879
+            learning_rate: 0.2
+            subsample: 0.8789
+            lambda_l1: 20.5700
+            lambda_l2: 58.0977
+            max_depth: 8
+            num_leaves: 210
+            num_threads: 20
+            early_stopping_rounds: 50
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: MOM12_1
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                train: [2017-01-03, 2023-12-29]
+                valid: [2024-01-02, 2024-12-31]
+                test: [2025-01-02, 2026-11-11]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            model: <MODEL>
+            dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            ana_long_short: False
+            ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            config: *port_analysis_config

@@ -1,6 +1,9 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+import json
+from pathlib import Path
+
 from qlib.contrib.data.loader import Alpha158DL, Alpha360DL
 from .l2_daily import get_l2_feature_config
 from ...data.dataset.handler import DataHandlerLP
@@ -8,6 +11,40 @@ from ...data.dataset.processor import Processor
 from ...utils import get_callable_kwargs
 from ...data.dataset import processor as processor_module
 from inspect import getfullargspec
+
+
+def _factor_lab_ab_feature_sets_dir() -> Path:
+    """LightGBM 特征 JSON 目录：examples/benchmarks/LightGBM/feature_sets。"""
+    # handler.py → data → contrib → qlib(package) → qlib(repo)
+    return (
+        Path(__file__).resolve().parents[3]
+        / "examples"
+        / "benchmarks"
+        / "LightGBM"
+        / "feature_sets"
+    )
+
+
+def _factor_lab_ab_default_json() -> Path:
+    """默认特征清单：feature_sets/factor_lab_ab_113.json。"""
+    return _factor_lab_ab_feature_sets_dir() / "factor_lab_ab_113.json"
+
+
+def _resolve_factor_lab_feature_path(feature_list_path) -> Path:
+    """解析特征 JSON。cwd 相对路径找不到时，回退到 feature_sets。"""
+    raw = Path(feature_list_path).expanduser()
+    candidates = [raw.resolve() if raw.is_absolute() else (Path.cwd() / raw).resolve()]
+    feature_dir = _factor_lab_ab_feature_sets_dir()
+    # 仓库根目录或 examples/ 下启动时，相对路径常绑错 cwd
+    candidates.append((feature_dir / raw.name).resolve())
+    candidates.append((feature_dir / raw).resolve())
+    for path in candidates:
+        if path.is_file():
+            return path
+    raise FileNotFoundError(
+        "FactorLabAB feature json not found: %s (tried %s)"
+        % (feature_list_path, [str(p) for p in candidates])
+    )
 
 
 def check_transform_proc(proc_l, fit_start_time, fit_end_time):
@@ -165,6 +202,14 @@ class L2Daily(Alpha158):
         return get_l2_feature_config()
 
 
+class MOM12_1(Alpha158):
+    """仅 MOM12-1 单因子；继承 Alpha158 以支持 rolling 注入的 label kwargs。"""
+
+    def get_feature_config(self):
+        # 与 alphalens qlib_bridge.MOMENTUM_FACTORS["MOM12-1"] 一致
+        return ["Ref($close, 21) / Ref($close, 252) - 1"], ["MOM12-1"]
+
+
 class Alpha158L2Daily(Alpha158):
     """Alpha158 的 158 列再拼 100 个 L2 因子；标签只保留一份。"""
 
@@ -172,3 +217,30 @@ class Alpha158L2Daily(Alpha158):
         fields, names = super().get_feature_config()
         l2_fields, l2_names = get_l2_feature_config()
         return fields + l2_fields, names + l2_names
+
+
+class FactorLabAB(Alpha158):
+    """Factor Lab 评级 A+B 精选因子（默认 113 列）；标签与 Alpha158 相同。
+
+    特征来自 LightGBM/feature_sets JSON（fields/names）；可用 kwargs
+    ``feature_list_path`` 覆盖路径。须在 ``super().__init__`` 前记下路径，
+    因为 ``Alpha158`` 会在初始化时调用 ``get_feature_config()``。
+    """
+
+    def __init__(self, feature_list_path=None, **kwargs):
+        # 须在 super().__init__ 前记下路径，Alpha158 初始化时会调 get_feature_config
+        self._feature_list_path = (
+            _resolve_factor_lab_feature_path(feature_list_path)
+            if feature_list_path
+            else _factor_lab_ab_default_json()
+        )
+        super().__init__(**kwargs)
+
+    def get_feature_config(self):
+        path = getattr(self, "_feature_list_path", None) or _factor_lab_ab_default_json()
+        data = json.loads(Path(path).read_text())
+        fields = list(data["fields"])
+        names = list(data["names"])
+        if len(fields) != len(names) or not fields:
+            raise ValueError("invalid FactorLabAB feature json: %s" % path)
+        return fields, names

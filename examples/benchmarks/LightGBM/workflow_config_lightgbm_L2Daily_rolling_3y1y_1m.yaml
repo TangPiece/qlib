@@ -1,0 +1,100 @@
+# 纯 L2 百因子滚动：3y train + 1y valid，约 1y step；预测约 20 交易日（一个月）
+# 首窗训 2017–2019 / 验 2020 / 测段模板 2021–2026-11-11；handler=L2Daily（仅 100 列）
+# LightGBM 超参对齐 workflow_config_lightgbm_L2Daily.yaml 强正则基线
+step: 243
+# 预测未来约 20 个交易日。命令行未传 --horizon 时，滚动脚本用它覆盖标签。
+horizon: 20
+qlib_init:
+    provider_uri: "~/.qlib/qlib_data/cn_data"
+    region: cn
+market: &market csi300
+benchmark: &benchmark SH000300
+data_handler_config: &data_handler_config
+    start_time: 2017-01-03
+    end_time: 2026-11-11
+    fit_start_time: 2017-01-03
+    fit_end_time: 2019-12-31
+    instruments: *market
+    # 与顶层 horizon=20 一致：从 T+1 收盘持有约 20 个交易日
+    label:
+        - ["Ref($close, -21) / Ref($close, -1) - 1"]
+        - ["LABEL0"]
+    # 无逐笔成交的停牌日先丢掉，再截面标准化/填空，避免被填成当天中位数
+    infer_processors:
+        - class: DropnaCols
+          kwargs:
+              col_list: ["l2_trade_count"]
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: feature
+              method: robust
+        - class: Fillna
+          kwargs:
+              fields_group: feature
+    learn_processors:
+        - class: DropnaLabel
+        - class: CSZScoreNorm
+          kwargs:
+              fields_group: label
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>
+            topk: 10
+            n_drop: 1
+    backtest:
+        start_time: 2021-01-01
+        end_time: 2026-11-11
+        account: 100000
+        benchmark: *benchmark
+        exchange_kwargs:
+            limit_threshold: 0.095
+            deal_price: close
+            open_cost: 0.0005
+            close_cost: 0.0015
+            min_cost: 5
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs:
+            loss: mse
+            colsample_bytree: 0.8879
+            learning_rate: 0.05
+            subsample: 0.8789
+            lambda_l1: 205.6999
+            lambda_l2: 580.9768
+            max_depth: 6
+            num_leaves: 64
+            num_threads: 20
+            early_stopping_rounds: 50
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: L2Daily
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                # 首窗模板：3y train + 1y valid；test 为全区间，RollingGen 按 step 裁切滑动
+                train: [2017-01-03, 2019-12-31]
+                valid: [2020-01-01, 2020-12-31]
+                test: [2021-01-01, 2026-11-11]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            model: <MODEL>
+            dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            ana_long_short: False
+            ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+            config: *port_analysis_config
