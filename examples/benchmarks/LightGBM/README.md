@@ -193,6 +193,8 @@ yaml `end_time` 常被写成「今天」，日历上可能已有 T，但本地�
 本地 Qlib 数据目录：`~/.qlib/qlib_data/cn_data`  
 数据来源为社区打包 bin：[chenditc/investment_data](https://github.com/chenditc/investment_data/releases/latest)
 
+**L2 因子 bin** 持久化在 `~/.qlib/qlib_data/cn_data_l2`（与社区包解耦）。用 [`../../scripts/dump_l2_daily.py`](../../scripts/dump_l2_daily.py) 从 staging 宽表写出；默认再 merge 进 `cn_data/features` 供训练（workflow 仍指向 `cn_data`）。
+
 使用 [`update_cn_data_daily.py`](update_cn_data_daily.py) 刷新数据，并把两份 rolling yaml
 （`..._rolling_7y1y.yaml` 与 `..._ind_weight.yaml`）中的**结束日**同步为
 **运行当天的日期**（本机 `YYYY-MM-DD`），不是 `calendars/day.txt` 末日。本地日历仍用于判断数据是否落后于 GitHub release；若今天晚于日历末日会打印 Warning。
@@ -200,14 +202,15 @@ yaml `end_time` 常被写成「今天」，日历上可能已有 T，但本地�
 **只改结束日**：不改写任何 `start_time`、`fit_start_time`，也不改 train/valid 区间或 `segments.test` 左端。
 
 investment_data **只提供全量** `qlib_bin.tar.gz`（约 540MB），无按日增量包。脚本会先比对远程 latest release tag 与本地
-`cn_data/.investment_data_release`（或日历末日）；已最新则**跳过下载**，只同步 yaml；落后再整包替换。
+`cn_data/.investment_data_release`（或日历末日）；已最新则**跳过下载**，只同步 yaml；落后再整包替换。整包替换后会自动按新日历从 staging 重 dump L2（或从 `cn_data_l2` 拷回），避免自定义 `l2_*.day.bin` 丢失；财务因子同理恢复到 `cn_data_fund` 再合回（可用 `--skip-fund-restore` 跳过）。
 
 ## 脚本做什么
 
 1. 解析 investment_data 最新 GitHub Release tag；若本地 marker / 日历已覆盖则跳过下载
 2. 需要更新时：下载 `qlib_bin.tar.gz`，将现有 `cn_data` 备份为 `cn_data.bak_YYYYMMDD_HHMMSS`（默认保留 2 份）
 3. 解压覆盖到 `~/.qlib/qlib_data/cn_data`，写入 `.investment_data_release`
-4. 默认同步两份 rolling yaml 中三处结束日为**今天**：
+4. 恢复 L2：优先 `data/level2_staging/.../v1` 重 dump → `cn_data_l2` 并 merge 进 `cn_data`；无 staging 则从 `cn_data_l2` 拷贝（可用 `--skip-l2-restore` 跳过）
+5. 默认同步两份 rolling yaml 中三处结束日为**今天**：
    - `data_handler_config.end_time`
    - `backtest.end_time`
    - `segments.test` 右端点
@@ -228,6 +231,9 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --skip-download
 
 # 强制全量重新下载（忽略已最新判定）
 python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --force
+
+# 整包替换后不恢复 L2（一般不需要）
+python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --force --skip-l2-restore
 ```
 
 ### 参数
@@ -235,9 +241,11 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --force
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `--qlib-dir` | `~/.qlib/qlib_data/cn_data` | 数据目录 |
+| `--l2-qlib-dir` | `~/.qlib/qlib_data/cn_data_l2` | L2 bin 持久化目录 |
 | `--config` | 两份 `rolling_7y1y*.yaml` | 要同步结束日的 YAML（可传多个路径） |
 | `--keep-backups N` | `2` | 保留最近 N 个 `cn_data.bak_*` |
 | `--skip-download` | 关闭 | 跳过下载，只同步 yaml |
+| `--skip-l2-restore` | 关闭 | 下载替换后不恢复/重 dump L2 |
 | `--force` | 关闭 | 强制全量下载，即使本地已是 latest |
 | `--dry-run` | 关闭 | 只打印将要执行的操作 |
 
@@ -246,6 +254,7 @@ python3 examples/benchmarks/LightGBM/update_cn_data_daily.py --force
 - 压缩包约 500MB+；已最新时默认不再重复下载。网络不稳定导致失败时，可重新跑或加 `--force`。
 - 官方 Yahoo 离线包与本社区 bin 不能增量混用；请始终用本脚本（或重新解压 release 包）整包替换。
 - 其它非 rolling yaml（momentum / chatgpt / zhipu 等）默认不改；如需更新，请传 `--config <路径>`。
+- 首次迁移：对已有 L2 再跑一次 `python scripts/dump_l2_daily.py dump`，会写入 `cn_data_l2` 并合回 `cn_data`。
 
 ---
 

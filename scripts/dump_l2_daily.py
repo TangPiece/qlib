@@ -1,16 +1,18 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""将 QuantDinger l2_daily 日宽表写入现有 qlib cn_data。
+"""将 QuantDinger l2_daily 日宽表写入独立 L2 bin 目录，并可合回训练用 cn_data。
 
 只新增 l2_*.day.bin，不改 calendars / instruments，也不覆盖 OHLCV。
 日宽表是「一天一个文件、多只股票」，不能直接走 dump_bin.dump_all。
 
+持久化默认写到 ~/.qlib/qlib_data/cn_data_l2（与社区 cn_data 解耦，避免整包更新覆盖）；
+日历仍读自 cn_data；训练时再把 l2_* 合入 cn_data/features。
+
 Example:
-    python scripts/dump_l2_daily.py dump \\
-        --qlib_dir=~/.qlib/qlib_data/cn_data
-    # 默认扫 qlib/data/level2_staging/factors/l2_daily/v1
-    # 按日转换不写 bin，需要训练/评估时再单独跑本脚本。
+    python scripts/dump_l2_daily.py dump
+    # 默认：日历 cn_data，bin 持久化 cn_data_l2，并 merge 进 cn_data
+    # 宽表默认扫 qlib/data/level2_staging/factors/l2_daily/v1
 """
 
 from __future__ import annotations
@@ -37,11 +39,15 @@ DAY_STEM_RE = re.compile(r"^\d{8}$")
 _DEFAULT_DATA_PATH = (
     Path(__file__).resolve().parents[1] / "data" / "level2_staging" / "factors" / "l2_daily" / "v1"
 )
-# 行情字段禁止覆盖，dump 只写 l2_* 
+# 行情字段禁止覆盖，dump 只写 l2_*
 _PROTECTED_FIELDS = frozenset(
     {"open", "close", "high", "low", "volume", "vwap", "factor", "change", "money"}
 )
 _EXCHANGES = frozenset({"SH", "SZ"})
+# 活跃行情 / 训练 provider（只读日历，并作为 merge 目标）
+_DEFAULT_CN_DATA = "~/.qlib/qlib_data/cn_data"
+# L2 bin 持久化根：与 cn_data 并列，避免 update 整包替换时丢失
+_DEFAULT_L2_QLIB_DIR = "~/.qlib/qlib_data/cn_data_l2"
 
 
 def to_qlib_symbol(symbol: str) -> Optional[str]:
@@ -136,6 +142,40 @@ def write_symbol_bins(
     return written
 
 
+def sync_l2_feature_bins(src_qlib_dir: Path, dst_qlib_dir: Path) -> int:
+    """把 src/features/**/l2_*.*.bin 拷到 dst/features（仅 L2，不碰 OHLCV）。
+
+    Returns
+    -------
+    int
+        成功拷贝的文件数。
+    """
+    src_features = src_qlib_dir / "features"
+    dst_features = dst_qlib_dir / "features"
+    if not src_features.is_dir():
+        logger.warning(f"no L2 features to sync: {src_features}")
+        return 0
+    dst_features.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for src in src_features.rglob("l2_*.*.bin"):
+        # 相对 features 的路径保持一致，如 sh600000/l2_trade_count.day.bin
+        rel = src.relative_to(src_features)
+        dst = dst_features / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        copied += 1
+    logger.info(f"synced {copied} l2_*.bin from {src_qlib_dir} -> {dst_qlib_dir}")
+    return copied
+
+
+def has_l2_feature_bins(qlib_dir: Path) -> bool:
+    """判断目录下是否已有任意 l2_*.*.bin。"""
+    features = qlib_dir / "features"
+    if not features.is_dir():
+        return False
+    return next(features.rglob("l2_*.*.bin"), None) is not None
+
+
 def _dump_symbol_job(
     parquet_paths: List[str],
     calendar_values: List[str],
@@ -152,12 +192,14 @@ def _dump_symbol_job(
 
 
 class DumpL2Daily:
-    """l2_daily 日宽表 -> 现有 cn_data 的 l2_*.day.bin。"""
+    """l2_daily 日宽表 -> cn_data_l2 持久化，并可 merge 进训练用 cn_data。"""
 
     def __init__(
         self,
         data_path: str = "",
-        qlib_dir: str = "~/.qlib/qlib_data/cn_data",
+        qlib_dir: str = _DEFAULT_L2_QLIB_DIR,
+        calendar_dir: str = _DEFAULT_CN_DATA,
+        merge_into: str = _DEFAULT_CN_DATA,
         max_workers: int = 8,
         dry_run: bool = False,
         symbols: str = "",
@@ -170,7 +212,11 @@ class DumpL2Daily:
         data_path : str
             l2_daily/v1 根目录（YYYY/YYYYMM/YYYYMMDD.parquet）
         qlib_dir : str
-            现有 qlib 数据目录，必须已有 calendars/day.txt
+            L2 bin 持久化目录（默认 cn_data_l2），与社区 cn_data 分离
+        calendar_dir : str
+            读取 calendars/day.txt 的目录（默认 cn_data）；索引必须对齐活跃行情
+        merge_into : str
+            额外把 l2_* 同步进训练目录（默认 cn_data）；传空字符串则跳过
         max_workers : int
             读日文件 / 写 bin 的进程数
         dry_run : bool
@@ -186,6 +232,12 @@ class DumpL2Daily:
         resolved = Path(data_path).expanduser() if str(data_path).strip() else _DEFAULT_DATA_PATH
         self.data_path = resolved.resolve()
         self.qlib_dir = Path(qlib_dir).expanduser().resolve()
+        self.calendar_dir = Path(calendar_dir).expanduser().resolve()
+        # 空字符串表示不同步；否则展开为绝对路径
+        merge_raw = str(merge_into).strip() if merge_into is not None else ""
+        self.merge_into: Optional[Path] = (
+            Path(merge_raw).expanduser().resolve() if merge_raw else None
+        )
         self.max_workers = max(1, int(max_workers))
         self.dry_run = dry_run
         self.symbol_filter = {s.strip().upper() for s in symbols.split(",") if s.strip()}
@@ -195,20 +247,23 @@ class DumpL2Daily:
         self.features_dir = self.qlib_dir / "features"
 
     def dump(self) -> None:
-        """扫描日宽表并写入 l2_* bin。"""
+        """扫描日宽表并写入 l2_* bin，必要时合回训练目录。"""
         day_files = iter_day_files(self.data_path)
         if not day_files:
             raise FileNotFoundError(f"no YYYYMMDD.parquet under {self.data_path}")
-        calendar = read_calendars(self.qlib_dir, self.freq)
+        # 日历始终来自活跃行情目录，避免 cn_data_l2 无 calendars
+        calendar = read_calendars(self.calendar_dir, self.freq)
         logger.info(
             f"day files={len(day_files)} calendar={calendar[0].date()}~{calendar[-1].date()} "
-            f"factors={len(self.factor_ids)} qlib_dir={self.qlib_dir}"
+            f"factors={len(self.factor_ids)} qlib_dir={self.qlib_dir} "
+            f"calendar_dir={self.calendar_dir} merge_into={self.merge_into}"
         )
 
         if self.dry_run:
             self._dry_run(day_files)
             return
 
+        self.features_dir.mkdir(parents=True, exist_ok=True)
         temp_root = Path(tempfile.mkdtemp(prefix="l2_daily_dump_"))
         try:
             symbol_files = self._materialize_by_year(day_files, temp_root)
@@ -218,6 +273,13 @@ class DumpL2Daily:
         finally:
             shutil.rmtree(temp_root, ignore_errors=True)
             logger.info("removed temp parquet dir")
+
+        # 训练仍用单一 provider_uri=cn_data，故把持久化 L2 合回
+        if self.merge_into is not None:
+            if self.merge_into.resolve() == self.qlib_dir.resolve():
+                logger.info("merge_into == qlib_dir；跳过二次同步")
+            else:
+                sync_l2_feature_bins(self.qlib_dir, self.merge_into)
 
     def _dry_run(self, day_files: Sequence[Path]) -> None:
         """扫描覆盖范围，不写任何 bin。"""
@@ -276,7 +338,7 @@ class DumpL2Daily:
         return frames
 
     def _dump_bins(self, symbol_files: dict, calendar: Sequence[pd.Timestamp]) -> None:
-        """按股票写 l2_*.day.bin。"""
+        """按股票写 l2_*.day.bin 到持久化目录。"""
         calendar_values = [ts.strftime("%Y-%m-%d") for ts in calendar]
         jobs = [
             (paths, calendar_values, str(self.features_dir), symbol, self.factor_ids)
@@ -295,7 +357,9 @@ class DumpL2Daily:
 
 def dump(
     data_path: str = "",
-    qlib_dir: str = "~/.qlib/qlib_data/cn_data",
+    qlib_dir: str = _DEFAULT_L2_QLIB_DIR,
+    calendar_dir: str = _DEFAULT_CN_DATA,
+    merge_into: str = _DEFAULT_CN_DATA,
     max_workers: int = 8,
     dry_run: bool = False,
     symbols: str = "",
@@ -306,6 +370,8 @@ def dump(
     DumpL2Daily(
         data_path=data_path,
         qlib_dir=qlib_dir,
+        calendar_dir=calendar_dir,
+        merge_into=merge_into,
         max_workers=max_workers,
         dry_run=dry_run,
         symbols=symbols,

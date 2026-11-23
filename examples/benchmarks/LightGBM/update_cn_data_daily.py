@@ -9,6 +9,15 @@ data is behind that release, replaces ~/.qlib/qlib_data/cn_data, then syncs
 **end_time** fields in rolling configs to **today's date** (local machine date),
 not the calendar last trading day.
 
+After a full replace, restores custom L2 bins: prefer re-dump from
+data/level2_staging into ~/.qlib/qlib_data/cn_data_l2 and merge into cn_data
+(so community updates do not permanently wipe L2). Use --skip-l2-restore to
+disable.
+
+Also restores fund_cn financial bins the same way: durable store at
+~/.qlib/qlib_data/cn_data_fund (from fundamental_staging or copy), then merge
+into cn_data. Use --skip-fund-restore to disable.
+
 investment_data only ships a full archive (~540MB); there is no incremental
 day pack. This script skips re-download when the local release marker (or
 calendar end) already matches / covers the remote latest tag.
@@ -20,10 +29,12 @@ Usage:
     python examples/benchmarks/LightGBM/update_cn_data_daily.py --dry-run
     python examples/benchmarks/LightGBM/update_cn_data_daily.py --skip-download
     python examples/benchmarks/LightGBM/update_cn_data_daily.py --force
+    python examples/benchmarks/LightGBM/update_cn_data_daily.py --skip-l2-restore
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 import shutil
 import socket
@@ -36,10 +47,21 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Iterable, List, Optional, Sequence, Tuple
 
 DIRNAME = Path(__file__).absolute().resolve().parent
+# LightGBM -> benchmarks -> examples -> qlib 仓库根
+REPO_ROOT = DIRNAME.parents[2]
 DEFAULT_QLIB_DIR = Path("~/.qlib/qlib_data/cn_data").expanduser()
+# L2 bin 持久化目录：与 cn_data 并列，整包替换行情时不会被抹掉
+DEFAULT_L2_QLIB_DIR = Path("~/.qlib/qlib_data/cn_data_l2").expanduser()
+# staging 真源：优先据此按新日历重 dump
+DEFAULT_L2_STAGING = REPO_ROOT / "data" / "level2_staging" / "factors" / "l2_daily" / "v1"
+# 财务因子 bin 持久化目录：与 cn_data / cn_data_l2 并列
+DEFAULT_FUND_QLIB_DIR = Path("~/.qlib/qlib_data/cn_data_fund").expanduser()
+DEFAULT_FUND_STAGING = (
+    REPO_ROOT / "data" / "fundamental_staging" / "factors" / "fund_cn" / "v1"
+)
 DEFAULT_CONFIGS = [
     DIRNAME / "workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml",
     # 20 日预测配置的结束日与隔日配置一起写成当天
@@ -545,6 +567,139 @@ def resolve_latest_release_tag() -> str:
     return "latest"
 
 
+def _load_dump_script_module(script_name: str, module_name: str) -> Any:
+    """按路径加载 scripts/<script_name>.py（scripts 非包）。"""
+    path = REPO_ROOT / "scripts" / f"{script_name}.py"
+    if not path.exists():
+        raise FileNotFoundError(f"missing dump script: {path}")
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load {module_name} from {path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _load_dump_l2_module() -> Any:
+    """按路径加载 scripts/dump_l2_daily.py。"""
+    return _load_dump_script_module("dump_l2_daily", "dump_l2_daily")
+
+
+def _load_dump_fund_module() -> Any:
+    """按路径加载 scripts/dump_fund_cn.py。"""
+    return _load_dump_script_module("dump_fund_cn", "dump_fund_cn")
+
+
+def restore_l2_bins(
+    qlib_dir: Path,
+    *,
+    l2_qlib_dir: Path = DEFAULT_L2_QLIB_DIR,
+    staging_dir: Path = DEFAULT_L2_STAGING,
+    dry_run: bool = False,
+) -> None:
+    """cn_data 整包替换后恢复 L2 bin：优先 staging 重 dump，否则从 cn_data_l2 拷回。"""
+    qlib_dir = qlib_dir.expanduser().resolve()
+    l2_qlib_dir = l2_qlib_dir.expanduser().resolve()
+    staging_dir = staging_dir.expanduser().resolve()
+
+    try:
+        dump_mod = _load_dump_l2_module()
+    except Exception as exc:  # noqa: BLE001
+        log(f"Warning: cannot load dump_l2_daily ({exc}); skip L2 restore")
+        return
+
+    day_files = dump_mod.iter_day_files(staging_dir) if staging_dir.is_dir() else []
+    if day_files:
+        log(
+            f"Restoring L2 bins from staging ({len(day_files)} day files) "
+            f"-> {l2_qlib_dir} + merge into {qlib_dir}"
+        )
+        if dry_run:
+            log("[dry-run] would run DumpL2Daily.dump() with new calendar")
+            return
+        dump_mod.DumpL2Daily(
+            data_path=str(staging_dir),
+            qlib_dir=str(l2_qlib_dir),
+            calendar_dir=str(qlib_dir),
+            merge_into=str(qlib_dir),
+        ).dump()
+        log("L2 restore via staging dump done")
+        return
+
+    if dump_mod.has_l2_feature_bins(l2_qlib_dir):
+        log(
+            f"Warning: staging missing under {staging_dir}; "
+            f"copying existing L2 bins from {l2_qlib_dir} into {qlib_dir}. "
+            "Calendar may have changed — prefer re-dump from staging when available."
+        )
+        if dry_run:
+            log("[dry-run] would sync_l2_feature_bins(cn_data_l2 -> cn_data)")
+            return
+        n = dump_mod.sync_l2_feature_bins(l2_qlib_dir, qlib_dir)
+        log(f"L2 restore via copy done ({n} files)")
+        return
+
+    log(
+        f"Warning: no L2 staging at {staging_dir} and no bins under {l2_qlib_dir}; "
+        "skip L2 restore (run scripts/dump_l2_daily.py dump after factors are ready)"
+    )
+
+
+def restore_fund_cn_bins(
+    qlib_dir: Path,
+    *,
+    fund_qlib_dir: Path = DEFAULT_FUND_QLIB_DIR,
+    staging_dir: Path = DEFAULT_FUND_STAGING,
+    dry_run: bool = False,
+) -> None:
+    """cn_data 整包替换后恢复财务因子 bin：优先 staging 重 dump，否则从 cn_data_fund 拷回。"""
+    qlib_dir = qlib_dir.expanduser().resolve()
+    fund_qlib_dir = fund_qlib_dir.expanduser().resolve()
+    staging_dir = staging_dir.expanduser().resolve()
+
+    try:
+        dump_mod = _load_dump_fund_module()
+    except Exception as exc:  # noqa: BLE001
+        log(f"Warning: cannot load dump_fund_cn ({exc}); skip fund restore")
+        return
+
+    day_files = dump_mod.iter_day_files(staging_dir) if staging_dir.is_dir() else []
+    if day_files:
+        log(
+            f"Restoring fund_cn bins from staging ({len(day_files)} day files) "
+            f"-> {fund_qlib_dir} + merge into {qlib_dir}"
+        )
+        if dry_run:
+            log("[dry-run] would run DumpFundCn.dump() with new calendar")
+            return
+        dump_mod.DumpFundCn(
+            data_path=str(staging_dir),
+            qlib_dir=str(fund_qlib_dir),
+            calendar_dir=str(qlib_dir),
+            merge_into=str(qlib_dir),
+        ).dump()
+        log("fund_cn restore via staging dump done")
+        return
+
+    if dump_mod.has_fund_feature_bins(fund_qlib_dir):
+        log(
+            f"Warning: fund staging missing under {staging_dir}; "
+            f"copying existing fund bins from {fund_qlib_dir} into {qlib_dir}. "
+            "Calendar may have changed — prefer re-dump from staging when available."
+        )
+        if dry_run:
+            log("[dry-run] would sync_fund_feature_bins(cn_data_fund -> cn_data)")
+            return
+        n = dump_mod.sync_fund_feature_bins(fund_qlib_dir, qlib_dir)
+        log(f"fund_cn restore via copy done ({n} files)")
+        return
+
+    log(
+        f"Warning: no fund staging at {staging_dir} and no bins under {fund_qlib_dir}; "
+        "skip fund restore (run scripts/dump_fund_cn.py dump after factors are ready)"
+    )
+
+
 def run(
     qlib_dir: Path,
     configs: Sequence[Path],
@@ -552,6 +707,10 @@ def run(
     dry_run: bool,
     keep_backups: int,
     force: bool = False,
+    skip_l2_restore: bool = False,
+    l2_qlib_dir: Path = DEFAULT_L2_QLIB_DIR,
+    skip_fund_restore: bool = False,
+    fund_qlib_dir: Path = DEFAULT_FUND_QLIB_DIR,
 ) -> None:
     qlib_dir = qlib_dir.expanduser().resolve()
     config_paths = [c.expanduser().resolve() for c in configs]
@@ -588,6 +747,14 @@ def run(
                 log(f"[dry-run] would download {DOWNLOAD_URL}")
                 log(f"[dry-run] would backup/replace {qlib_dir}")
                 log(f"[dry-run] would write marker {RELEASE_MARKER_NAME}={release_tag}")
+                if not skip_l2_restore:
+                    restore_l2_bins(
+                        qlib_dir, l2_qlib_dir=l2_qlib_dir, dry_run=True
+                    )
+                if not skip_fund_restore:
+                    restore_fund_cn_bins(
+                        qlib_dir, fund_qlib_dir=fund_qlib_dir, dry_run=True
+                    )
             else:
                 # 使用固定缓存路径，中断后重跑可断点续传
                 archive = _download_cache_path()
@@ -604,6 +771,17 @@ def run(
                 except OSError as exc:
                     log(f"Warning: could not remove cache {archive} ({exc})")
                 did_download = True
+                # 社区包不含自定义 L2 / fund：按新日历重 dump 或从持久化目录合回
+                if not skip_l2_restore:
+                    restore_l2_bins(qlib_dir, l2_qlib_dir=l2_qlib_dir, dry_run=False)
+                else:
+                    log("Skipping L2 restore (--skip-l2-restore)")
+                if not skip_fund_restore:
+                    restore_fund_cn_bins(
+                        qlib_dir, fund_qlib_dir=fund_qlib_dir, dry_run=False
+                    )
+                else:
+                    log("Skipping fund restore (--skip-fund-restore)")
 
     first, cal_latest = read_calendar_bounds(qlib_dir)
     n_inst = count_instruments(qlib_dir)
@@ -670,6 +848,28 @@ def main(argv: Optional[List[str]] = None) -> None:
         default=2,
         help="Keep N most recent cn_data.bak_* dirs (default: 2)",
     )
+    parser.add_argument(
+        "--skip-l2-restore",
+        action="store_true",
+        help="After download, do not re-dump/merge L2 bins into cn_data",
+    )
+    parser.add_argument(
+        "--l2-qlib-dir",
+        type=Path,
+        default=DEFAULT_L2_QLIB_DIR,
+        help=f"durable L2 bin root (default: {DEFAULT_L2_QLIB_DIR})",
+    )
+    parser.add_argument(
+        "--skip-fund-restore",
+        action="store_true",
+        help="After download, do not re-dump/merge fund_cn bins into cn_data",
+    )
+    parser.add_argument(
+        "--fund-qlib-dir",
+        type=Path,
+        default=DEFAULT_FUND_QLIB_DIR,
+        help=f"durable fund_cn bin root (default: {DEFAULT_FUND_QLIB_DIR})",
+    )
     args = parser.parse_args(argv)
     configs = list(args.config) if args.config else list(DEFAULT_CONFIGS)
     run(
@@ -679,6 +879,10 @@ def main(argv: Optional[List[str]] = None) -> None:
         dry_run=args.dry_run,
         keep_backups=args.keep_backups,
         force=args.force,
+        skip_l2_restore=args.skip_l2_restore,
+        l2_qlib_dir=args.l2_qlib_dir,
+        skip_fund_restore=args.skip_fund_restore,
+        fund_qlib_dir=args.fund_qlib_dir,
     )
 
 
