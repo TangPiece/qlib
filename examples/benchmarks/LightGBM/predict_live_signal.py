@@ -72,6 +72,11 @@ SOURCE_POSITIONS_JSON = "positions_json"
 SOURCE_RECORDER = "recorder"
 
 _CONF_PATH_RE = re.compile(r"--conf_path(?:=|\s+)(\S+)")
+# qrun / python -m qlib.cli.run 常把 yaml 写成位置参数，没有 --conf_path
+_WORKFLOW_YAML_RE = re.compile(
+    r"(?:^|\s)((?:[^\s\"']|/)+workflow_config[^\s\"']*\.ya?ml)",
+    re.IGNORECASE,
+)
 
 
 def _safe_name(exp_name: str) -> str:
@@ -114,8 +119,17 @@ def _rolling_models_exp_name(ensemble_rec) -> Optional[str]:
 
 
 def _conf_raw_from_argv(argv_text: str) -> Optional[Path]:
-    """从 cmd-sys.argv 取出 --conf_path 原文（文件可以已不存在）。"""
-    m = _CONF_PATH_RE.search(argv_text or "")
+    """从 cmd-sys.argv 取出训练 yaml 原文（文件可以已不存在）。
+
+    优先 ``--conf_path``；没有时再取含 ``workflow_config`` 的位置参数 yaml。
+    """
+    text = argv_text or ""
+    m = _CONF_PATH_RE.search(text)
+    if m:
+        raw = m.group(1).strip().strip("'\"")
+        if raw:
+            return Path(raw)
+    m = _WORKFLOW_YAML_RE.search(text)
     if not m:
         return None
     raw = m.group(1).strip().strip("'\"")
