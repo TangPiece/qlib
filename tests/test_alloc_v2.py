@@ -658,7 +658,14 @@ def test_jin10_etf_holdings_early_stop(monkeypatch) -> None:
                 }
             return {"data": {"values": []}}
 
-    monkeypatch.setattr(requests, "get", lambda *_a, **_k: _Resp())
+    seen: dict[str, object] = {}
+
+    def _get(*_a, **kwargs):
+        # 金十必须带上网络层超时，否则分页会把 update 挂死
+        seen["timeout"] = kwargs.get("timeout")
+        return _Resp()
+
+    monkeypatch.setattr(requests, "get", _get)
     frame = jin10_etf.fetch_jin10_etf_holdings(
         attr_id="1",
         commodity="黄金",
@@ -670,6 +677,7 @@ def test_jin10_etf_holdings_early_stop(monkeypatch) -> None:
     assert frame["日期"].min() >= date(2024, 10, 1)
     # 第二页已越过 start，应早停，不会无限翻页
     assert calls["n"] <= 3
+    assert seen.get("timeout") is not None
     reset_network_state_for_tests()
 
 
@@ -791,4 +799,188 @@ def test_lab_http_index_series_rows_and_catalog_page(tmp_path: Path) -> None:
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_fetch_window_keeps_lagged_month_and_quarter() -> None:
+    """日频重叠只有 7 日时，上月末和最近两个季末仍要能落进慢频窗口。"""
+    from qlib.contrib.data.alloc_v2.pipeline import update_windows
+    from qlib.contrib.data.alloc_v2.schema import in_fetch_window, lookback_start
+
+    end = date(2026, 11, 23)
+    daily = end - timedelta(days=7)
+    assert in_fetch_window(
+        date(2026, 10, 31),
+        available_at=date(2026, 11, 15),
+        freq="month",
+        start=daily,
+        end=end,
+    )
+    assert not in_fetch_window(
+        date(2024, 1, 31),
+        available_at=date(2024, 2, 15),
+        freq="month",
+        start=daily,
+        end=end,
+    )
+    # 日频不因 available_at 落在月内就放宽到上月
+    assert not in_fetch_window(
+        date(2026, 10, 31),
+        available_at=date(2026, 11, 15),
+        freq="day",
+        start=daily,
+        end=end,
+    )
+    q_start = lookback_start("quarter", anchor=end)
+    assert q_start <= date(2026, 6, 30)
+    assert date(2026, 9, 30) >= q_start
+    windows = update_windows(end, daily)
+    assert windows["day"] == daily
+    assert windows["month"] <= date(2026, 10, 31)
+    assert windows["quarter"] <= date(2026, 6, 30)
+
+
+def test_fund_holding_quarter_end_is_not_lookahead() -> None:
+    from qlib.contrib.data.alloc_v2.adapters.institution import quarter_available_at, quarter_period_end
+
+    event = quarter_period_end(2026, 1)
+    avail = quarter_available_at(event)
+    assert event == date(2026, 3, 31)
+    assert avail >= date(2026, 4, 1)
+    assert avail.month != event.month
+    q4 = quarter_period_end(2026, 4)
+    assert q4 == date(2026, 12, 31)
+    assert quarter_available_at(q4) == date(2027, 1, 15)
+
+
+def test_s3_lhb_uses_industry_map_not_raw_code() -> None:
+    """行业代码即使和龙虎榜实体字符串相同，也不得直接当成旁证。"""
+    from qlib.contrib.data.alloc_v2.signals import signal_s3_stock
+
+    asof = pd.Timestamp("2024-06-10")
+    s2 = pd.DataFrame([{"entity_id": "801080", "value": 1.0}])
+    factors = pd.DataFrame(
+        [
+            {
+                "factor_id": "LHB_Institution_Ratio_d5",
+                "entity_id": "801080",
+                "value": 0.9,
+                "event_date": asof,
+                "available_at": asof,
+                "quality_flag": "ok",
+            }
+        ]
+    )
+    unmapped = signal_s3_stock(factors, pd.DataFrame(), s2, asof=asof)
+    assert "unmapped" in unmapped.iloc[0]["notes"]
+    assert "trade_confirm=lhb" not in unmapped.iloc[0]["notes"]
+
+    standard = pd.DataFrame(
+        [
+            {
+                "dataset": "industry_member",
+                "entity_id": "600000",
+                "field": "801080",
+                "value": 1.0,
+                "event_date": asof,
+                "available_at": asof,
+            }
+        ]
+    )
+    mapped_factors = pd.DataFrame(
+        [
+            {
+                "factor_id": "LHB_Institution_Ratio_d5",
+                "entity_id": "600000",
+                "value": 0.5,
+                "event_date": asof,
+                "available_at": asof,
+                "quality_flag": "ok",
+            }
+        ]
+    )
+    mapped = signal_s3_stock(mapped_factors, standard, s2, asof=asof)
+    assert "trade_confirm=lhb" in mapped.iloc[0]["notes"]
+
+
+def test_s2_sparse_flow_is_not_estimate() -> None:
+    from qlib.contrib.data.alloc_v2.signals import signal_s2_industry
+
+    asof = pd.Timestamp("2024-06-10")
+
+    def _row(factor_id: str, value: float, quality: str) -> dict:
+        return {
+            "factor_id": factor_id,
+            "entity_id": "801080",
+            "value": value,
+            "event_date": asof,
+            "available_at": asof,
+            "quality_flag": quality,
+        }
+
+    sparse = signal_s2_industry(
+        pd.DataFrame(
+            [
+                _row("Industry_Turnover_Rel20", 1.5, "ok"),
+                _row("IndustryETFFlow20_pct120", 0.95, "sparse_sample"),
+                _row("Industry_ResidualRet20", 0.1, "ok"),
+                _row("IndustryAllocationScore", 2.0, "ok"),
+            ]
+        ),
+        asof=asof,
+    )
+    sparse_row = sparse[sparse["entity_id"] == "801080"].iloc[0]
+    assert float(sparse_row["value"]) == 0.0
+    assert "sparse_sample" in str(sparse_row["notes"])
+
+    fresh = signal_s2_industry(
+        pd.DataFrame(
+            [
+                _row("Industry_Turnover_Rel20", 1.5, "ok"),
+                _row("IndustryETFFlow20_pct120", 0.95, "ok"),
+                _row("Industry_ResidualRet20", 0.1, "ok"),
+                _row("IndustryAllocationScore", 2.0, "ok"),
+            ]
+        ),
+        asof=asof,
+    )
+    fresh_row = fresh[fresh["entity_id"] == "801080"].iloc[0]
+    assert float(fresh_row["value"]) == 1.0
+    assert "estimate" in str(fresh_row["notes"])
+
+
+def test_flow_quality_does_not_paint_recent_dates() -> None:
+    from qlib.contrib.data.alloc_v2.factors import industry_quality_by_day
+
+    est = pd.DataFrame(
+        [
+            {
+                "entity_id": "512480",
+                "event_date": pd.Timestamp("2024-01-05"),
+                "quality_flag": "sparse_sample",
+                "value": 1.0,
+            },
+            {
+                "entity_id": "512480",
+                "event_date": pd.Timestamp("2024-06-03"),
+                "quality_flag": "ok",
+                "value": 2.0,
+            },
+        ]
+    )
+    panel = industry_quality_by_day(est, {"512480": "801080"})
+    assert panel.loc[pd.Timestamp("2024-01-05"), "801080"] == "sparse_sample"
+    assert panel.loc[pd.Timestamp("2024-06-03"), "801080"] == "ok"
+
+
+def test_sw_l1_includes_textile_and_light_industry() -> None:
+    from qlib.contrib.data.alloc_v2.adapters.industry import SW_L1
+    from qlib.contrib.data.alloc_v2.labels import display_name
+
+    assert SW_L1["801130"] == "纺织服饰"
+    assert SW_L1["801140"] == "轻工制造"
+    assert len(SW_L1) == 31
+    assert display_name("801130") == "纺织服饰"
+    assert "未进信号" in dataset_by_id()["margin"].notes
+    assert "jin10" in dataset_by_id()["gold_gld"].source
+    assert "jin10" in dataset_by_id()["silver_etf"].source
 

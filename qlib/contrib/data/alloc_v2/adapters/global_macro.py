@@ -178,7 +178,7 @@ class GlobalMacroAdapter:
         _log.info("拉取 SPDR 黄金 ETF 持仓（有界分页，start=%s）…", start)
         spec = lookup("gold_gld")
         frame = safe_call(
-            "macro_cons_gold",
+            "jin10.etf.gold",
             fetch_jin10_etf_holdings,
             attr_id="1",
             commodity="黄金",

@@ -173,7 +173,7 @@ class V22FreeAdapter:
         _log.info("拉取白银 ETF 持仓（有界分页，start=%s）…", start)
         spec = lookup("silver_etf")
         frame = safe_call(
-            "macro_cons_silver",
+            "jin10.etf.silver",
             fetch_jin10_etf_holdings,
             attr_id="2",
             commodity="白银",

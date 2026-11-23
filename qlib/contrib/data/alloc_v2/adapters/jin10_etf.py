@@ -12,7 +12,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..network import prepare_network
+from ..network import prepare_network, resolve_http_timeout
 from ..schema import parse_day
 
 _log = logging.getLogger(__name__)
@@ -71,7 +71,13 @@ def fetch_jin10_etf_holdings(
     chunks: list[pd.DataFrame] = []
     for page in range(1, pages + 1):
         try:
-            resp = requests.get(_URL, params=params, headers=_HEADERS)
+            # 与网络层短超时一致，避免金十分页把整次 update 挂死
+            resp = requests.get(
+                _URL,
+                params=params,
+                headers=_HEADERS,
+                timeout=resolve_http_timeout(),
+            )
             resp.raise_for_status()
             payload = resp.json()
         except Exception as exc:  # noqa: BLE001

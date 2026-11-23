@@ -21,13 +21,13 @@
 | US/CN yields | bond_zh_us_rate | day | T+0 | free | yield_cn_us | 已有 |
 | USDCNY | currency_boc_safe | day | T+0 | free | fx_usdcny | 已有 |
 | SGE_GOLD | spot_golden_benchmark_sge | day | T+0 | free | gold_sge | 已有 |
-| GLD_tonnes | macro_cons_gold | day | T+1 | free | gold_gld | 持仓吨位，非净流入 |
+| GLD_tonnes | jin10 etf attr=1 | day | T+1 | free | gold_gld | 持仓吨位，非净流入 |
 | VIX | CBOE VIX_History.csv | day | T+1 | free | vix_cboe | 官方 CSV |
 | DXY | index_global_hist_em 美元指数 | day | T+0 | free | dxy | 替换不稳定 eastmoney-push |
 | BRENT | futures_global_hist_em B00Y | day | T+0 | free | oil_brent | 连续合约价格 proxy |
 | WTI | futures_global_hist_em CL00Y | day | T+0 | free | oil_wti | 辅助价差，非库存 |
 | SGE_SILVER | spot_silver_benchmark_sge | day | T+0 | free | silver_sge | 国内白银基准 |
-| SLV_tonnes | macro_cons_silver | day | T+1 | free | silver_etf | ETF 持仓吨位 |
+| SLV_tonnes | jin10 etf attr=2 | day | T+1 | free | silver_etf | ETF 持仓吨位 |
 | BTCUSDT | Binance public klines | day | T+0 | free | crypto_btc | 现货价/量；非 ETF 申赎 |
 | US_REAL10Y | FRED DFII10 | day | T+1 | free | us_real_rate | 10Y TIPS 实际利率 |
 | FED_WALCL | FRED WALCL | week | T+1 | free | fed_balance | 美联储资产负债表 |

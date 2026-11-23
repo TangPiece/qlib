@@ -9,7 +9,7 @@ import re
 from calendar import monthrange
 from datetime import date, timedelta
 
-from ..schema import finite_number, first_col, in_range, parse_day
+from ..schema import finite_number, first_col, in_fetch_window, in_range, parse_day
 from .base import lookup, row_of, safe_call
 
 
@@ -140,7 +140,11 @@ class ChinaAdapter:
                     for raw_day, raw_value in zip(money[date_col], money[value_col]):
                         day = parse_cn_month(raw_day)
                         value = finite_number(raw_value)
-                        if value is None or not in_range(day, start, end):
+                        # 月频按发布日或月末落窗，避免增量 7 日重叠漏掉上月数
+                        avail = _macro_available_at(day) if day is not None else None
+                        if value is None or not in_fetch_window(
+                            day, available_at=avail, freq="month", start=start, end=end
+                        ):
                             continue
                         rows.append(
                             row_of(
@@ -150,7 +154,7 @@ class ChinaAdapter:
                                 field,
                                 value,
                                 unit=unit,
-                                available_at=_macro_available_at(day),
+                                available_at=avail,
                             )
                         )
 
@@ -163,7 +167,10 @@ class ChinaAdapter:
                 for raw_day, raw_value in zip(socfin[date_col], socfin[value_col]):
                     day = parse_cn_month(raw_day)
                     value = finite_number(raw_value)
-                    if value is None or not in_range(day, start, end):
+                    avail = _macro_available_at(day) if day is not None else None
+                    if value is None or not in_fetch_window(
+                        day, available_at=avail, freq="month", start=start, end=end
+                    ):
                         continue
                     rows.append(
                         row_of(
@@ -173,7 +180,7 @@ class ChinaAdapter:
                             "amount",
                             value,
                             unit="cny_yi",
-                            available_at=_macro_available_at(day),
+                            available_at=avail,
                         )
                     )
 
@@ -185,9 +192,12 @@ class ChinaAdapter:
                 for raw_day, raw_value in zip(pmi[date_col], pmi[manu_col]):
                     day = parse_cn_month(raw_day)
                     value = finite_number(raw_value)
-                    if value is None or not in_range(day, start, end):
-                        continue
                     # PMI 通常月初公布上月值，lag 取 3 日保守估计
+                    avail = _macro_available_at(day, lag_days=3) if day is not None else None
+                    if value is None or not in_fetch_window(
+                        day, available_at=avail, freq="month", start=start, end=end
+                    ):
+                        continue
                     rows.append(
                         row_of(
                             spec,
@@ -196,7 +206,7 @@ class ChinaAdapter:
                             "pmi",
                             value,
                             unit="index",
-                            available_at=_macro_available_at(day, lag_days=3),
+                            available_at=avail,
                         )
                     )
 
@@ -208,7 +218,10 @@ class ChinaAdapter:
                 for raw_day, raw_value in zip(lpr[date_col], lpr[value_col]):
                     day = parse_day(raw_day)
                     value = finite_number(raw_value)
-                    if value is None or not in_range(day, start, end):
+                    # LPR 挂在月频 cn_macro 上，增量同样按月窗口保留最近公布
+                    if value is None or not in_fetch_window(
+                        day, available_at=day, freq="month", start=start, end=end
+                    ):
                         continue
                     rows.append(row_of(spec, "LPR1Y", day, "lpr", value, unit="pct"))
         return rows

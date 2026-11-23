@@ -5,15 +5,27 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from calendar import monthrange
+from datetime import date
 
-from ..schema import finite_number, first_col, in_range, parse_day
+from ..schema import finite_number, first_col, in_fetch_window, in_range, parse_day
 from .base import lookup, row_of, safe_call
 
 
-def _quarter_available_at(event_date: date) -> date:
-    """季报最早按披露日后约 30 日可观测；缺公告日时用季末 + 30。"""
-    return event_date + timedelta(days=30)
+def quarter_period_end(year: int, quarter: int) -> date:
+    """季度最后一个自然日。一季度是 3 月 31 日，不是 3 月 1 日。"""
+    month = int(quarter) * 3
+    return date(int(year), month, monthrange(int(year), month)[1])
+
+
+def quarter_available_at(event_date: date) -> date:
+    """披露日不早于季末次月：取次月 15 日，避免把季末当月写成可观测。
+
+    公募季报大约在季末后 15 个工作日，次月 15 日仍偏早时由 quality_flag 禁止 PIT。
+    """
+    if event_date.month == 12:
+        return date(event_date.year + 1, 1, 15)
+    return date(event_date.year, event_date.month + 1, 15)
 
 
 class InstitutionAdapter:
@@ -172,22 +184,29 @@ class InstitutionAdapter:
         fn = getattr(ak, "stock_institute_hold", None)
         if fn is None:
             return []
+        rows = []
         for symbol in candidates:
+            year, quarter = int(symbol[:4]), int(symbol[4])
+            event = quarter_period_end(year, quarter)
+            # 行数不是持仓明细：可观测日放到季末次月，并标 unavailable，禁止当 PIT 持仓
+            avail = quarter_available_at(event)
+            if not in_fetch_window(event, available_at=avail, freq="quarter", start=start, end=end):
+                continue
             frame = safe_call(f"stock_institute_hold:{symbol}", fn, symbol=symbol)
             if frame.empty:
                 continue
-            event = date(int(symbol[:4]), int(symbol[4]) * 3, 1)
-            return [
+            rows.append(
                 row_of(
                     spec,
                     "ALL",
                     event,
                     "n_names",
                     float(len(frame)),
-                    available_at=_quarter_available_at(event),
-                    announcement_date=_quarter_available_at(event),
+                    available_at=avail,
+                    announcement_date=avail,
                     unit="count",
-                    source=f"{spec.source}:{symbol}",
+                    quality_flag="unavailable",
+                    source=f"{spec.source}:{symbol}:n_names_not_holdings",
                 )
-            ]
-        return []
+            )
+        return rows

@@ -35,11 +35,52 @@ def pit_slice(factors: pd.DataFrame, asof: pd.Timestamp) -> pd.DataFrame:
 
 
 def _latest_by_entity(part: pd.DataFrame, asof: pd.Timestamp) -> pd.Series:
+    latest = _latest_rows(part, asof)
+    if latest.empty:
+        return pd.Series(dtype="float64")
+    return latest["value"]
+
+
+def _latest_rows(part: pd.DataFrame, asof: pd.Timestamp) -> pd.DataFrame:
+    """每个实体在 asof 之前最后一行，保留 quality_flag。"""
     part = pit_slice(part, asof)
     if part.empty:
-        return pd.Series(dtype="float64")
+        return part
     part = part.sort_values("available_at")
-    return part.groupby("entity_id")["value"].last()
+    return part.groupby("entity_id").tail(1).set_index("entity_id")
+
+
+def _stock_industry_map(standard: pd.DataFrame) -> dict[str, str]:
+    """industry_member：entity 为股票代码，field 为申万一级（801xxx）。没有成分表则返回空。"""
+    if standard is None or standard.empty or "dataset" not in getattr(standard, "columns", []):
+        return {}
+    part = standard[standard["dataset"] == "industry_member"]
+    if part.empty or "field" not in part.columns:
+        return {}
+    mapping: dict[str, str] = {}
+    for _, row in part.iterrows():
+        industry = str(row["field"])
+        if not industry.startswith("801"):
+            continue
+        code = str(row["entity_id"]).split(".")[0].zfill(6)
+        mapping[code] = industry
+    return mapping
+
+
+def _lhb_by_industry(lhb: pd.Series, stock_to_industry: dict[str, str]) -> pd.Series:
+    """把龙虎榜股票占比汇总到申万行业。取成分最大值，缺失股不填 0。"""
+    if lhb.empty or not stock_to_industry:
+        return pd.Series(dtype="float64")
+    buckets: dict[str, list[float]] = {}
+    for code, value in lhb.items():
+        if pd.isna(value):
+            continue
+        text = str(code).split(".")[0]
+        industry = stock_to_industry.get(text.zfill(6)) or stock_to_industry.get(text)
+        if not industry:
+            continue
+        buckets.setdefault(industry, []).append(float(value))
+    return pd.Series({key: max(values) for key, values in buckets.items()})
 
 
 def signal_s1_market(factors: pd.DataFrame, standard: pd.DataFrame, *, asof: pd.Timestamp) -> dict[str, Any]:
@@ -95,10 +136,11 @@ def signal_s2_industry(factors: pd.DataFrame, *, asof: pd.Timestamp) -> pd.DataF
     - C2: IndustryETFFlow20_pct120 > 0.6（有行业对齐流时用 estimate；否则 RelRet 代理）
     - C3: Industry_ResidualRet20 > 0（若无则 Industry_RelRet20 > 0）
     - C4: IndustryAllocationScore 截面前 30%
-    - C5: 数据 quality_flag == ok
+    - C5: 行业流近期点不是 sparse_sample / stale_ffill（无流因子时默认通过）
     """
     turn = _latest_by_entity(_factor_panel(factors, "Industry_Turnover_Rel20"), asof)
-    flow_pct = _latest_by_entity(_factor_panel(factors, "IndustryETFFlow20_pct120"), asof)
+    flow_rows = _latest_rows(_factor_panel(factors, "IndustryETFFlow20_pct120"), asof)
+    flow_pct = flow_rows["value"] if not flow_rows.empty else pd.Series(dtype="float64")
     resid = _latest_by_entity(_factor_panel(factors, "Industry_ResidualRet20"), asof)
     rel = _latest_by_entity(_factor_panel(factors, "Industry_RelRet20"), asof)
     score = _latest_by_entity(_factor_panel(factors, "IndustryAllocationScore"), asof)
@@ -106,10 +148,17 @@ def signal_s2_industry(factors: pd.DataFrame, *, asof: pd.Timestamp) -> pd.DataF
     entities = sorted(set(turn.index) | set(rel.index) | set(resid.index) | set(score.index) | set(flow_pct.index))
     rows = []
     score_cut = float(score.quantile(0.7)) if len(score) else np.nan
+    weak_quality = {"sparse_sample", "stale_ffill"}
     for entity in entities:
         c1 = bool(turn.get(entity, np.nan) > 1.0) if entity in turn.index else False
-        # 流因子可用则不再依赖收益代理，减少「涨了就算流入」循环论证
-        if entity in flow_pct.index and pd.notna(flow_pct.get(entity)):
+        flow_quality = "ok"
+        if not flow_rows.empty and entity in flow_rows.index and "quality_flag" in flow_rows.columns:
+            flow_quality = str(flow_rows.at[entity, "quality_flag"])
+        # 稀疏/停更填充不能当成已核实的 estimate 流入
+        if entity in flow_pct.index and pd.notna(flow_pct.get(entity)) and flow_quality in weak_quality:
+            c2 = False
+            c2_kind = flow_quality
+        elif entity in flow_pct.index and pd.notna(flow_pct.get(entity)):
             c2 = bool(flow_pct.get(entity) > 0.6)
             c2_kind = "estimate"
         else:
@@ -120,7 +169,7 @@ def signal_s2_industry(factors: pd.DataFrame, *, asof: pd.Timestamp) -> pd.DataF
         else:
             c3 = bool(rel.get(entity, np.nan) > 0) if entity in rel.index else False
         c4 = bool(score.get(entity, np.nan) >= score_cut) if entity in score.index and pd.notna(score_cut) else False
-        c5 = True  # 进入因子表的默认 ok；质量不通过上游已剔除
+        c5 = flow_quality not in weak_quality
         extras = sum([c3, c4, c5])
         passed = bool(c1 and c2 and extras >= 2)
         rows.append(
@@ -146,12 +195,13 @@ def signal_s3_stock(
     *,
     asof: pd.Timestamp,
 ) -> pd.DataFrame:
-    """S3：行业级确认骨架（当前无个股映射）。
+    """S3：行业级确认骨架。
 
     语义（显式）：
     - 对每个 S2=1 行业输出一行 S3=1（骨架放行），notes 标明是否有龙虎榜旁证；
-    - 龙虎榜**不否决** S3（non_mandatory）；将来若改为强制，须同步改 S4 交集逻辑。
-    - 因此当前「三层共振」在个股层等价于 S1∧S2，文档须与此一致。
+    - 龙虎榜实体是股票代码，必须先经 industry_member 映到申万行业再汇总；
+    - 没有映射时写 unmapped，禁止用股票代码和行业代码直接比较；
+    - 龙虎榜不否决 S3（non_mandatory）；将来若改为强制，须同步改 S4 交集逻辑。
     """
     if s2.empty:
         return pd.DataFrame()
@@ -161,12 +211,17 @@ def signal_s3_stock(
             columns=["asof", "entity_id", "signal_id", "value", "statement_kind", "available_at", "quality_flag", "notes", "version"]
         )
 
+    stock_to_industry = _stock_industry_map(standard)
     lhb = _latest_by_entity(_factor_panel(factors, "LHB_Institution_Ratio_d5"), asof)
-    lhb_available = not lhb.empty
+    industry_lhb = _lhb_by_industry(lhb, stock_to_industry)
     rows = []
     for entity in sorted(watch):
-        trade_confirm = bool(entity in lhb.index and pd.notna(lhb.get(entity)) and float(lhb.get(entity)) > 0.2)
-        # 骨架模式：S2 观察名单一律 S3=1；LHB 仅写入 notes
+        if not stock_to_industry or entity not in industry_lhb.index:
+            note = "skeleton_pass;trade_confirm=unmapped"
+        elif pd.notna(industry_lhb.get(entity)) and float(industry_lhb.get(entity)) > 0.2:
+            note = "skeleton_pass;trade_confirm=lhb"
+        else:
+            note = "skeleton_pass;trade_confirm=none(non_mandatory)"
         rows.append(
             {
                 "asof": asof.date().isoformat(),
@@ -176,15 +231,10 @@ def signal_s3_stock(
                 "statement_kind": "signal",
                 "available_at": asof.date().isoformat(),
                 "quality_flag": "ok",
-                "notes": (
-                    "skeleton_pass;trade_confirm=lhb"
-                    if trade_confirm
-                    else f"skeleton_pass;trade_confirm=none(non_mandatory);lhb_data={'yes' if lhb_available else 'no'}"
-                ),
+                "notes": note,
                 "version": SIGNAL_VERSION,
             }
         )
-    _ = standard
     return pd.DataFrame(rows)
 
 

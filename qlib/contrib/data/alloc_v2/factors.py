@@ -113,6 +113,33 @@ def aggregate_etf_panel_to_industry(
         return grouped.max().T
     return grouped.sum().T
 
+
+def industry_quality_by_day(est: pd.DataFrame, code_to_industry: dict[str, str]) -> pd.DataFrame:
+    """按事件日汇总 ETF 质量标记到申万行业。
+
+    只看当日成分：历史周采样不会把近期仍是 ok 的日期涂成 sparse_sample。
+    同一天任一成分是 sparse_sample 或 stale_ffill，该行业当日沿用该标记。
+    """
+    if est.empty or "quality_flag" not in est.columns or not code_to_industry:
+        return pd.DataFrame()
+    part = est.copy()
+    part["event_date"] = pd.to_datetime(part["event_date"])
+    part["industry"] = part["entity_id"].map(lambda code: code_to_industry.get(str(code), ""))
+    part = part[part["industry"].astype(str).str.startswith("801")]
+    if part.empty:
+        return pd.DataFrame()
+
+    def _worst(flags: pd.Series) -> str:
+        vals = [str(v) for v in flags.dropna().tolist()]
+        if any(v == "sparse_sample" for v in vals):
+            return "sparse_sample"
+        if any(v == "stale_ffill" for v in vals):
+            return "stale_ffill"
+        return "ok"
+
+    return part.groupby(["event_date", "industry"])["quality_flag"].agg(_worst).unstack("industry")
+
+
 def industry_turnover_delta(turn: pd.DataFrame, *, window: int = 20) -> pd.DataFrame:
     """成交占比变化（水平拥挤常均值回归，改用 Δ）。"""
     if turn.empty:
@@ -194,14 +221,23 @@ def _long_factor_rows(
     available_at_lag_days: int = 0,
     available_at_panel: pd.DataFrame | None = None,
     quality_flag: str = "ok",
+    quality_panel: pd.DataFrame | None = None,
 ) -> list[dict[str, Any]]:
-    """写出因子长表。份额衍生因子应传 available_at_lag_days=1 或 available_at_panel。"""
+    """写出因子长表。份额衍生因子应传 available_at_lag_days=1 或 available_at_panel。
+
+    quality_panel 按事件日覆盖默认 quality_flag，避免整段序列被历史稀疏标记污染。
+    """
     rows: list[dict[str, Any]] = []
     for entity in panel.columns:
         for ts, value in panel[entity].items():
             if pd.isna(value):
                 continue
             day = ts.date() if hasattr(ts, "date") else ts
+            flag = quality_flag
+            if quality_panel is not None and not quality_panel.empty and entity in quality_panel.columns:
+                raw_q = quality_panel[entity].get(ts, None)
+                if raw_q is not None and pd.notna(raw_q):
+                    flag = str(raw_q)
             if available_at_panel is not None and entity in available_at_panel.columns:
                 raw_at = available_at_panel[entity].get(ts)
                 if pd.notna(raw_at):
@@ -222,7 +258,7 @@ def _long_factor_rows(
                     "unit": unit,
                     "freq": "day",
                     "evidence_class": evidence_class,
-                    "quality_flag": quality_flag,
+                    "quality_flag": flag,
                     "version": SCHEMA_VERSION,
                     "source": "computed",
                     "layer": layer,
@@ -303,9 +339,8 @@ def build_all_factors(standard: pd.DataFrame, *, asof: pd.Timestamp | None = Non
                 at_ind = aggregate_etf_panel_to_industry(at_p, code_to_industry, how="max")
             else:
                 at_ind = pd.DataFrame()
-            flow_quality = "ok"
-            if "quality_flag" in est.columns and (est["quality_flag"].astype(str) == "sparse_sample").any():
-                flow_quality = "sparse_sample"
+            # 质量按日保留：远端周采样只标那些日期，近端 ok 不被历史 any() 涂掉
+            quality_panel = industry_quality_by_day(est, code_to_industry)
             if not est_ind.empty and not aum_ind.empty:
                 industry_flow20 = industry_etf_flow20(est_ind, aum_ind, window=20)
                 rows.extend(
@@ -317,7 +352,7 @@ def build_all_factors(standard: pd.DataFrame, *, asof: pd.Timestamp | None = Non
                         window=20,
                         available_at_lag_days=1,
                         available_at_panel=at_ind if not at_ind.empty else None,
-                        quality_flag=flow_quality,
+                        quality_panel=quality_panel,
                     )
                 )
                 for win in (120, 250):
@@ -333,7 +368,7 @@ def build_all_factors(standard: pd.DataFrame, *, asof: pd.Timestamp | None = Non
                                 window=win,
                                 available_at_lag_days=1,
                                 available_at_panel=at_ind if not at_ind.empty else None,
-                                quality_flag=flow_quality,
+                                quality_panel=quality_panel,
                             )
                         )
     amount = _pivot(work, "sw_industry", "amount")

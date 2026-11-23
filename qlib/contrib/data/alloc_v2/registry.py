@@ -113,7 +113,7 @@ DATASETS: tuple[DatasetDef, ...] = (
     _d("yield_cn_us", "中美国债收益率", "B", source_grade="B", freq="day", adapter="global_macro", source="akshare.bond_zh_us_rate", evidence_class="proxy", notes="收益率是定价，不是债券申购。", unit="pct"),
     _d("fx_usdcny", "美元兑人民币中间价", "B", source_grade="B", freq="day", adapter="global_macro", source="akshare.currency_boc_safe", evidence_class="proxy", unit="cny"),
     _d("gold_sge", "上海金基准价", "B", source_grade="B", freq="day", adapter="global_macro", source="akshare.spot_golden_benchmark_sge", evidence_class="proxy", unit="cny/g"),
-    _d("gold_gld", "SPDR黄金ETF持仓", "B", source_grade="B", freq="day", adapter="global_macro", source="akshare.macro_cons_gold", evidence_class="direct", publish_lag="T+1", notes="吨位增减接近投资需求；市值含金价。", unit="tonne"),
+    _d("gold_gld", "SPDR黄金ETF持仓", "B", source_grade="B", freq="day", adapter="global_macro", source="jin10.reports_list_v2:etf:1", evidence_class="direct", publish_lag="T+1", notes="吨位增减接近投资需求；市值含金价。来源为金十分页，不是 akshare.macro_cons_gold。", unit="tonne"),
     _d(
         "cn_macro",
         "中国货币与利率",
@@ -196,10 +196,10 @@ DATASETS: tuple[DatasetDef, ...] = (
         source_grade="B",
         freq="day",
         adapter="v22_free",
-        source="akshare.macro_cons_silver",
+        source="jin10.reports_list_v2:etf:2",
         evidence_class="direct",
         publish_lag="T+1",
-        notes="吨位增减接近投资需求；市值含银价。",
+        notes="吨位增减接近投资需求；市值含银价。来源为金十分页，不是 akshare.macro_cons_silver。",
         unit="tonne",
     ),
     _d(
@@ -302,15 +302,15 @@ DATASETS: tuple[DatasetDef, ...] = (
     _d("etf_shares", "ETF份额", "C", source_grade="A", freq="day", adapter="etf", source="akshare.fund_etf_scale_sse/szse", evidence_class="direct", publish_lag="T+1", notes="份额变化 ≠ 现金净流入。"),
     _d("etf_status", "ETF申赎与跨境状态", "C", source_grade="C", freq="day", adapter="etf", source="manual/exchange", evidence_class="direct", notes="缺公告则标记，不臆造。"),
     _d("sw_industry", "申万一级行情", "C", source_grade="B", freq="day", adapter="industry", source="akshare.index_hist_sw", evidence_class="proxy", notes="指数涨跌 ≠ 行业净流入。"),
-    _d("industry_member", "行业成分与状态", "C", source_grade="B", freq="day", adapter="industry", source="manual/sw_map", evidence_class="direct", notes="停牌/新股/ST 规则写死；缺成分则 breadth 标 unavailable。"),
+    _d("industry_member", "行业成分与状态", "C", source_grade="B", freq="day", adapter="industry", source="manual/sw_map", evidence_class="direct", notes="停牌/新股/ST 规则写死；缺成分则 breadth 标 unavailable。已采集、未进信号。"),
     _d("index_rebalance", "指数调仓事件", "C", source_grade="C", freq="event", adapter="none", source="announcement", evidence_class="direct", enabled=False, notes="先留字段骨架，缺公告则标记，避免把被动调仓当主动选股。"),
     # ----- D 机构 / 个股 -----
-    _d("fund_holding", "公募重仓", "D", source_grade="B", freq="quarter", adapter="institution", source="akshare.fund_portfolio", evidence_class="direct", publish_lag="T+1q", notes="季报 ≠ 实时持仓。"),
+    _d("fund_holding", "公募重仓", "D", source_grade="B", freq="quarter", adapter="institution", source="akshare.stock_institute_hold", evidence_class="direct", publish_lag="T+1q", notes="季报 ≠ 实时持仓。当前只存季度行数，quality_flag=unavailable，不可用于 PIT。已采集、未进信号。"),
     _d("fund_scale_snapshot", "开放式基金规模快照", "D", source_grade="C", freq="day", adapter="institution", source="akshare.fund_scale_open_sina", evidence_class="estimate", publish_lag="快照", notes="时点快照，不是净申购时间序列。"),
     _d("lhb", "龙虎榜机构席位", "D", source_grade="C", freq="event", adapter="institution", source="akshare.stock_lhb", evidence_class="proxy", notes="机构席位 ≠ 已确认公募/保险；无数据保持 NA，不填 0。"),
-    _d("block_trade", "大宗交易", "D", source_grade="C", freq="day", adapter="institution", source="akshare.stock_dzjy", evidence_class="proxy", notes="折溢价与金额占比，不预设多空。"),
-    _d("margin", "融资余额", "D", source_grade="B", freq="day", adapter="china", source="akshare.macro_china_market_margin", evidence_class="proxy", notes="融资负债变化 ≠ 全市场净流入。"),
-    _d("holder_event", "股东与增减持公告", "D", source_grade="C", freq="event", adapter="institution", source="akshare.stock_hold_change", evidence_class="direct", notes="能解析多少算多少；主体口径见 entity_map。"),
+    _d("block_trade", "大宗交易", "D", source_grade="C", freq="day", adapter="institution", source="akshare.stock_dzjy", evidence_class="proxy", notes="折溢价与金额占比，不预设多空。已采集、未进信号。"),
+    _d("margin", "融资余额", "D", source_grade="B", freq="day", adapter="china", source="akshare.macro_china_market_margin", evidence_class="proxy", notes="融资负债变化 ≠ 全市场净流入。已采集、未进信号。"),
+    _d("holder_event", "股东与增减持公告", "D", source_grade="C", freq="event", adapter="institution", source="akshare.stock_hold_change", evidence_class="direct", notes="能解析多少算多少；主体口径见 entity_map。已采集、未进信号。"),
     _d("private_hold", "私募/理财/自营持仓", "D", source_grade="D", freq="quarter", adapter="none", source="unavailable", evidence_class="estimate", enabled=False, role="disabled", notes="无完整持仓则只做主体登记。"),
 )
 

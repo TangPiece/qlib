@@ -19,7 +19,7 @@ from .interfaces import dump_status
 from .mappings import write_empty_maps
 from .paths import default_root
 from .quality import mark_quality, quality_summary
-from .schema import STANDARD_COLUMNS, StandardRow
+from .schema import STANDARD_COLUMNS, StandardRow, lookback_start
 from .signals import build_signals
 from .store import (
     read_standard,
@@ -119,6 +119,15 @@ class UpdateError(RuntimeError):
     """增量更新前置条件不满足（例如本地无 standard）。"""
 
 
+def update_windows(end_day: date, daily_start: date) -> dict[str, date]:
+    """日频维持重叠起点；月/季频再往前盖住上月末和最近两个披露季。"""
+    return {
+        "day": daily_start,
+        "month": min(daily_start, lookback_start("month", anchor=end_day)),
+        "quarter": min(daily_start, lookback_start("quarter", anchor=end_day)),
+    }
+
+
 def run_update(
     *,
     root: Path | None = None,
@@ -126,13 +135,18 @@ def run_update(
     end: date | None = None,
     rows: Sequence[StandardRow] | None = None,
 ) -> dict[str, Any]:
-    """从本地最近 event_date 重叠窗口增量拉取并合并，再重算因子/信号/回测。"""
+    """从本地最近 event_date 重叠窗口增量拉取并合并，再重算因子/信号/回测。
+
+    传给适配器的 start 仍是日频重叠起点。月/季频在 in_fetch_window 里按
+    windows 放宽，并用 event_date 或 available_at 落窗，避免滞后发布被丢掉。
+    """
     root = root or default_root()
     last = latest_event_date(root)
     if last is None:
         raise UpdateError("本地无 standard 数据，请先运行：./scripts/run_alloc_v2.sh all --start 2018-01-01")
     end_day = end or date.today()
     start_day = last - timedelta(days=max(0, int(overlap_days)))
+    windows = update_windows(end_day, start_day)
     fetch_info = run_fetch(start=start_day, end=end_day, root=root, rows=rows, merge=True)
     factor_info = run_factor(root=root)
     signal_info = run_signal(root=root)
@@ -142,6 +156,7 @@ def run_update(
         "overlap_days": int(overlap_days),
         "start": start_day.isoformat(),
         "end": end_day.isoformat(),
+        "windows": {key: value.isoformat() for key, value in windows.items()},
         "fetch": fetch_info,
         "factor": factor_info,
         "signal": signal_info,
