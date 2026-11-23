@@ -92,6 +92,32 @@ def load_yaml_horizon(conf_path: Path) -> Optional[int]:
     return value
 
 
+def explicit_step_from_argv() -> Optional[int]:
+    """命令行显式传入的 step；未传则返回 None，交给 yaml 或自动 ~2y。"""
+    argv = sys.argv[1:]
+    for i, arg in enumerate(argv):
+        if arg.startswith("--step="):
+            return int(arg.split("=", 1)[1])
+        # fire 也接受 --step 243 / step 243
+        if arg in ("--step", "step") and i + 1 < len(argv) and not str(argv[i + 1]).startswith("-"):
+            return int(argv[i + 1])
+    return None
+
+
+def load_yaml_step(conf_path: Path) -> Optional[int]:
+    """读取 yaml 顶层 step（交易日）。没有该字段或非法时返回 None。"""
+    raw = load_conf(conf_path).get("step")
+    if raw is None:
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if value < 1:
+        return None
+    return value
+
+
 def resolve_conf_path_from_argv(default_conf: Path, env_key: str = "ROLLING_CONF") -> Path:
     """从 argv / 环境变量解析 --conf_path，供 auto_init 读取 qlib_init。"""
     conf_path = Path(os.environ.get(env_key, default_conf))
@@ -212,16 +238,27 @@ def make_rolling_cli(
                 resolved_horizon = yaml_horizon
             else:
                 resolved_horizon = horizon
+            # 显式 --step / fire 入参优先；否则用 yaml 顶层 step；都没有则 None 走自动 ~2y
+            cli_step = explicit_step_from_argv()
+            if cli_step is not None:
+                resolved_step = cli_step
+            elif step is not None:
+                resolved_step = step
+            else:
+                resolved_step = load_yaml_step(conf_path)
             super().__init__(
                 conf_path=conf_path,
                 exp_name=exp_name,
                 horizon=resolved_horizon,
-                step=step,
+                step=resolved_step,
                 override_label=override_label,
                 **kwargs,
             )
             if yaml_horizon is not None:
                 self.logger.info(f"Using horizon={resolved_horizon} from yaml (CLI --horizon not set)")
+            # 未显式传 step、且最终值来自 yaml 时打日志
+            if cli_step is None and step is None and resolved_step is not None:
+                self.logger.info(f"Using step={resolved_step} from yaml (CLI --step not set)")
 
     if set_omp_threads:
         # macOS 上 joblib fork 后多线程 OpenMP 易 SIGSEGV；训练前锁定单线程
