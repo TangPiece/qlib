@@ -28,12 +28,102 @@
     </section>
 
     <div class="main-split">
-      <!-- 左栏：滚动配置 + 结束日 + 更新数据 -->
-      <section class="card prep-card" id="prepCard">
-        <h2>数据准备</h2>
+      <!-- 左栏：每日数据更新（行情 / L2 / 资金面）+ 低频财务扩展 -->
+      <section class="card update-card" id="updateCard">
+        <h2>数据更新</h2>
+
+        <div class="card-section">
+          <h3>更新行情</h3>
+          <div class="row checks">
+            <label><input type="checkbox" id="skipDownload" /> skip-download</label>
+            <label><input type="checkbox" id="forceDownload" /> force</label>
+          </div>
+          <button type="button" id="btnUpdateData" class="btn primary btn-block">运行 update_cn_data_daily</button>
+        </div>
+
+        <!-- Level2 因子：raw → staging parquet，不写 qlib bin -->
+        <div class="card-section">
+          <h3>Level2 因子</h3>
+          <div class="row">
+            <label class="field grow">
+              <span>起始日（可选）</span>
+              <input type="date" id="l2StartDate" />
+            </label>
+            <label class="field grow">
+              <span>结束日（可选）</span>
+              <input type="date" id="l2EndDate" />
+            </label>
+          </div>
+          <div class="row checks">
+            <label><input type="checkbox" id="l2Force" /> force</label>
+          </div>
+          <p class="hint">起止日都空则跑 all；只写 staging，不 dump bin。</p>
+          <button type="button" id="btnL2Daily" class="btn primary btn-block">运行 l2_daily 因子计算</button>
+        </div>
+
+        <!-- 资金面：alloc_v2 增量更新，每日常驻 -->
+        <div class="card-section">
+          <h3>资金面</h3>
+          <div class="row">
+            <label class="field narrow">
+              <span>overlap-days</span>
+              <input type="number" id="allocOverlapDays" value="7" min="1" step="1" />
+            </label>
+            <label class="field grow">
+              <span>结束日（可选）</span>
+              <input type="date" id="allocEndDate" />
+            </label>
+          </div>
+          <p class="hint">增量更新 data/alloc_v2；研究站请另跑 serve（8766）。</p>
+          <button type="button" id="btnAllocV2" class="btn primary btn-block">运行 alloc_v2 update</button>
+        </div>
+
+        <!-- 财务不常用：默认收起 -->
+        <details class="prep-ext">
+          <summary>扩展更新 <span class="prep-ext-hint">财务因子，按需展开</span></summary>
+          <div class="card-section">
+            <h3>财务因子</h3>
+            <div class="row">
+              <label class="field grow">
+                <span>交易日起始</span>
+                <input type="date" id="fundTradeStart" />
+              </label>
+              <label class="field grow">
+                <span>交易日结束</span>
+                <input type="date" id="fundTradeEnd" />
+              </label>
+            </div>
+            <div class="row checks">
+              <label><input type="checkbox" id="fundFullAll" /> 完整 all</label>
+              <label><input type="checkbox" id="fundNoR2" checked /> no-r2</label>
+              <label><input type="checkbox" id="fundDump" checked /> 完成后 dump</label>
+            </div>
+            <p class="hint">默认 compute；勾 dump 后合回训练用 cn_data。</p>
+            <button type="button" id="btnFundCn" class="btn primary btn-block">运行 fund_cn</button>
+          </div>
+        </details>
+      </section>
+
+      <!-- 右栏：按操作顺序 选模型 → 滚动配置 → 训练 → 导出 -->
+      <section class="card train-card" id="trainCard">
+        <h2>训练与导出</h2>
         <p class="hint" id="prepRollingHint" hidden>
-          当前为官方单次训练：滚动 YAML / 写入结束日仅作用于左侧滚动配置；更新数据仍可用。
+          当前为官方单次训练：滚动 YAML / 写入结束日仅作用于滚动配置；左侧数据更新仍可用。
         </p>
+
+        <div class="card-section">
+          <h3>选择模型</h3>
+          <label class="field">
+            <span>模型</span>
+            <select id="modelSelect"></select>
+          </label>
+          <label class="field" id="yamlField" hidden>
+            <span>官方 YAML</span>
+            <select id="yamlSelect"></select>
+          </label>
+          <p class="hint" id="modelHint" hidden>暂不支持修改参数，将使用该 YAML 中的 qlib 默认配置。</p>
+          <p class="hint" id="modelNote" hidden></p>
+        </div>
 
         <div class="card-section" id="prepRollingSection">
           <h3>滚动配置</h3>
@@ -52,31 +142,7 @@
         </div>
 
         <div class="card-section">
-          <h3>更新行情</h3>
-          <div class="row checks">
-            <label><input type="checkbox" id="skipDownload" /> skip-download</label>
-            <label><input type="checkbox" id="forceDownload" /> force</label>
-          </div>
-          <button type="button" id="btnUpdateData" class="btn primary btn-block">运行 update_cn_data_daily</button>
-        </div>
-      </section>
-
-      <!-- 右栏：训练 + 导出 -->
-      <section class="card train-card" id="trainCard">
-        <h2>训练与导出</h2>
-
-        <div class="card-section">
           <h3>执行训练</h3>
-          <label class="field">
-            <span>模型</span>
-            <select id="modelSelect"></select>
-          </label>
-          <label class="field" id="yamlField" hidden>
-            <span>官方 YAML</span>
-            <select id="yamlSelect"></select>
-          </label>
-          <p class="hint" id="modelHint" hidden>暂不支持修改参数，将使用该 YAML 中的 qlib 默认配置。</p>
-          <p class="hint" id="modelNote" hidden></p>
           <div class="row">
             <label class="field grow">
               <span>exp_name</span>

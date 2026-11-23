@@ -14,6 +14,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -90,11 +91,30 @@ ROLLING_MODELS: Dict[str, Dict[str, Any]] = {
         yaml_names={
             "7y1y": "workflow_config_lightgbm_Alpha158_rolling_7y1y.yaml",
             "7y1y_1m": "workflow_config_lightgbm_Alpha158_rolling_7y1y_1m.yaml",
+            # 与 7y1y_1m 相同的 20 日标签，持仓改为 5 只
+            "7y1y_1m_topk5": "workflow_config_lightgbm_Alpha158_rolling_7y1y_1m_topk5.yaml",
             "7y1y_10000w": "workflow_config_lightgbm_Alpha158_rolling_7y1y_10000w.yaml",
+            # 纯 Alpha158：3y 训 + 1y 验，窗口对齐 3y1y_l2daily 对照
+            "3y1y": "workflow_config_lightgbm_Alpha158_rolling_3y1y.yaml",
+            # Alpha158+L2：3y 训 + 1y 验 + yaml step≈1y
+            "3y1y_l2daily": "workflow_config_lightgbm_Alpha158_L2Daily_rolling_3y1y.yaml",
+            # 纯 L2 百因子滚动（handler=L2Daily）
+            "3y1y_l2only": "workflow_config_lightgbm_L2Daily_rolling_3y1y.yaml",
+            # 纯 L2 + 约 20 交易日（一个月）预测标签
+            "3y1y_l2only_1m": "workflow_config_lightgbm_L2Daily_rolling_3y1y_1m.yaml",
+            # 单因子 MOM12-1：3y 训 + 1y 验，窗口对齐 Alpha158 3y1y
+            "3y1y_mom12_1": "workflow_config_lightgbm_MOM12_1_rolling_3y1y.yaml",
         },
-        # 20 日预测实验名与隔日 7y1y 分开
+        # 20 日预测 / L2 联合与纯 L2 / MOM12-1 / 隔日 7y1y 实验名前缀分开
         exp_prefixes={
             "7y1y_1m": "LightGBM_Alpha158_rolling_7y1y_1m",
+            # 持仓 5 只与 topk=10 的 1m 实验名分开，避免 mlruns 混在一起
+            "7y1y_1m_topk5": "LightGBM_Alpha158_rolling_7y1y_1m_topk5",
+            "3y1y": "LightGBM_Alpha158_rolling_3y1y",
+            "3y1y_l2daily": "LightGBM_Alpha158_L2Daily_rolling_3y1y",
+            "3y1y_l2only": "LightGBM_L2Daily_rolling_3y1y",
+            "3y1y_l2only_1m": "LightGBM_L2Daily_rolling_3y1y_1m",
+            "3y1y_mom12_1": "LightGBM_MOM12_1_rolling_3y1y",
         },
         use_omp=True,
     ),
@@ -1491,6 +1511,78 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
                     for c in configs:
                         cmd.append(str(_resolve_config(str(c), model_id)))
                 job = _start_job("update-data", cmd)
+                _json_response(self, 200, {"ok": True, "job": job})
+                return
+
+            # Level2 因子计算：raw → staging parquet（不 dump bin）
+            if path == "/api/l2-daily":
+                cmd = [sys.executable, "-m", "qlib.contrib.data.l2_daily"]
+                start = str(body.get("start") or "").strip().replace("-", "")
+                end = str(body.get("end") or "").strip().replace("-", "")
+                if start or end:
+                    if not (start.isdigit() and len(start) == 8 and end.isdigit() and len(end) == 8):
+                        raise ValueError("start/end 需同时为 YYYYMMDD")
+                    cmd.extend(["--start", start, "--end", end])
+                else:
+                    cmd.append("all")
+                if body.get("force"):
+                    cmd.append("--force")
+                job = _start_job("l2-daily", cmd)
+                _json_response(self, 200, {"ok": True, "job": job})
+                return
+
+            # 财务因子：fund_cn compute/all → staging；可选串联 dump 合回 cn_data
+            if path == "/api/fund-cn":
+                trade_start = str(body.get("trade_start") or "").strip()
+                trade_end = str(body.get("trade_end") or "").strip()
+                # 校验 YYYY-MM-DD，避免向子进程注入异常参数
+                _iso = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+                if not (_iso.match(trade_start) and _iso.match(trade_end)):
+                    raise ValueError("trade_start/trade_end 需为 YYYY-MM-DD")
+                subcmd = "all" if body.get("full_all") else "compute"
+                fund_cmd = [
+                    sys.executable,
+                    "-m",
+                    "qlib.contrib.data.fund_cn",
+                    subcmd,
+                    "--trade-start",
+                    trade_start,
+                    "--trade-end",
+                    trade_end,
+                ]
+                if body.get("no_r2", True):
+                    fund_cmd.append("--no-r2")
+                if body.get("dump", True):
+                    dump_cmd = [sys.executable, str(REPO_ROOT / "scripts" / "dump_fund_cn.py"), "dump"]
+                    # 单 job 内串联：compute 成功后再 dump
+                    cmd = [
+                        "bash",
+                        "-lc",
+                        f"{shlex.join(fund_cmd)} && {shlex.join(dump_cmd)}",
+                    ]
+                else:
+                    cmd = fund_cmd
+                job = _start_job("fund-cn", cmd)
+                _json_response(self, 200, {"ok": True, "job": job})
+                return
+
+            # 资金面：alloc_v2 增量 update（写 data/alloc_v2，不 dump bin）
+            if path == "/api/alloc-v2":
+                cmd = [sys.executable, "-m", "qlib.contrib.data.alloc_v2", "update"]
+                overlap = body.get("overlap_days", 7)
+                try:
+                    overlap_n = int(overlap)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("overlap_days 需为整数") from exc
+                if overlap_n < 1:
+                    raise ValueError("overlap_days 需 >= 1")
+                cmd.extend(["--overlap-days", str(overlap_n)])
+                end = str(body.get("end") or "").strip()
+                if end:
+                    if not re.match(r"^\d{4}-\d{2}-\d{2}$", end):
+                        raise ValueError("end 需为 YYYY-MM-DD")
+                    cmd.extend(["--end", end])
+                job = _start_job("alloc-v2", cmd)
                 _json_response(self, 200, {"ok": True, "job": job})
                 return
 

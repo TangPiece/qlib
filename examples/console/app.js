@@ -167,10 +167,20 @@
   function setBusy(busy) {
     jobBusy = !!busy;
     $("btnUpdateData").disabled = jobBusy;
+    $("btnL2Daily").disabled = jobBusy;
+    $("btnAllocV2").disabled = jobBusy;
+    $("btnFundCn").disabled = jobBusy;
     $("btnTrain").disabled = jobBusy;
     $("btnExport").disabled = jobBusy;
     // 滚动专用按钮还要受当前模型类型约束。
     applyPrepRollingState();
+  }
+
+  /** date input 的 YYYY-MM-DD → YYYYMMDD；空串保持为空 */
+  function dateInputToYmd(value) {
+    const s = String(value || "").trim();
+    if (!s) return "";
+    return s.replace(/-/g, "");
   }
 
   function fillConfigSelect(configs, preferredKey) {
@@ -587,6 +597,79 @@
         body: JSON.stringify(payload),
       });
       toast("已启动数据更新");
+      await watchJob(data.job);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  });
+
+  // Level2 因子计算：起止日都空 → all；有区间则传 --start/--end
+  $("btnL2Daily").addEventListener("click", async () => {
+    try {
+      const start = dateInputToYmd($("l2StartDate").value);
+      const end = dateInputToYmd($("l2EndDate").value);
+      if ((start && !end) || (!start && end)) {
+        toast("起始日与结束日需同时填写，或都留空跑 all", true);
+        return;
+      }
+      const payload = {
+        force: $("l2Force").checked,
+        start,
+        end,
+      };
+      const data = await api("/api/l2-daily", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      toast(start ? `已启动 l2_daily ${start}~${end}` : "已启动 l2_daily all");
+      await watchJob(data.job);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  });
+
+  // 资金面：alloc_v2 增量 update
+  $("btnAllocV2").addEventListener("click", async () => {
+    try {
+      const overlapRaw = ($("allocOverlapDays").value || "").trim();
+      const overlap_days = overlapRaw === "" ? 7 : Number(overlapRaw);
+      if (!Number.isFinite(overlap_days) || overlap_days < 1) {
+        toast("overlap-days 需为 >= 1 的整数", true);
+        return;
+      }
+      const end = ($("allocEndDate").value || "").trim();
+      const payload = { overlap_days };
+      if (end) payload.end = end;
+      const data = await api("/api/alloc-v2", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      toast(end ? `已启动 alloc_v2 update → ${end}` : "已启动 alloc_v2 update");
+      await watchJob(data.job);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  });
+
+  // 财务：fund_cn compute/all，可选 dump
+  $("btnFundCn").addEventListener("click", async () => {
+    try {
+      const trade_start = ($("fundTradeStart").value || "").trim();
+      const trade_end = ($("fundTradeEnd").value || "").trim();
+      if (!trade_start || !trade_end) {
+        toast("财务更新需填写交易日起止日", true);
+        return;
+      }
+      const full_all = $("fundFullAll").checked;
+      const no_r2 = $("fundNoR2").checked;
+      const dump = $("fundDump").checked;
+      const payload = { trade_start, trade_end, full_all, no_r2, dump };
+      const data = await api("/api/fund-cn", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      const mode = full_all ? "all" : "compute";
+      toast(`已启动 fund_cn ${mode}${dump ? " + dump" : ""}`);
       await watchJob(data.job);
     } catch (e) {
       toast(e.message, true);
