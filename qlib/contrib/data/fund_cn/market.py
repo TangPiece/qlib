@@ -20,31 +20,38 @@ _DEFAULT_QLIB_DIR = Path.home() / ".qlib" / "qlib_data" / "cn_data"
 
 
 def instrument_to_qlib(instrument_key: str) -> str | None:
-    """CNStock:600000 / 600000.SH → SH600000。"""
+    """CNStock:600000 / 600000.SH → SH600000；北交所 → BJ。"""
     text = str(instrument_key or "").strip()
     if not text:
         return None
-    if "." in text and text.rsplit(".", 1)[-1].upper() in {"SH", "SZ"}:
+    if "." in text and text.rsplit(".", 1)[-1].upper() in {"SH", "SZ", "BJ"}:
         code, exch = text.rsplit(".", 1)
         if code.isdigit():
             return f"{exch.upper()}{code.zfill(6)}"
     code = instrument_to_a_code(text)
     if not code.isdigit() or len(code) != 6:
         return None
-    prefix = code[0]
-    exch = "SH" if prefix in {"6", "9"} else "SZ"
-    return f"{exch}{code}"
+    # 与东财 em_symbol 对齐：6/9→SH，4/8/92→BJ，其余 SZ
+    if code.startswith(("6", "9")) and not code.startswith("92"):
+        return f"SH{code}"
+    if code.startswith(("4", "8", "92")):
+        return f"BJ{code}"
+    return f"SZ{code}"
 
 
 def qlib_to_instrument(symbol: str) -> str:
-    """SH600000 → CNStock:600000。"""
+    """SH600000 / BJ430047 → CNStock:xxxxxx。"""
     text = str(symbol or "").strip().upper()
-    if len(text) >= 8 and text[:2] in {"SH", "SZ"} and text[2:].isdigit():
+    if len(text) >= 8 and text[:2] in {"SH", "SZ", "BJ"} and text[2:].isdigit():
         return a_code_to_instrument(text[2:])
     if "." in text:
         code, _exch = text.rsplit(".", 1)
         return a_code_to_instrument(code)
     return a_code_to_instrument(text)
+
+
+class AdjustFactorRequiredError(ValueError):
+    """cn_data 缺少 $factor，无法可靠还原未复权收盘价。"""
 
 
 def _ensure_qlib(qlib_dir: Path) -> None:
@@ -75,8 +82,12 @@ def load_unadjusted_close(
     trading_dates: Sequence[date | str],
     *,
     qlib_dir: str | Path | None = None,
+    require_factor: bool = True,
 ) -> pd.DataFrame:
-    """从 qlib 取 $close/$factor，还原 raw_close = close / factor。"""
+    """从 qlib 取 $close/$factor，还原 raw_close = close / factor。
+
+    ``require_factor=True``（默认）时缺少 $factor 直接失败，避免误把复权价当未复权。
+    """
     from qlib.data import D
 
     start = min(pd.to_datetime(d) for d in trading_dates)
@@ -93,14 +104,18 @@ def load_unadjusted_close(
         _log.warning("qlib.init 失败 %s: %s", provider, exc)
         return pd.DataFrame(columns=["instrument_key", "trading_date", "close"])
 
-    fields = ["$close"]
+    has_factor = False
     try:
         sample = D.features(symbols[:1], ["$factor"], start_time=start, end_time=end)
-        if sample is not None and not sample.empty:
-            fields.append("$factor")
+        has_factor = sample is not None and not sample.empty
     except Exception:
-        pass
+        has_factor = False
+    if require_factor and not has_factor:
+        raise AdjustFactorRequiredError(
+            f"cn_data 缺少 $factor，无法可靠还原未复权收盘价: {provider}"
+        )
 
+    fields = ["$close", "$factor"] if has_factor else ["$close"]
     panel = D.features(symbols, fields, start_time=start, end_time=end)
     if panel is None or panel.empty:
         return pd.DataFrame(columns=["instrument_key", "trading_date", "close"])
@@ -120,7 +135,7 @@ def load_unadjusted_close(
         factor = pd.to_numeric(frame["$factor"], errors="coerce")
         raw = close / factor.replace(0, pd.NA)
     else:
-        _log.warning("cn_data 无 $factor，按已是未复权 close 使用")
+        _log.warning("cn_data 无 $factor，按已是未复权 close 使用（require_factor=False）")
         raw = close
     out = pd.DataFrame(
         {

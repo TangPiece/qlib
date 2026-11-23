@@ -19,6 +19,8 @@ from .base import (
     a_code_to_instrument,
     instrument_to_a_code,
 )
+from .csmar_adapter import CsmarStatementAdapter, dataframe_to_csmar_rows
+from .em_announce import EmNoticeAnnounceAdapter, build_csmar_announce_calendar
 from .share_capital import (
     CninfoShareCapitalAdapter,
     StaticShareCapitalAdapter,
@@ -31,11 +33,15 @@ __all__ = [
     "AnnounceRow",
     "CninfoShareCapitalAdapter",
     "CompositeAnnounceAdapter",
+    "CsmarStatementAdapter",
+    "EmNoticeAnnounceAdapter",
     "ShareCapitalRow",
     "StatementFieldRow",
     "StaticAnnounceAdapter",
     "StaticShareCapitalAdapter",
+    "build_csmar_announce_calendar",
     "dataframe_to_announce_rows",
+    "dataframe_to_csmar_rows",
     "dataframe_to_share_rows",
     "em_symbol",
     "a_code_to_instrument",

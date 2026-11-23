@@ -20,6 +20,7 @@ from .catalog import (
     wide_columns,
 )
 from .pipeline import run_compute_publish, run_coverage, run_pipeline, run_pit, run_stage
+from .source_policy import DEFAULT_POLICY, FundCnSourcePolicy, resolve_policy
 
 # 顺序与 catalog.FACTOR_DEFINITIONS 一致
 FUND_CN_FACTOR_IDS: Tuple[str, ...] = tuple(factor_ids())
@@ -34,16 +35,19 @@ def get_fund_cn_feature_config(*, mvp_only: bool = True) -> Tuple[List[str], Lis
 
 
 __all__ = [
+    "DEFAULT_POLICY",
     "FACTOR_DEFINITIONS",
     "FACTOR_SET",
     "FACTOR_VERSION",
     "FUND_CN_FACTOR_IDS",
+    "FundCnSourcePolicy",
     "SUPPORT_METRICS",
     "backtest_eligible_factors",
     "coverage_matrix",
     "factor_ids",
     "get_fund_cn_feature_config",
     "mvp_factors",
+    "resolve_policy",
     "run_compute_publish",
     "run_coverage",
     "run_pipeline",

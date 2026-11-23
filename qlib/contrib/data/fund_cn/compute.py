@@ -14,6 +14,7 @@ import pandas as pd
 
 from .catalog import FACTOR_DEFINITIONS, backtest_eligible_factors, mvp_factors
 from .numeric import finite_float, safe_divide
+from .source_policy import is_financial_industry
 
 _log = logging.getLogger(__name__)
 
@@ -243,16 +244,17 @@ def compute_valuation_factors(
     require_market: bool = True,
     share_capital: pd.DataFrame | None = None,
     max_staleness_days: int | None = DEFAULT_MAX_STALENESS_DAYS,
+    prefer_report_shares: bool = True,
 ) -> pd.DataFrame:
     """
     Valuation factors: ``mcap = raw (unadjusted) close × total shares``.
 
     ``market`` columns: instrument_key, trading_date, close — close must be
     **unadjusted** (Canonical bars store raw prices).
-    Total shares come from ``share_capital`` events (effective & announced by the
-    trade day); when an issuer has no visible event the report-period
-    ``shares_outstanding`` PIT metric is used and a warning is logged once.
-    When ``factor_ids_subset`` is omitted, ``mvp_only`` selects the default set.
+
+    国泰安策略默认 ``prefer_report_shares=True``：优先报告期末
+    ``shares_outstanding``，巨潮事件仅在报告股本缺失时回退，并打
+    ``shares_source`` 标签（report | event | missing）。
     """
     wanted = resolve_factor_subset(mvp_only=mvp_only, factor_ids_subset=factor_ids_subset)
     valuation_ids = [
@@ -276,27 +278,44 @@ def compute_valuation_factors(
     mkt = market.copy()
     mkt["trading_date"] = pd.to_datetime(mkt["trading_date"]).dt.date
     records: list[dict[str, Any]] = []
-    fallback_keys: set[str] = set()
+    event_fallback_keys: set[str] = set()
 
     def _div(num: float | None, den: float | None) -> float | None:
         """Keep valuation output finite and reject economically unstable denominators."""
         return safe_divide(num, den)
 
-    def _shares(ik: str, kt: datetime) -> float | None:
+    def _event_shares(ik: str, kt: datetime) -> float | None:
         entry = share_index.get(ik)
-        if entry is not None:
-            times, values, _ = entry
-            idx = int(np.searchsorted(times, int(pd.Timestamp(kt).value), side="right")) - 1
-            if idx >= 0:
-                return finite_float(values[idx])
-        fallback_keys.add(ik)
-        return latest_metric_asof_fast(
+        if entry is None:
+            return None
+        times, values, _ = entry
+        idx = int(np.searchsorted(times, int(pd.Timestamp(kt).value), side="right")) - 1
+        if idx < 0:
+            return None
+        return finite_float(values[idx])
+
+    def _shares(ik: str, kt: datetime) -> tuple[float | None, str]:
+        report = latest_metric_asof_fast(
             asof_index,
             instrument_key=ik,
             metric_code="shares_outstanding",
             knowledge_time=kt,
             max_staleness_days=max_staleness_days,
         )
+        event = _event_shares(ik, kt)
+        if prefer_report_shares:
+            if report is not None:
+                return report, "report"
+            if event is not None:
+                event_fallback_keys.add(ik)
+                return event, "event"
+            return None, "missing"
+        if event is not None:
+            return event, "event"
+        if report is not None:
+            event_fallback_keys.add(ik)
+            return report, "report"
+        return None, "missing"
 
     for day, day_frame in mkt.groupby("trading_date", sort=True):
         kt = datetime(day.year, day.month, day.day, 7, 0, tzinfo=timezone.utc)
@@ -313,7 +332,7 @@ def compute_valuation_factors(
                     max_staleness_days=max_staleness_days,
                 )
 
-            shares = _shares(ik, kt)
+            shares, shares_source = _shares(ik, kt)
             equity = pit("shareholder_equity")
             net_ttm = pit("net_income_ttm")
             rev_ttm = pit("revenue_ttm")
@@ -336,16 +355,17 @@ def compute_valuation_factors(
             row: dict[str, Any] = {
                 "trading_date": day.isoformat() if hasattr(day, "isoformat") else str(day),
                 "instrument_key": ik,
+                "shares_source": shares_source,
             }
             for fid in valuation_ids:
                 row[fid] = values.get(fid)
             records.append(row)
-    if fallback_keys:
+    if event_fallback_keys:
         _log.warning(
-            "share_capital events missing for %d instruments; fell back to report shares_outstanding "
-            "(stale after 送转/增发): %s",
-            len(fallback_keys),
-            sorted(fallback_keys)[:10],
+            "valuation shares fallback for %d instruments (prefer_report_shares=%s): %s",
+            len(event_fallback_keys),
+            prefer_report_shares,
+            sorted(event_fallback_keys)[:10],
         )
     return pd.DataFrame.from_records(records)
 
@@ -365,6 +385,40 @@ def merge_factor_panels(
     )
 
 
+def apply_non_financial_mask(
+    panel: pd.DataFrame,
+    industry_map: pd.DataFrame | None,
+    *,
+    factor_ids_subset: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """将 applicability=non_financial 的因子在金融业（行业门类 J）上置空。"""
+    if panel is None or panel.empty or industry_map is None or industry_map.empty:
+        return panel
+    if "instrument_key" not in industry_map.columns or "industry_code" not in industry_map.columns:
+        return panel
+    mapping = {
+        str(r.instrument_key): str(r.industry_code)
+        for r in industry_map.itertuples(index=False)
+        if getattr(r, "instrument_key", None) is not None
+    }
+    financial_keys = {ik for ik, code in mapping.items() if is_financial_industry(code)}
+    if not financial_keys:
+        return panel
+    wanted = set(factor_ids_subset or [f.factor_id for f in FACTOR_DEFINITIONS])
+    mask_ids = [
+        f.factor_id
+        for f in FACTOR_DEFINITIONS
+        if f.factor_id in wanted and f.applicability == "non_financial" and f.factor_id in panel.columns
+    ]
+    if not mask_ids:
+        return panel
+    out = panel.copy()
+    hit = out["instrument_key"].astype(str).isin(financial_keys)
+    for fid in mask_ids:
+        out.loc[hit, fid] = np.nan
+    return out
+
+
 def build_daily_factor_panel(
     pit_rows: Sequence[dict[str, Any]],
     trading_dates: Sequence[date | str],
@@ -374,7 +428,9 @@ def build_daily_factor_panel(
     mvp_only: bool = True,
     require_market: bool | None = None,
     share_capital: pd.DataFrame | None = None,
+    industry_map: pd.DataFrame | None = None,
     max_staleness_days: int | None = DEFAULT_MAX_STALENESS_DAYS,
+    prefer_report_shares: bool = True,
 ) -> pd.DataFrame:
     subset = resolve_factor_subset(mvp_only=mvp_only, factor_ids_subset=None)
     has_valuation = any(
@@ -396,10 +452,19 @@ def build_daily_factor_panel(
         require_market=must_have_market,
         share_capital=share_capital,
         max_staleness_days=max_staleness_days,
+        prefer_report_shares=prefer_report_shares,
     )
     panel = merge_factor_panels(report, valuation)
+    panel = apply_non_financial_mask(panel, industry_map, factor_ids_subset=subset)
+    # 统一 trading_date 为 ISO 字符串，避免年批/单票路径 dtype 不一致导致 QA 假阳性
+    if panel is not None and not panel.empty and "trading_date" in panel.columns:
+        panel = panel.copy()
+        panel["trading_date"] = pd.to_datetime(panel["trading_date"]).dt.strftime("%Y-%m-%d")
+        # 外连接偶发重复键时保留最后一行，保证 (date, instrument) 唯一
+        panel = panel.drop_duplicates(subset=["trading_date", "instrument_key"], keep="last")
     cols = ["trading_date", "instrument_key"] + list(subset)
+    extras = [c for c in ("shares_source",) if c in panel.columns]
     for column in subset:
         if column not in panel.columns:
             panel[column] = np.nan
-    return panel[cols]
+    return panel[cols + extras]

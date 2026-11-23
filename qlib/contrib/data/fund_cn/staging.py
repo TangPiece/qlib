@@ -155,6 +155,39 @@ def read_marker(job: str, *, root: Path | None = None) -> dict[str, Any] | None:
         return None
 
 
+def industry_map_dir(root: Path | None = None) -> Path:
+    """行业映射目录（CSMAR 行业代码，供 non_financial 掩码）。"""
+    path = (root or default_staging_root()) / "industry"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def write_industry_map(
+    rows: Sequence[Any],
+    *,
+    root: Path | None = None,
+    part_name: str = "industry_map.parquet",
+) -> Path:
+    """写入 instrument_key / industry_code / industry_name。"""
+    dest = industry_map_dir(root) / part_name
+    frame = pd.DataFrame(rows_as_dicts(rows))
+    if frame.empty:
+        frame = pd.DataFrame(columns=["instrument_key", "industry_code", "industry_name", "as_of"])
+    temporary = dest.with_suffix(".parquet.tmp")
+    frame.to_parquet(temporary, index=False)
+    temporary.replace(dest)
+    return dest
+
+
+def read_industry_map(
+    root: Path | None = None, part_name: str = "industry_map.parquet"
+) -> pd.DataFrame:
+    path = industry_map_dir(root) / part_name
+    if not path.is_file():
+        return pd.DataFrame(columns=["instrument_key", "industry_code", "industry_name", "as_of"])
+    return pd.read_parquet(path)
+
+
 def staging_source_version(root: Path | None = None) -> str:
     import hashlib
 
@@ -164,6 +197,7 @@ def staging_source_version(root: Path | None = None) -> str:
         "statements/statements.parquet",
         "announce/announce.parquet",
         "share_capital/share_capital.parquet",
+        "industry/industry_map.parquet",
     ):
         path = base / rel
         if not path.is_file():

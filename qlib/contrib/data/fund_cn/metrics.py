@@ -24,6 +24,7 @@ import pandas as pd
 
 from .adapters.announce import as_utc
 from .numeric import finite_float, safe_divide
+from .source_policy import RESTATEMENT_UNRECOVERABLE
 
 QKey = tuple[int, int]
 
@@ -413,6 +414,8 @@ def compute_period_metrics(wide_with_announce: pd.DataFrame) -> list[dict[str, A
         pt = row.get("publish_time")
         if pt is None or pd.isna(pt):
             pt = at
+        # EM 单快照无法重建更正前首发值 → 质量标签
+        is_restatement = bool(row.get("is_restatement") or False)
         base = {
             "instrument_key": ik,
             "report_period_start": None,
@@ -423,8 +426,9 @@ def compute_period_metrics(wide_with_announce: pd.DataFrame) -> list[dict[str, A
             "available_time": as_utc(pd.Timestamp(at).to_pydatetime()),
             "currency": "CNY",
             "revision": revision,
-            "is_restatement": bool(row.get("is_restatement") or False),
+            "is_restatement": is_restatement,
             "source": str(row.get("announce_source") or "fund_cn"),
+            "quality_tag": RESTATEMENT_UNRECOVERABLE if is_restatement else "",
         }
         record_id = row.get("announce_record_id")
         if record_id is not None and pd.isna(record_id):

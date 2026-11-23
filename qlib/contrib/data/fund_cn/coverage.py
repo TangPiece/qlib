@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
 
 from .catalog import FACTOR_DEFINITIONS, FundFactorDef, mvp_factors
+from .source_policy import COVERAGE_REPORT_MIN_DATE
 
 # Map every catalog metric_deps entry → upstream raw statement field_code(s).
 # Missing keys must raise (never silently fail coverage with empty frames).
@@ -85,6 +87,57 @@ class CoverageReport:
 
 DEFAULT_MAX_MISSING_ANNOUNCE = 0.05
 DEFAULT_MAX_VALUE_MISSING = 0.30
+
+
+def filter_statements_by_report_min(
+    statements: pd.DataFrame,
+    *,
+    report_min: date | None = COVERAGE_REPORT_MIN_DATE,
+) -> pd.DataFrame:
+    """Coverage/PIT 窗口：只保留报告期 ≥ report_min 的科目行。"""
+    if statements is None or statements.empty or report_min is None:
+        return statements if statements is not None else pd.DataFrame()
+    frame = statements.copy()
+    frame["report_period_end"] = pd.to_datetime(frame["report_period_end"]).dt.date
+    return frame[frame["report_period_end"] >= report_min].copy()
+
+
+def drop_statements_without_announce(
+    statements: pd.DataFrame,
+    announce: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """剔除无法挂公告的 (instrument, period, revision) 科目行。
+
+    返回 (保留行, 缺失清单)。缺失清单用于 marker / 重试 EM。
+    """
+    if statements is None or statements.empty:
+        return pd.DataFrame(), pd.DataFrame(
+            columns=["instrument_key", "report_period_end", "revision"]
+        )
+    frame = statements.copy()
+    if "revision" not in frame.columns:
+        frame["revision"] = 0
+    frame["revision"] = frame["revision"].fillna(0).astype(int)
+    frame["report_period_end"] = pd.to_datetime(frame["report_period_end"]).dt.date
+    join_keys = ["instrument_key", "report_period_end", "revision"]
+    keys = frame[join_keys].drop_duplicates()
+    if announce is None or announce.empty:
+        return frame.iloc[0:0].copy(), keys
+    ann = announce.copy()
+    if "revision" not in ann.columns:
+        ann["revision"] = 0
+    ann["revision"] = ann["revision"].fillna(0).astype(int)
+    ann["report_period_end"] = pd.to_datetime(ann["report_period_end"]).dt.date
+    merged = keys.merge(
+        ann[join_keys].drop_duplicates(),
+        on=join_keys,
+        how="left",
+        indicator=True,
+    )
+    missing = merged[merged["_merge"] == "left_only"][join_keys].copy()
+    keep_keys = merged[merged["_merge"] == "both"][join_keys]
+    kept = frame.merge(keep_keys, on=join_keys, how="inner")
+    return kept, missing
 
 
 def resolve_statement_fields(metric_dep: str) -> tuple[str, ...]:
@@ -233,22 +286,117 @@ def evaluate_factor_gates(
     }
 
 
+def announce_attach_rate(
+    statements: pd.DataFrame,
+    announce: pd.DataFrame,
+    *,
+    report_min: date | None = COVERAGE_REPORT_MIN_DATE,
+) -> dict[str, Any]:
+    """窗口内公告挂载率（默认报告期 ≥2005）。"""
+    frame = filter_statements_by_report_min(statements, report_min=report_min)
+    if frame is None or frame.empty:
+        return {
+            "periods": 0,
+            "missing_announce_rate": 1.0,
+            "ok": False,
+            "report_min": str(report_min) if report_min else None,
+        }
+    if "revision" not in frame.columns:
+        frame["revision"] = 0
+    frame["revision"] = frame["revision"].fillna(0).astype(int)
+    frame["report_period_end"] = pd.to_datetime(frame["report_period_end"]).dt.date
+    keys = frame[["instrument_key", "report_period_end", "revision"]].drop_duplicates()
+    if announce is None or announce.empty:
+        return {
+            "periods": int(len(keys)),
+            "missing_announce_rate": 1.0,
+            "ok": False,
+            "report_min": str(report_min) if report_min else None,
+        }
+    ann = announce.copy()
+    if "revision" not in ann.columns:
+        ann["revision"] = 0
+    ann["revision"] = ann["revision"].fillna(0).astype(int)
+    ann["report_period_end"] = pd.to_datetime(ann["report_period_end"]).dt.date
+    join_keys = ["instrument_key", "report_period_end", "revision"]
+    merged = keys.merge(ann[join_keys].drop_duplicates(), on=join_keys, how="left", indicator=True)
+    missing = float((merged["_merge"] == "left_only").mean()) if len(merged) else 1.0
+    return {
+        "periods": int(len(keys)),
+        "missing_announce_rate": missing,
+        "ok": missing <= DEFAULT_MAX_MISSING_ANNOUNCE,
+        "report_min": str(report_min) if report_min else None,
+        "missing_keys": int((merged["_merge"] == "left_only").sum()) if len(merged) else int(len(keys)),
+    }
+
+
+def _all_instruments_financial(industry_map: pd.DataFrame | None, instrument_keys: Sequence[str]) -> bool:
+    """行业映射齐全且全部为金融业（门类 J）时，跳过 non_financial 因子硬闸。"""
+    from .source_policy import is_financial_industry
+
+    if industry_map is None or industry_map.empty or not instrument_keys:
+        return False
+    if "industry_code" not in industry_map.columns:
+        return False
+    mapping = {
+        str(r.instrument_key): str(r.industry_code)
+        for r in industry_map.itertuples(index=False)
+    }
+    codes = [mapping.get(str(k)) for k in instrument_keys]
+    if any(c is None or c == "" for c in codes):
+        return False
+    return all(is_financial_industry(c) for c in codes)
+
+
 def coverage_summary(
     statements: pd.DataFrame,
     announce: pd.DataFrame,
     *,
     factors: Sequence[FundFactorDef] | None = None,
+    verify_payload: dict[str, Any] | None = None,
+    industry_map: pd.DataFrame | None = None,
+    report_min: date | None = COVERAGE_REPORT_MIN_DATE,
 ) -> dict[str, Any]:
+    # 窗口化后再评闸，避免早期无公告期污染
+    windowed = filter_statements_by_report_min(statements, report_min=report_min)
     targets = list(factors) if factors is not None else list(mvp_factors())
-    rows = [evaluate_factor_gates(f, statements, announce) for f in targets]
+    keys: list[str] = []
+    if windowed is not None and not windowed.empty and "instrument_key" in windowed.columns:
+        keys = sorted(windowed["instrument_key"].astype(str).unique())
+    finance_only = _all_instruments_financial(industry_map, keys)
+    rows = []
+    for f in targets:
+        row = evaluate_factor_gates(f, windowed, announce)
+        # 全样本均为金融业时，non_financial 因子不参与 MVP 硬闸（日频侧会掩码为空）
+        if finance_only and f.applicability == "non_financial":
+            row = {
+                **row,
+                "RAW_OK": "ok",
+                "PIT_OK": "ok",
+                "eligible_pit_safe": True,
+                "skipped_non_financial": True,
+            }
+        rows.append(row)
     eligible = [r["factor_id"] for r in rows if r["eligible_pit_safe"]]
-    return {
+    attach = announce_attach_rate(windowed, announce, report_min=report_min)
+    summary: dict[str, Any] = {
         "factor_count": len(rows),
         "eligible_count": len(eligible),
         "eligible_factor_ids": eligible,
         "factors": rows,
         "catalog_size": len(FACTOR_DEFINITIONS),
+        "announce_attach": attach,
+        "source_policy": "csmar_primary",
+        "finance_only_universe": finance_only,
+        "report_min": str(report_min) if report_min else None,
     }
+    if verify_payload is not None:
+        summary["verify"] = {
+            "ok": bool(verify_payload.get("ok")),
+            "summary": verify_payload.get("summary"),
+            "mismatch_rate": (verify_payload.get("statement_compare") or {}).get("mismatch_rate"),
+        }
+    return summary
 
 
 class CoverageFailed(RuntimeError):

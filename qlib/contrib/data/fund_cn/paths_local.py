@@ -70,6 +70,17 @@ def pit_metrics_path(root: Path | None = None) -> Path:
     return pit_dir(root) / "metrics.parquet"
 
 
+def pit_year_dir(root: Path | None = None) -> Path:
+    """PIT 按 available_time 年份分片目录。"""
+    path = pit_dir(root) / "by_year"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def pit_year_path(root: Path | None, year: int) -> Path:
+    return pit_year_dir(root) / f"{int(year)}.parquet"
+
+
 def version_segment(factor_version: int = FACTOR_VERSION) -> str:
     return f"v{int(factor_version)}"
 

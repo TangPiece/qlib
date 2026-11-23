@@ -35,12 +35,19 @@ from qlib.contrib.data.fund_cn.compute import (
 from qlib.contrib.data.fund_cn.coverage import (
     METRIC_TO_STATEMENT_FIELDS,
     CoverageFailed,
+    announce_attach_rate,
     assert_mvp_coverage,
     coverage_summary,
+    drop_statements_without_announce,
     evaluate_metric_coverage,
+    filter_statements_by_report_min,
     resolve_statement_fields,
 )
-from qlib.contrib.data.fund_cn.ingest import stage_from_adapters
+from qlib.contrib.data.fund_cn.ingest import (
+    pit_years_for_trade_year,
+    stage_from_adapters,
+    write_pit_from_staging,
+)
 from qlib.contrib.data.fund_cn.market import instrument_to_qlib, qlib_to_instrument
 from qlib.contrib.data.fund_cn.metrics import (
     attach_announce,
@@ -51,6 +58,7 @@ from qlib.contrib.data.fund_cn.metrics import (
 )
 from qlib.contrib.data.fund_cn.pipeline import run_compute_publish, run_pipeline
 from qlib.contrib.data.fund_cn.qa import check_day
+from qlib.contrib.data.fund_cn.source_policy import COVERAGE_REPORT_MIN_DATE, RESTATEMENT_UNRECOVERABLE
 from qlib.contrib.data.fund_cn.staging import read_announce_rows, read_statement_rows
 
 
@@ -457,3 +465,450 @@ def test_check_day_empty_fails(tmp_path: Path):
     )
     assert payload["ok"] is False
     assert any("空" in e for e in payload["errors"])
+
+
+def test_instrument_to_qlib_beijing():
+    assert instrument_to_qlib("CNStock:430047") == "BJ430047"
+    assert instrument_to_qlib("CNStock:920001") == "BJ920001"
+    assert qlib_to_instrument("BJ430047") == "CNStock:430047"
+
+
+def test_csmar_dataframe_to_rows_filters_typrep_and_maps_fields():
+    from qlib.contrib.data.fund_cn.adapters.csmar_adapter import dataframe_to_csmar_rows
+    from qlib.contrib.data.fund_cn.source_policy import is_financial_industry
+
+    frame = pd.DataFrame(
+        [
+            {
+                "证券代码": "600000",
+                "季度日期": "2023-12-31",
+                "报表类型编码": "A",
+                "是否发生差错更正": "",
+                "差错更正披露日期": "",
+                "行业代码": "J66",
+                "行业名称": "货币金融服务",
+                "营业收入": 100.0,
+                "营业成本": 40.0,
+                "归属于母公司所有者的净利润": 10.0,
+                "经营活动产生的现金流量净额": 12.0,
+                "资产总计": 200.0,
+                "负债合计": 90.0,
+                "归属于母公司所有者权益合计": 110.0,
+                "实收资本(或股本)": 50.0,
+            },
+            {
+                "证券代码": "600000",
+                "季度日期": "2023-12-31",
+                "报表类型编码": "B",  # 母公司，应过滤
+                "营业收入": 999.0,
+                "归属于母公司所有者的净利润": 99.0,
+                "资产总计": 1.0,
+                "负债合计": 1.0,
+                "归属于母公司所有者权益合计": 1.0,
+                "经营活动产生的现金流量净额": 1.0,
+                "实收资本(或股本)": 1.0,
+            },
+        ]
+    )
+    stmts, corrects, industries = dataframe_to_csmar_rows(frame, instrument_keys=["CNStock:600000"])
+    assert corrects == []
+    assert any(r.field_code == "revenue" and r.value == 100.0 for r in stmts)
+    assert all(r.source == "csmar" for r in stmts)
+    assert not any(r.value == 999.0 for r in stmts)
+    assert industries and is_financial_industry(industries[0].industry_code)
+
+
+def test_csmar_correct_announce_revision():
+    from qlib.contrib.data.fund_cn.adapters.csmar_adapter import dataframe_to_csmar_rows
+
+    frame = pd.DataFrame(
+        [
+            {
+                "证券代码": "000001",
+                "季度日期": "2023-12-31",
+                "报表类型编码": "A",
+                "是否发生差错更正": "1",
+                "差错更正披露日期": "2024-04-15",
+                "行业代码": "J66",
+                "营业收入": 100.0,
+                "归属于母公司所有者的净利润": 10.0,
+                "资产总计": 200.0,
+                "负债合计": 100.0,
+                "归属于母公司所有者权益合计": 100.0,
+                "经营活动产生的现金流量净额": 11.0,
+                "实收资本(或股本)": 10.0,
+            }
+        ]
+    )
+    stmts, corrects, _ = dataframe_to_csmar_rows(frame)
+    assert all(r.revision == 1 for r in stmts)
+    assert len(corrects) == 1
+    assert corrects[0].revision == 1
+    assert corrects[0].source == "csmar_correct_declare"
+
+
+def test_compare_statement_samples_mismatch_rate():
+    from qlib.contrib.data.fund_cn.verify import compare_statement_samples
+
+    pe = date(2023, 12, 31)
+    ik = "CNStock:600000"
+    csmar = [
+        _stmt(ik, pe, "revenue", 100.0),
+        _stmt(ik, pe, "net_profit_parent", 10.0),
+    ]
+    free_ok = [
+        _stmt(ik, pe, "revenue", 100.5),
+        _stmt(ik, pe, "net_profit_parent", 10.1),
+    ]
+    free_bad = [
+        _stmt(ik, pe, "revenue", 200.0),
+        _stmt(ik, pe, "net_profit_parent", 10.0),
+    ]
+    ok = compare_statement_samples(csmar, free_ok, max_rel_error=0.05)
+    assert ok["compared"] == 2
+    assert ok["mismatch"] == 0
+    bad = compare_statement_samples(csmar, free_bad, max_rel_error=0.05)
+    assert bad["mismatch"] >= 1
+
+
+def test_prefer_report_shares_and_shares_source_tag(sample_universe: str):
+    from qlib.contrib.data.fund_cn.compute import compute_valuation_factors
+
+    ik = sample_universe
+    available = datetime(2024, 3, 28, 15, 0, tzinfo=timezone.utc)
+    pit_rows = [
+        {
+            "instrument_key": ik,
+            "metric_code": "shares_outstanding",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 10.0,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "net_income_ttm",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 20.0,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "shareholder_equity",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 100.0,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "revenue_ttm",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 200.0,
+        },
+    ]
+    market = pd.DataFrame([{"instrument_key": ik, "trading_date": date(2024, 4, 1), "close": 10.0}])
+    # 事件股本故意不同：优先报告股本时 PE 仍按 10 股
+    share_capital = pd.DataFrame(
+        [
+            {
+                "instrument_key": ik,
+                "effective_date": date(2024, 1, 1),
+                "announce_time": available,
+                "total_shares": 20.0,
+                "source": "cninfo",
+                "source_record_id": "x",
+            }
+        ]
+    )
+    panel = compute_valuation_factors(
+        pit_rows,
+        market,
+        share_capital=share_capital,
+        prefer_report_shares=True,
+        mvp_only=True,
+    )
+    assert float(panel.iloc[0]["pe_ttm"]) == pytest.approx(5.0)
+    assert panel.iloc[0]["shares_source"] == "report"
+
+
+def test_non_financial_mask_clears_gross_margin_for_banks():
+    from qlib.contrib.data.fund_cn.compute import apply_non_financial_mask
+
+    panel = pd.DataFrame(
+        [
+            {"trading_date": "2024-04-01", "instrument_key": "CNStock:600000", "gross_margin": 0.3, "roe": 0.1},
+            {"trading_date": "2024-04-01", "instrument_key": "CNStock:600519", "gross_margin": 0.5, "roe": 0.2},
+        ]
+    )
+    industry = pd.DataFrame(
+        [
+            {"instrument_key": "CNStock:600000", "industry_code": "J66", "industry_name": "银行"},
+            {"instrument_key": "CNStock:600519", "industry_code": "C15", "industry_name": "酒"},
+        ]
+    )
+    out = apply_non_financial_mask(panel, industry, factor_ids_subset=["gross_margin", "roe"])
+    bank = out[out["instrument_key"] == "CNStock:600000"].iloc[0]
+    liquor = out[out["instrument_key"] == "CNStock:600519"].iloc[0]
+    assert pd.isna(bank["gross_margin"])
+    assert bank["roe"] == pytest.approx(0.1)
+    assert liquor["gross_margin"] == pytest.approx(0.5)
+
+
+def test_resolve_policy_defaults_to_csmar():
+    from qlib.contrib.data.fund_cn.source_policy import StatementSource, resolve_policy
+
+    policy = resolve_policy(source="csmar")
+    assert policy.statement_source == StatementSource.CSMAR
+    assert policy.prefer_report_shares is True
+    assert policy.verify_with_free_sources is True
+
+
+def test_csmar_adapter_reads_fixture_csv(tmp_path: Path):
+    from qlib.contrib.data.fund_cn.adapters.csmar_adapter import CsmarStatementAdapter
+
+    csv_path = tmp_path / "quarterly.csv"
+    pd.DataFrame(
+        [
+            {
+                "证券代码": "600519",
+                "季度日期": "2023-12-31",
+                "报表类型编码": "A",
+                "是否发生差错更正": "",
+                "差错更正披露日期": "",
+                "行业代码": "C15",
+                "行业名称": "酒、饮料和精制茶制造业",
+                "营业收入": 1000.0,
+                "营业成本": 300.0,
+                "归属于母公司所有者的净利润": 400.0,
+                "经营活动产生的现金流量净额": 450.0,
+                "资产总计": 2000.0,
+                "负债合计": 500.0,
+                "归属于母公司所有者权益合计": 1500.0,
+                "实收资本(或股本)": 100.0,
+            }
+        ]
+    ).to_csv(csv_path, index=False, encoding="utf-8-sig")
+    adapter = CsmarStatementAdapter(path=csv_path, chunksize=10)
+    rows = adapter.fetch_statements(["CNStock:600519"], start=date(2023, 1, 1), end=date(2023, 12, 31))
+    assert any(r.field_code == "revenue" and r.value == 1000.0 for r in rows)
+    assert adapter.fetch_industry_map()[0].industry_code == "C15"
+
+
+def test_pipeline_with_industry_mask(tmp_path: Path):
+    """注入 CSMAR 风格行业映射后，银行 gross_margin 应为空。"""
+    from qlib.contrib.data.fund_cn.staging import write_industry_map
+
+    ik = "CNStock:600000"
+    p2023 = date(2023, 12, 31)
+    available = datetime(2024, 3, 28, 15, 0, tzinfo=timezone.utc)
+    statements = []
+    statements += _full_pack(ik, date(2022, 12, 31), 4, 0, 80.0, 8.0, 100.0)
+    statements += _full_pack(ik, date(2023, 3, 31), 1, 0, 20.0, 2.0, 105.0)
+    statements += _full_pack(ik, date(2023, 6, 30), 2, 0, 45.0, 5.0, 107.0)
+    statements += _full_pack(ik, date(2023, 9, 30), 3, 0, 75.0, 7.5, 108.0)
+    statements += _full_pack(ik, p2023, 4, 0, 100.0, 10.0, 110.0)
+    announces = [
+        _ann(ik, date(2022, 12, 31), datetime(2023, 3, 30, 15, 0, tzinfo=timezone.utc)),
+        _ann(ik, date(2023, 3, 31), datetime(2023, 4, 28, 15, 0, tzinfo=timezone.utc)),
+        _ann(ik, date(2023, 6, 30), datetime(2023, 8, 28, 15, 0, tzinfo=timezone.utc)),
+        _ann(ik, date(2023, 9, 30), datetime(2023, 10, 28, 15, 0, tzinfo=timezone.utc)),
+        _ann(ik, p2023, available, revision=0),
+    ]
+    market = pd.DataFrame([{"instrument_key": ik, "trading_date": date(2024, 4, 1), "close": 11.0}])
+    staging = tmp_path / "staging"
+    write_industry_map(
+        [{"instrument_key": ik, "industry_code": "J66", "industry_name": "银行", "as_of": p2023}],
+        root=staging,
+    )
+    result = run_pipeline(
+        [ik],
+        [date(2024, 4, 1)],
+        statement_rows=statements,
+        announce_rows=announces,
+        market=market,
+        root=staging,
+        factor_root=tmp_path / "factors",
+        mvp_only=True,
+        require_coverage=True,
+        upload=False,
+        qa_dir=tmp_path / "qa",
+        skip_verify=True,
+    )
+    assert result["factors"]["row_count"] > 0
+    panel = pd.read_parquet(result["factors"]["days"][0]["path"])
+    assert pd.isna(panel.iloc[0]["gross_margin"])
+    assert float(panel.iloc[0]["roe"]) == pytest.approx(panel.iloc[0]["roe"])
+
+
+def test_drop_statements_without_announce_and_window():
+    """缺公告修订行剔除后挂载率归零；窗口过滤掉早期报告期。"""
+    ik = "CNStock:000001"
+    early = date(1998, 12, 31)
+    late = date(2023, 12, 31)
+    statements = pd.DataFrame(
+        [
+            _stmt(ik, early, "revenue", 1.0).__dict__,
+            _stmt(ik, late, "revenue", 100.0, revision=0).__dict__,
+            _stmt(ik, late, "revenue", 110.0, revision=1).__dict__,
+        ]
+    )
+    announce = pd.DataFrame(
+        [_ann(ik, late, datetime(2024, 3, 28, 15, tzinfo=timezone.utc), revision=0).__dict__]
+    )
+    windowed = filter_statements_by_report_min(statements, report_min=COVERAGE_REPORT_MIN_DATE)
+    assert early not in set(windowed["report_period_end"].tolist())
+    kept, missing = drop_statements_without_announce(windowed, announce)
+    assert len(missing) == 1
+    assert int(missing.iloc[0]["revision"]) == 1
+    assert set(kept["revision"].astype(int)) == {0}
+    attach = announce_attach_rate(kept, announce, report_min=COVERAGE_REPORT_MIN_DATE)
+    assert attach["missing_announce_rate"] == pytest.approx(0.0)
+    assert attach["ok"]
+
+
+def test_year_batch_panel_matches_single_day(sample_universe: str):
+    """年批面板切片与单日单票重算应一致（QA 硬闸前提）。"""
+    ik = sample_universe
+    available = datetime(2024, 3, 28, 15, 0, tzinfo=timezone.utc)
+    pit_rows = [
+        {
+            "instrument_key": ik,
+            "metric_code": "debt_to_asset",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 0.5,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "roe",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 0.12,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "shares_outstanding",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 10.0,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "shareholder_equity",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 100.0,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "net_income_ttm",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 20.0,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "revenue_ttm",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 200.0,
+        },
+        {
+            "instrument_key": ik,
+            "metric_code": "cash_from_operations_ttm",
+            "report_period_end": date(2023, 12, 31),
+            "available_time": available,
+            "revision": 0,
+            "value": 25.0,
+        },
+    ]
+    days = [date(2024, 4, 1), date(2024, 4, 2)]
+    market = pd.DataFrame(
+        [
+            {"instrument_key": ik, "trading_date": date(2024, 4, 1), "close": 10.0},
+            {"instrument_key": ik, "trading_date": date(2024, 4, 2), "close": 11.0},
+        ]
+    )
+    year_panel = build_daily_factor_panel(pit_rows, days, [ik], market, mvp_only=True)
+    day_panel = build_daily_factor_panel(
+        pit_rows, [date(2024, 4, 1)], [ik], market[market["trading_date"] == date(2024, 4, 1)], mvp_only=True
+    )
+    year_row = year_panel[year_panel["trading_date"].astype(str).str[:10] == "2024-04-01"].iloc[0]
+    for field in ("debt_to_asset", "roe", "pe_ttm", "pb"):
+        assert year_row[field] == pytest.approx(float(day_panel.iloc[0][field]), rel=1e-5, abs=1e-8)
+
+
+def test_resume_skips_complete_year(tmp_path: Path, sample_universe: str):
+    """已完整落盘的年份在 resume 下应跳过。"""
+    from qlib.contrib.data.fund_cn.storage import write_day
+
+    ik = sample_universe
+    factor_root = tmp_path / "factors"
+    # 预先写入该交易日宽表，模拟上年已跑完
+    write_day(
+        factor_root,
+        "2024-04-01",
+        pd.DataFrame([{"trading_date": "2024-04-01", "instrument_key": ik, "roe": 0.1}]),
+        mvp_only=True,
+    )
+    market = pd.DataFrame([{"instrument_key": ik, "trading_date": date(2024, 4, 1), "close": 10.0}])
+    result = run_compute_publish(
+        [date(2024, 4, 1)],
+        [ik],
+        market,
+        pit_rows=[],
+        root=tmp_path / "staging",
+        factor_root=factor_root,
+        upload=False,
+        qa_dir=tmp_path / "qa",
+        resume=True,
+    )
+    assert "2024" in result["skipped_years"]
+    assert pit_years_for_trade_year(2000) == [1998, 1999, 2000]
+
+
+def test_pit_shards_and_quality_tag(tmp_path: Path, sample_universe: str):
+    """PIT 写 by_year 分片；更正行带 restatement_unrecoverable 标签。"""
+    ik = sample_universe
+    pe = date(2023, 12, 31)
+    statements = [
+        _stmt(ik, pe, "revenue", 100.0, revision=0),
+        _stmt(ik, pe, "net_profit_parent", 10.0, revision=0),
+        _stmt(ik, pe, "shareholder_equity", 100.0, statement_type="balance", revision=0),
+        _stmt(ik, pe, "total_assets", 200.0, statement_type="balance", revision=0),
+        _stmt(ik, pe, "total_liabilities", 100.0, statement_type="balance", revision=0),
+        _stmt(ik, pe, "gross_profit", 40.0, revision=0),
+        _stmt(ik, pe, "cash_from_operations", 12.0, statement_type="cashflow", revision=0),
+        _stmt(ik, pe, "shares_outstanding", 10.0, statement_type="balance", revision=0),
+        _stmt(ik, pe, "revenue", 110.0, revision=1),
+        _stmt(ik, pe, "net_profit_parent", 12.0, revision=1),
+        _stmt(ik, pe, "shareholder_equity", 100.0, statement_type="balance", revision=1),
+        _stmt(ik, pe, "total_assets", 200.0, statement_type="balance", revision=1),
+        _stmt(ik, pe, "total_liabilities", 100.0, statement_type="balance", revision=1),
+        _stmt(ik, pe, "gross_profit", 44.0, revision=1),
+        _stmt(ik, pe, "cash_from_operations", 13.0, statement_type="cashflow", revision=1),
+        _stmt(ik, pe, "shares_outstanding", 10.0, statement_type="balance", revision=1),
+    ]
+    announces = [
+        _ann(ik, pe, datetime(2024, 3, 28, 15, tzinfo=timezone.utc), revision=0),
+        _ann(ik, pe, datetime(2024, 4, 15, 10, tzinfo=timezone.utc), revision=1),
+    ]
+    stage_from_adapters(statements, announces, root=tmp_path)
+    info = write_pit_from_staging(tmp_path)
+    assert info["row_count"] > 0
+    assert "2024" in info["year_shards"]
+    assert (tmp_path / "pit" / "by_year" / "2024.parquet").is_file()
+    frame = pd.read_parquet(tmp_path / "pit" / "metrics.parquet")
+    assert "quality_tag" in frame.columns
+    restated = frame[frame["revision"] == 1]
+    assert (restated["quality_tag"] == RESTATEMENT_UNRECOVERABLE).all()
