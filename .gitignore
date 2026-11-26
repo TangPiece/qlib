@@ -79,3 +79,7 @@ node_modules/
 /examples/benchmarks/LightGBM/eval_output/
 !examples/alloc_v2/*.ipynb
 
+examples/benchmarks/_factor_sweep/logs
+
+# get_or_create_path 在 ~/tmp 不可写时的临时权重
+.qlib_tmp/

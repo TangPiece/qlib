@@ -72,9 +72,10 @@ SOURCE_POSITIONS_JSON = "positions_json"
 SOURCE_RECORDER = "recorder"
 
 _CONF_PATH_RE = re.compile(r"--conf_path(?:=|\s+)(\S+)")
-# qrun / python -m qlib.cli.run 常把 yaml 写成位置参数，没有 --conf_path
-_WORKFLOW_YAML_RE = re.compile(
-    r"(?:^|\s)((?:[^\s\"']|/)+workflow_config[^\s\"']*\.ya?ml)",
+# qrun / python -m qlib.cli.run 常把 yaml 写成位置参数，没有 --conf_path。
+# factor sweep 生成文件名不含 workflow_config（如 alstm_alpha158_20w.yaml），不能只认那一类。
+_POSITIONAL_YAML_RE = re.compile(
+    r"(?:^|\s)([^\s\"']+\.ya?ml)",
     re.IGNORECASE,
 )
 
@@ -121,7 +122,8 @@ def _rolling_models_exp_name(ensemble_rec) -> Optional[str]:
 def _conf_raw_from_argv(argv_text: str) -> Optional[Path]:
     """从 cmd-sys.argv 取出训练 yaml 原文（文件可以已不存在）。
 
-    优先 ``--conf_path``；没有时再取含 ``workflow_config`` 的位置参数 yaml。
+    优先 ``--conf_path``，命中后直接返回。没有时取第一个位置参数 ``.yaml`` / ``.yml``，
+    不要求文件名含 ``workflow_config``。多份 yaml 时只取第一份，避免选到后面的说明文件。
     """
     text = argv_text or ""
     m = _CONF_PATH_RE.search(text)
@@ -129,7 +131,7 @@ def _conf_raw_from_argv(argv_text: str) -> Optional[Path]:
         raw = m.group(1).strip().strip("'\"")
         if raw:
             return Path(raw)
-    m = _WORKFLOW_YAML_RE.search(text)
+    m = _POSITIONAL_YAML_RE.search(text)
     if not m:
         return None
     raw = m.group(1).strip().strip("'\"")

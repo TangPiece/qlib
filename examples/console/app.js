@@ -74,7 +74,11 @@
   // 当前滚动模型各 config key 的实验名前缀，由 /api/status 下发
   let rollingExpPrefixes = {};
 
+  // 最近一次 /api/status 给出的默认实验名（含资金、持仓和时分）
+  let serverDefaultExpName = "";
+
   function defaultExpName() {
+    if (serverDefaultExpName) return serverDefaultExpName;
     if (!isRollingModel()) {
       const model = selectedModel();
       const yaml = selectedYaml();
@@ -84,6 +88,31 @@
     const key = ($("configSelect") && $("configSelect").value) || "";
     const prefix = (key && rollingExpPrefixes[key]) || selectedModel().exp_prefix || "rolling";
     return `${prefix}_${todayStamp()}`;
+  }
+
+  /** 去掉默认名末尾的日期时分，用来判断是不是同一份配置。 */
+  function expNamePrefix(name) {
+    return String(name || "").replace(/_\d{8}_\d{2}:\d{2}$/, "");
+  }
+
+  /**
+   * 未手改时：训练框只在配置变化时换新时分，刷新不改已显示的名字；
+   * 导出框优先填当前配置最近一次已经写入 MLflow 的实验。
+   */
+  function applyServerExpName(data) {
+    const name = data && data.default_exp_name;
+    if (!name) return;
+    serverDefaultExpName = name;
+    const expInput = $("expName");
+    if (!expInput.dataset.touched) {
+      const current = expInput.value.trim();
+      if (!current || expNamePrefix(current) !== expNamePrefix(name)) {
+        expInput.value = name;
+      }
+    }
+    if (!$("exportExpName").dataset.touched) {
+      $("exportExpName").value = data.latest_exp_name || expInput.value.trim() || name;
+    }
   }
 
   /** 官方单次训练时禁用滚动 YAML / 写入结束日，更新数据仍可用。 */
@@ -264,21 +293,27 @@
     if (!$("exportExpName").value) {
       $("exportExpName").value = $("expName").value;
     }
+    applyServerExpName(data);
   }
 
   async function refreshStatus() {
     // 滚动读左侧 config；官方模型读右侧所选 YAML，状态条结束日随之变化。
     const params = new URLSearchParams();
     const model = selectedModel();
-    if (model.kind === "qrun") {
-      params.set("model", model.id);
-      const yaml = ($("yamlSelect") && $("yamlSelect").value) || "";
-      if (yaml) params.set("yaml", yaml);
-    } else {
-      const cfg = $("configSelect").value;
-      if (cfg) params.set("config", cfg);
-      params.set("model", model.id);
-    }
+      if (model.kind === "qrun") {
+        params.set("model", model.id);
+        const yaml = ($("yamlSelect") && $("yamlSelect").value) || "";
+        if (yaml) params.set("yaml", yaml);
+      } else {
+        const cfg = $("configSelect").value;
+        if (cfg) params.set("config", cfg);
+        params.set("model", model.id);
+        // 只有用户改过 horizon 才覆盖 YAML，避免页面初始值 1 盖掉 yaml 里的 20
+        if (horizonTouched) {
+          const horizon = Number($("horizon").value);
+          if (horizon >= 1) params.set("horizon", String(horizon));
+        }
+      }
     const data = await api(`/api/status?${params.toString()}`);
     // 滚动模型切换后 configs 可能变了，强制重建
     if (isRollingModel() && data.configs) {
@@ -311,7 +346,7 @@
             title="${fav ? "取消收藏" : "收藏"}"
             aria-label="${fav ? "取消收藏" : "收藏"}">${fav ? "★" : "☆"}</button>
         </td>
-        <td>${escapeHtml(r.exp_name)}</td>
+        <td>${escapeHtml(r.exp_name)}${r.profile_summary ? `<div class="hint">${escapeHtml(r.profile_summary)}</div>` : ""}</td>
         <td>${kind}</td>
         <td>${escapeHtml(r.mtime)}</td>
         <td>${r.size_mb} MB</td>
@@ -508,46 +543,30 @@
 
   $("horizon").addEventListener("input", () => {
     horizonTouched = true;
+    // 改 horizon 后按新值重算实验名；未手改过的名字会被服务端结果替换
+    clearTimeout($("horizon")._nameTimer);
+    $("horizon")._nameTimer = setTimeout(() => {
+      refreshStatus().catch((e) => toast(e.message, true));
+    }, 250);
   });
 
   $("configSelect").addEventListener("change", () => {
-    refreshStatus()
-      .then(() => {
-        // 未手改实验名时，切换 10 万 / 1 亿等配置要换成该 key 的前缀
-        if (!$("expName").dataset.touched) {
-          $("expName").value = defaultExpName();
-          if (!$("exportExpName").dataset.touched) {
-            $("exportExpName").value = $("expName").value;
-          }
-        }
-      })
-      .catch((e) => toast(e.message, true));
+    // 换 YAML 后 horizon 回到文件里的值，不再沿用上一个配置手改的数字
+    horizonTouched = false;
+    refreshStatus().catch((e) => toast(e.message, true));
   });
 
   $("modelSelect").addEventListener("change", () => {
     // 切换模型时重置未手动改过的实验名，并重建滚动配置下拉
     delete $("expName").dataset.touched;
     delete $("exportExpName").dataset.touched;
+    horizonTouched = false;
+    serverDefaultExpName = "";
     renderModelForm();
-    refreshStatus()
-      .then(() => {
-        if (!$("expName").dataset.touched) {
-          $("expName").value = defaultExpName();
-          if (!$("exportExpName").dataset.touched) {
-            $("exportExpName").value = $("expName").value;
-          }
-        }
-      })
-      .catch((e) => toast(e.message, true));
+    refreshStatus().catch((e) => toast(e.message, true));
   });
 
   $("yamlSelect").addEventListener("change", () => {
-    if (!$("expName").dataset.touched) {
-      $("expName").value = defaultExpName();
-      if (!$("exportExpName").dataset.touched) {
-        $("exportExpName").value = $("expName").value;
-      }
-    }
     refreshStatus().catch((e) => toast(e.message, true));
   });
 

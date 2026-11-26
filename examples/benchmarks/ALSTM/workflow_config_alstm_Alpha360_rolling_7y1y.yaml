@@ -32,12 +32,12 @@ port_analysis_config: &port_analysis_config
     module_path: qlib.contrib.strategy
     kwargs:
       signal: <PRED>
-      topk: 50
-      n_drop: 5
+      topk: 10
+      n_drop: 1
   backtest:
     start_time: '2016-01-01'
     end_time: '2026-10-16'
-    account: 100000000
+    account: 200000
     benchmark: *benchmark
     exchange_kwargs:
       limit_threshold: 0.095

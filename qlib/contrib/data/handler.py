@@ -244,3 +244,33 @@ class FactorLabAB(Alpha158):
         if len(fields) != len(names) or not fields:
             raise ValueError("invalid FactorLabAB feature json: %s" % path)
         return fields, names
+
+
+class FundCn(Alpha158):
+    """仅 A 股财务因子 fund_cn（默认 MVP 子集）；标签与 Alpha158 相同。"""
+
+    def get_feature_config(self):
+        # 延迟导入，避免 handler 模块加载时拉起 fund_cn 全依赖
+        from qlib.contrib.data.fund_cn import get_fund_cn_feature_config
+
+        return get_fund_cn_feature_config(mvp_only=True)
+
+
+class MixFour(Alpha158):
+    """Alpha158 + Alpha360 + L2Daily + FundCn 拼接；列名加前缀防撞名。"""
+
+    def get_feature_config(self):
+        from qlib.contrib.data.fund_cn import get_fund_cn_feature_config
+
+        f158, n158 = super().get_feature_config()
+        f360, n360 = Alpha360DL.get_feature_config()
+        fl2, nl2 = get_l2_feature_config()
+        ff, nf = get_fund_cn_feature_config(mvp_only=True)
+        fields = list(f158) + list(f360) + list(fl2) + list(ff)
+        names = (
+            ["a158_%s" % n for n in n158]
+            + ["a360_%s" % n for n in n360]
+            + ["l2_%s" % n for n in nl2]
+            + ["fund_%s" % n for n in nf]
+        )
+        return fields, names

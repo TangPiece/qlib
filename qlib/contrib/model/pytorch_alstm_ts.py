@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 from typing import Text, Union
 import copy
+import os
+import subprocess
 from ...utils import get_or_create_path
 from ...log import get_module_logger
 
@@ -167,6 +169,37 @@ class ALSTM(Model):
 
         raise ValueError("unknown metric `%s`" % self.metric)
 
+    def _num_workers(self) -> int:
+        """多进程 DataLoader 需要 torch_shm_manager。当前进程不能启动它时改为单进程。
+
+        探测进程一旦起来就结束，避免留下常驻进程。n_jobs 为 0 或探测成功时不改配置。
+        """
+        cached = getattr(self, "_resolved_workers", None)
+        if cached is not None:
+            return cached
+        if self.n_jobs <= 0:
+            self._resolved_workers = 0
+            return 0
+        manager = os.path.join(os.path.dirname(torch.__file__), "bin", "torch_shm_manager")
+        try:
+            proc = subprocess.Popen(
+                [manager],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except (PermissionError, OSError) as exc:
+            self.logger.warning("torch_shm_manager 无法启动 (%s)，DataLoader 改为单进程" % exc)
+            self._resolved_workers = 0
+            return 0
+        try:
+            proc.wait(timeout=0.2)
+        except subprocess.TimeoutExpired:
+            # 管理进程已驻留，说明共享内存可用；DataLoader 会再起自己的进程
+            proc.kill()
+            proc.wait()
+        self._resolved_workers = self.n_jobs
+        return self.n_jobs
+
     def train_epoch(self, data_loader):
         self.ALSTM_model.train()
 
@@ -227,18 +260,19 @@ class ALSTM(Model):
         else:
             raise ValueError("Unsupported reweighter type.")
 
+        num_workers = self._num_workers()
         train_loader = DataLoader(
             ConcatDataset(dl_train, wl_train),
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.n_jobs,
+            num_workers=num_workers,
             drop_last=True,
         )
         valid_loader = DataLoader(
             ConcatDataset(dl_valid, wl_valid),
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.n_jobs,
+            num_workers=num_workers,
             drop_last=True,
         )
 
@@ -290,7 +324,7 @@ class ALSTM(Model):
 
         dl_test = dataset.prepare(segment, col_set=["feature", "label"], data_key=DataHandlerLP.DK_I)
         dl_test.config(fillna_type="ffill+bfill")
-        test_loader = DataLoader(dl_test, batch_size=self.batch_size, num_workers=self.n_jobs)
+        test_loader = DataLoader(dl_test, batch_size=self.batch_size, num_workers=self._num_workers())
         self.ALSTM_model.eval()
         preds = []
 

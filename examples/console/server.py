@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import parse_qs, unquote, urlparse
 
+from ruamel.yaml import YAML
+
 CONSOLE_DIR = Path(__file__).absolute().resolve().parent  # examples/console
 EXAMPLES_DIR = CONSOLE_DIR.parent
 REPO_ROOT = EXAMPLES_DIR.parent
@@ -265,6 +267,7 @@ _SKIP_MODEL_DIRS = frozenset({"console", "__pycache__", "_rolling"})
 _MODEL_NOTES = {
     "TFT": "官方说明需要 GPU，且仅支持 Python 3.6–3.7，仍允许执行。",
 }
+# 只从文件名抽数据集；资金和持仓改从 YAML 正文计算，避免文件名和配置不一致
 _DATASET_TOKENS = ("early_stop", "Alpha360", "Alpha158", "L2Daily", "csi500", "multi_pass", "full")
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -518,11 +521,192 @@ def _resolve_official_yaml(model_id: str, yaml_name: str) -> Path:
     return path
 
 
-def _default_qrun_exp_name(model_id: str, yaml_name: str) -> str:
-    """官方单次训练的默认实验名：模型_数据集_日期。"""
-    dataset = _dataset_label(yaml_name)
-    stamp = datetime.now().strftime("%Y%m%d")
-    return f"{model_id}_{dataset}_{stamp}"
+def _load_workflow_conf(config_path: Path) -> Dict[str, Any]:
+    """读取 workflow YAML。锚点由 ruamel 展开；读失败时返回空 dict，名字仍能带上日期。"""
+    if not config_path.is_file():
+        return {}
+    yaml = YAML(typ="safe", pure=True)
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            data = yaml.load(f) or {}
+    except Exception:  # noqa: BLE001 — 坏 yaml 不应让控制台状态接口整体失败
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _account_tag(account: Any) -> Optional[str]:
+    """资金写成万：200000 → 20w。不能整除 10000 时保留原整数，避免四舍五入后对不上。"""
+    try:
+        amount = int(account)
+    except (TypeError, ValueError):
+        return None
+    if amount % 10000 == 0:
+        return f"{amount // 10000}w"
+    return str(amount)
+
+
+def _position_tag(topk: Any, n_drop: Any) -> Optional[str]:
+    """持仓标记 topk 与 n_drop，例如 10 和 1 → 10n1。缺任一则不编进名字。"""
+    try:
+        return f"{int(topk)}n{int(n_drop)}"
+    except (TypeError, ValueError):
+        return None
+
+
+def _name_stamp(now: Optional[datetime] = None) -> str:
+    """本地时间戳，接在实验名日期后面：YYYYMMDD_HH:mm。"""
+    current = now or datetime.now()
+    return current.strftime("%Y%m%d_%H:%M")
+
+
+# 与 _name_stamp 对应，只匹配默认名末尾，避免把资金/持仓段误当成时间
+_EXP_STAMP_RE = re.compile(r"_(\d{8}_\d{2}:\d{2})$")
+
+
+def _exp_name_prefix(default_exp_name: str) -> str:
+    """去掉末尾日期时分，得到同一配置下可对照的实验名前缀。"""
+    return _EXP_STAMP_RE.sub("", default_exp_name or "")
+
+
+def _latest_exp_for_prefix(prefix: str) -> Optional[str]:
+    """同一配置前缀下，MLflow 里最近一次实验名。没有则返回 None。"""
+    if not prefix or not MLRUNS_DIR.is_dir():
+        return None
+    needle = prefix + "_"
+    best_name = None
+    best_stamp = ""
+    for _exp_id, exp_dir in _iter_experiment_dirs(MLRUNS_DIR):
+        name = _read_meta_name(exp_dir)
+        if not name or not name.startswith(needle):
+            continue
+        stamp = name[len(needle) :]
+        # 前缀后必须恰好是日期时分，避免 h20 等更长名字被短前缀误匹配
+        if not re.fullmatch(r"\d{8}_\d{2}:\d{2}", stamp):
+            continue
+        if stamp > best_stamp:
+            best_stamp = stamp
+            best_name = name
+    return best_name
+
+
+def _train_profile(
+    model_id: str,
+    config_path: Path,
+    horizon: int,
+    *,
+    rolling: bool,
+    prefix: str = "",
+    exp_name: str = "",
+    now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """从当前 YAML 抽出资金、持仓、horizon，并生成默认实验名。
+
+    滚动训练保留已有窗口前缀；官方单次用「模型_handler」。
+    前缀里已经有的片段（如 10000w）不再拼接一次。horizon 为 1 时不写入名字。
+    """
+    conf = _load_workflow_conf(config_path)
+    task = conf.get("task") if isinstance(conf.get("task"), dict) else {}
+    dataset_kwargs = ((task.get("dataset") or {}).get("kwargs") or {}) if isinstance(task, dict) else {}
+    handler_node = dataset_kwargs.get("handler") if isinstance(dataset_kwargs, dict) else None
+    handler = ""
+    if isinstance(handler_node, dict):
+        handler = str(handler_node.get("class") or "").strip()
+    port = conf.get("port_analysis_config") if isinstance(conf.get("port_analysis_config"), dict) else {}
+    strategy = (port.get("strategy") or {}) if isinstance(port, dict) else {}
+    strategy_kwargs = strategy.get("kwargs") if isinstance(strategy, dict) else {}
+    if not isinstance(strategy_kwargs, dict):
+        strategy_kwargs = {}
+    backtest = port.get("backtest") if isinstance(port, dict) else {}
+    if not isinstance(backtest, dict):
+        backtest = {}
+    account = backtest.get("account")
+    topk = strategy_kwargs.get("topk")
+    n_drop = strategy_kwargs.get("n_drop")
+    try:
+        topk_i = int(topk) if topk is not None else None
+    except (TypeError, ValueError):
+        topk_i = None
+    try:
+        n_drop_i = int(n_drop) if n_drop is not None else None
+    except (TypeError, ValueError):
+        n_drop_i = None
+    try:
+        account_i = int(account) if account is not None else None
+    except (TypeError, ValueError):
+        account_i = None
+    account_tag = _account_tag(account_i)
+    position_tag = _position_tag(topk_i, n_drop_i)
+    horizon_i = horizon if isinstance(horizon, int) and horizon >= 1 else 1
+    horizon_tag = f"h{horizon_i}" if horizon_i != 1 else ""
+
+    if rolling and prefix:
+        base = prefix
+    elif handler:
+        base = f"{model_id}_{handler}"
+    else:
+        base = f"{model_id}_{_dataset_label(config_path.name)}"
+    seen = set(base.split("_"))
+    parts = [base]
+    for tag in (account_tag, position_tag, horizon_tag):
+        if tag and tag not in seen:
+            parts.append(tag)
+            seen.add(tag)
+    stamp = _name_stamp(now)
+    default_name = "_".join(parts + [stamp])
+    try:
+        yaml_rel = str(config_path.resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        yaml_rel = str(config_path)
+    generated = (now or datetime.now()).isoformat(timespec="seconds")
+    return {
+        "exp_name": exp_name or default_name,
+        "default_exp_name": default_name,
+        "model": model_id,
+        "yaml": yaml_rel,
+        "account": account_i,
+        "account_tag": account_tag,
+        "topk": topk_i,
+        "n_drop": n_drop_i,
+        "position_tag": position_tag,
+        "horizon": horizon_i,
+        "handler": handler,
+        "generated_at": generated,
+    }
+
+
+def _profile_summary(profile: Dict[str, Any]) -> str:
+    """历史列表上的一行摘要：资金、持仓，horizon 不是 1 时带上。"""
+    bits: List[str] = []
+    if profile.get("account_tag"):
+        bits.append(str(profile["account_tag"]))
+    if profile.get("topk") is not None:
+        bits.append(f"topk {profile['topk']}")
+    if profile.get("n_drop") is not None:
+        bits.append(f"n_drop {profile['n_drop']}")
+    horizon = profile.get("horizon")
+    if isinstance(horizon, int) and horizon != 1:
+        bits.append(f"h{horizon}")
+    return " · ".join(bits)
+
+
+def _write_train_profile(profile: Dict[str, Any]) -> Path:
+    """开训时落盘，之后按实验名查资金和持仓。实验名里的冒号保留，与页面显示一致。"""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    exp_name = str(profile.get("exp_name") or "").strip()
+    path = DATA_DIR / f"{exp_name}_train_profile.json"
+    path.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def _read_train_profile(exp_name: str) -> Optional[Dict[str, Any]]:
+    path = DATA_DIR / f"{exp_name}_train_profile.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _rolling_configs(model_id: Optional[str] = None) -> Dict[str, Path]:
@@ -788,6 +972,8 @@ def _list_results() -> List[Dict[str, Any]]:
         st = path.stat()
         name = path.name
         exp_name = name[: -len("_positions.json")] if name.endswith("_positions.json") else name
+        favorited = name in favorites
+        profile = _read_train_profile(exp_name)
         rows.append(
             {
                 "filename": name,
@@ -798,7 +984,8 @@ def _list_results() -> List[Dict[str, Any]]:
                 "mtime_ts": st.st_mtime,
                 "size_bytes": st.st_size,
                 "size_mb": round(st.st_size / (1024 * 1024), 2),
-                "favorited": name in favorites,
+                "favorited": favorited,
+                "profile_summary": _profile_summary(profile) if profile else "",
             }
         )
 
@@ -809,6 +996,8 @@ def _list_results() -> List[Dict[str, Any]]:
         exp_name = (
             name[: -len("_positions_view.html")] if name.endswith("_positions_view.html") else name
         )
+        favorited = name in favorites
+        profile = _read_train_profile(exp_name)
         rows.append(
             {
                 "filename": name,
@@ -819,7 +1008,8 @@ def _list_results() -> List[Dict[str, Any]]:
                 "mtime_ts": st.st_mtime,
                 "size_bytes": st.st_size,
                 "size_mb": round(st.st_size / (1024 * 1024), 2),
-                "favorited": name in favorites,
+                "favorited": favorited,
+                "profile_summary": _profile_summary(profile) if profile else "",
             }
         )
 
@@ -1341,8 +1531,12 @@ def _status_payload(
     config_key: str = "7y1y",
     model: Optional[str] = None,
     yaml_name: Optional[str] = None,
+    horizon_override: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """状态条展示的结束日跟当前训练目标 YAML：滚动用 config，官方模型用 model+yaml。"""
+    """状态条展示的结束日跟当前训练目标 YAML：滚动用 config，官方模型用 model+yaml。
+
+    horizon_override 只在滚动训练、且页面改过 horizon 时传入；否则用 YAML。
+    """
     model_id = (model or "").strip() or DEFAULT_ROLLING_MODEL_ID
     if model_id in ROLLING_MODELS:
         configs = _rolling_configs(model_id)
@@ -1356,6 +1550,11 @@ def _status_payload(
         exp_prefixes_out = dict(ROLLING_MODELS[model_id].get("exp_prefixes") or {})
         horizon_fallback = int(ROLLING_MODELS[model_id].get("default_horizon") or 1)
         horizon_out = _yaml_horizon(config_path, horizon_fallback)
+        if horizon_override is not None and horizon_override >= 1:
+            horizon_out = horizon_override
+        prefixes = exp_prefixes_out
+        name_prefix = prefixes.get(resolved_key) or ROLLING_MODELS[model_id]["exp_prefix"]
+        rolling = True
     else:
         config_path = _resolve_official_yaml(model_id, yaml_name or "")
         resolved_key = None
@@ -1365,7 +1564,16 @@ def _status_payload(
             for k, v in _rolling_configs(DEFAULT_ROLLING_MODEL_ID).items()
         }
         exp_prefixes_out = {}
-        horizon_out = 1
+        horizon_out = _yaml_horizon(config_path, 1)
+        name_prefix = ""
+        rolling = False
+    profile = _train_profile(
+        model_id,
+        config_path,
+        horizon_out,
+        rolling=rolling,
+        prefix=name_prefix,
+    )
     cal = _calendar_bounds()
     active = _get_active()
     return {
@@ -1379,6 +1587,10 @@ def _status_payload(
         "yaml_ends": _parse_yaml_ends(config_path),
         "configs": configs_out,
         "exp_prefixes": exp_prefixes_out,
+        "default_exp_name": profile["default_exp_name"],
+        # 刷新页面时导出应指向已存在的实验，而不是刚算出来、尚未训练的新时分
+        "latest_exp_name": _latest_exp_for_prefix(_exp_name_prefix(profile["default_exp_name"])),
+        "train_profile": profile,
         "active_job_id": active,
         "active_job": _job_snapshot(active) if active else None,
         "python": sys.executable,
@@ -1404,11 +1616,23 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             default_key = next(iter(configs.keys()))
             config_key = (qs.get("config") or [default_key])[0]
             yaml_name = (qs.get("yaml") or [None])[0]
+            horizon_raw = (qs.get("horizon") or [None])[0]
+            horizon_override = None
+            if horizon_raw not in (None, ""):
+                try:
+                    horizon_override = int(horizon_raw)
+                except (TypeError, ValueError):
+                    horizon_override = None
             try:
                 _json_response(
                     self,
                     200,
-                    _status_payload(config_key, model=model, yaml_name=yaml_name),
+                    _status_payload(
+                        config_key,
+                        model=model,
+                        yaml_name=yaml_name,
+                        horizon_override=horizon_override,
+                    ),
                 )
             except Exception as exc:  # noqa: BLE001
                 _json_response(self, 400, {"error": str(exc)})
@@ -1596,13 +1820,20 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
                     spec = ROLLING_MODELS[model]
                     config_key = body.get("config") or body.get("conf_path")
                     config_path = _resolve_config(config_key, model)
-                    if not exp_name:
-                        stamp = datetime.now().strftime("%Y%m%d")
-                        # 未传实验名时跟当前 config key 的前缀，避免 Alpha360 写成 Alpha158
-                        prefixes = spec.get("exp_prefixes") or {}
-                        prefix = prefixes.get(config_key) or spec["exp_prefix"]
-                        exp_name = f"{prefix}_{stamp}"
+                    prefixes = spec.get("exp_prefixes") or {}
+                    prefix = prefixes.get(config_key) or spec["exp_prefix"]
                     horizon = int(body.get("horizon") or spec["default_horizon"])
+                    profile = _train_profile(
+                        model,
+                        config_path,
+                        horizon,
+                        rolling=True,
+                        prefix=prefix,
+                    )
+                    if not exp_name:
+                        exp_name = profile["default_exp_name"]
+                    profile["exp_name"] = exp_name
+                    _write_train_profile(profile)
                     conf_rel = config_path.relative_to(REPO_ROOT)
                     cmd = [
                         sys.executable,
@@ -1617,8 +1848,17 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
                     # 官方单次：不改 YAML，交给 qrun
                     yaml_name = str(body.get("yaml") or "").strip()
                     config_path = _resolve_official_yaml(model, yaml_name)
+                    horizon = _yaml_horizon(config_path, 1)
+                    profile = _train_profile(
+                        model,
+                        config_path,
+                        horizon,
+                        rolling=False,
+                    )
                     if not exp_name:
-                        exp_name = _default_qrun_exp_name(model, yaml_name)
+                        exp_name = profile["default_exp_name"]
+                    profile["exp_name"] = exp_name
+                    _write_train_profile(profile)
                     conf_rel = config_path.relative_to(REPO_ROOT)
                     cmd = [
                         sys.executable,

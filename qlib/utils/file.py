@@ -13,6 +13,37 @@ from qlib.log import get_module_logger
 log = get_module_logger("utils.file")
 
 
+def _temp_path_candidates() -> list:
+    """未指定路径时的临时目录顺序。靠前的目录能写就用它。"""
+    return [
+        os.path.expanduser("~/tmp"),
+        tempfile.gettempdir(),
+        os.path.join(os.getcwd(), ".qlib_tmp"),
+    ]
+
+
+def _create_unnamed_temp(return_dir: bool) -> str:
+    """在可写目录中新建临时文件或目录。
+
+    部分启动方式对 ~/tmp 返回 EPERM。只在 PermissionError 时换下一个目录，
+    磁盘满等其它 OSError 仍抛出。调用方传入的具体路径不走这里。
+    """
+    last_error = None
+    for directory in _temp_path_candidates():
+        try:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            if return_dir:
+                return tempfile.mkdtemp(dir=directory)
+            fd, created = tempfile.mkstemp(dir=directory)
+            # mkstemp 会占着文件描述符；调用方只用路径，这里关掉避免泄漏
+            os.close(fd)
+            return created
+        except PermissionError as exc:
+            last_error = exc
+    raise last_error
+
+
 def get_or_create_path(path: Optional[Text] = None, return_dir: bool = False):
     """Create or get a file or directory given the path and return_dir.
 
@@ -30,13 +61,7 @@ def get_or_create_path(path: Optional[Text] = None, return_dir: bool = False):
             if not os.path.exists(xpath):
                 os.makedirs(xpath)
     else:
-        temp_dir = os.path.expanduser("~/tmp")
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-        if return_dir:
-            _, path = tempfile.mkdtemp(dir=temp_dir)
-        else:
-            _, path = tempfile.mkstemp(dir=temp_dir)
+        path = _create_unnamed_temp(return_dir)
     return path
 
 
